@@ -1,0 +1,15 @@
+{
+  "functions": [{ "source": "functions", "codebase": "default", "runtime": "nodejs22", "predeploy": ["npm --prefix functions run build"] }],
+  "hosting": {
+    "public": "apps/web/out",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "cleanUrls": true,
+    "trailingSlash": false,
+    "rewrites": [{ "source": "/api/**", "function": { "functionId": "api", "region": "us-central1", "pinTag": true } }, { "source": "**", "destination": "/index.html" }],
+    "headers": [{ "source": "**", "headers": [{ "key": "X-Content-Type-Options", "value": "nosniff" }, { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }, { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(self)" }, { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" }] }]
+  },
+  "firestore": { "rules": "firestore.rules", "indexes": "firestore.indexes.json" },
+  "storage": { "rules": "storage.rules" },
+  "emulators": { "auth": { "port": 9099 }, "functions": { "port": 5001 }, "firestore": { "port": 8080 }, "hosting": { "port": 5000 }, "storage": { "port": 9199 }, "ui": { "enabled": true } }
+}
+

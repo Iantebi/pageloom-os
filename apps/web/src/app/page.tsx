@@ -1,0 +1,2 @@
+"use client";import{Dashboard}from"@/components/dashboard";import{OperationsOverview}from"@/components/operations-overview";import{SignIn}from"@/components/sign-in";import{useAuth}from"@/lib/auth";
+export default function Home(){const{user,loading}=useAuth();if(loading)return <main className="grid min-h-screen place-items-center bg-[#f4f5ef]"><div className="h-8 w-8 animate-spin rounded-full border-2 border-[#12140f] border-t-transparent"/></main>;return user?<><Dashboard/><OperationsOverview/></>:<SignIn/>}

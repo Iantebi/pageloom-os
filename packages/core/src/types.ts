@@ -1,0 +1,24 @@
+import { z } from "zod";
+
+export const agentIdSchema = z.enum(["ceo","sales","client-journey","project-manager","website-architect","ui-ux-designer","frontend-builder","backend","firebase","seo","content","brand","media","qa","deployment","maintenance","support","marketing","finance","analytics","automation","crm"]);
+export type AgentId = z.infer<typeof agentIdSchema>;
+export const localeSchema = z.enum(["en","he"]); export type Locale = z.infer<typeof localeSchema>;
+export const taskStatusSchema = z.enum(["queued","running","awaiting_approval","completed","failed","cancelled"]); export type TaskStatus=z.infer<typeof taskStatusSchema>;
+export const prioritySchema=z.enum(["critical","high","normal","low"]); export type Priority=z.infer<typeof prioritySchema>;
+export const providerSchema=z.enum(["openai","gemini"]); export type ModelProvider=z.infer<typeof providerSchema>;
+export const journeyStageSchema=z.enum(["lead","ceo_call","deal_closed","questionnaire","assets","planning","ui_design","development","quality_assurance","customer_approval","deployment","support","maintenance"]);export type JourneyStage=z.infer<typeof journeyStageSchema>;
+
+export const assignJobSchema=z.object({organizationId:z.string().min(1),projectId:z.string().min(1).optional(),agentId:agentIdSchema,objective:z.string().min(10).max(20000),locale:localeSchema.default("en"),priority:prioritySchema.default("normal"),context:z.record(z.unknown()).default({}),constraints:z.array(z.string()).default([])});
+export type AssignJobInput=z.infer<typeof assignJobSchema>;
+export interface AgentDefinition {id:AgentId;name:string;purpose:string;responsibilities:readonly string[];inputs:readonly string[];outputs:readonly string[];workflow:readonly string[];systemPrompt:string;tools:readonly string[];preferredProvider:ModelProvider;fallbackProvider:ModelProvider;approvalRequiredFor:readonly string[];}
+export interface Task {id:string;organizationId:string;projectId?:string;agentId:AgentId;objective:string;locale:Locale;priority:Priority;status:TaskStatus;context:Record<string,unknown>;constraints:string[];createdBy:string;createdAt:string;updatedAt:string;startedAt?:string;completedAt?:string;attempt:number;model?:string;provider?:ModelProvider;output?:AgentOutput;error?:string;}
+export const actionRequestSchema=z.object({tool:z.string().min(1),operation:z.string().min(1),parameters:z.record(z.unknown()),reason:z.string(),requiresApproval:z.boolean(),idempotencyKey:z.string().min(8)});
+export type ActionRequest=z.infer<typeof actionRequestSchema>;
+export const agentOutputSchema=z.object({summary:z.string(),message:z.string(),deliverables:z.array(z.object({type:z.string(),title:z.string(),content:z.string(),files:z.array(z.object({path:z.string(),content:z.string()})).default([])})),decisions:z.array(z.object({decision:z.string(),rationale:z.string()})),risks:z.array(z.object({risk:z.string(),severity:z.enum(["low","medium","high"]),mitigation:z.string()})),delegatedTasks:z.array(z.object({agentId:agentIdSchema,objective:z.string(),priority:prioritySchema,context:z.record(z.unknown()).default({})})),actionRequests:z.array(actionRequestSchema)});
+export type AgentOutput=z.infer<typeof agentOutputSchema>;
+export interface Approval {id:string;organizationId:string;taskId:string;tool:string;operation:string;parameters:Record<string,unknown>;reason:string;status:"pending"|"approved"|"rejected"|"executed"|"failed";requestedBy:AgentId;requestedAt:string;decidedBy?:string;decidedAt?:string;executionResult?:unknown;}
+export interface Project {id:string;organizationId:string;name:string;clientName:string;status:"planning"|"active"|"review"|"completed"|"on_hold";journeyStage:JourneyStage;locale:Locale;progress:number;budget:number;revenue:number;cost:number;dealClosedAt?:string;customerApprovedAt?:string;deployedAt?:string;deadline?:string;createdAt:string;updatedAt:string;}
+export interface UsageRecord {id:string;organizationId:string;taskId:string;agentId:AgentId;provider:ModelProvider;model:string;inputTokens:number;outputTokens:number;estimatedCostUsd:number;latencyMs:number;createdAt:string;}
+export interface DashboardMetrics {activeAgents:number;queuedTasks:number;pendingApprovals:number;activeProjects:number;revenue:number;costs:number;grossProfit:number;aiCostUsd:number;apiCalls:number;tokenUsage:number;analytics:{sessions:number;conversions:number;organicClicks:number};communications?:{drafts:number};deployments?:{total:number;activeBuilds:number};crm?:{leads:number;openDeals:number;customers:number};}
+export interface ChatMessage {id:string;organizationId:string;chatId:string;agentId:AgentId;role:"user"|"agent";content:string;locale:Locale;createdBy:string;createdAt:string;taskId?:string;}
+export interface ModelRoute {provider:ModelProvider;model:string;reason:string;maxOutputTokens:number;estimatedMaxCostUsd:number;}

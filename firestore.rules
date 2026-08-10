@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function member(orgId) { return signedIn() && exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)); }
+    function role(orgId) { return get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role; }
+    function operator(orgId) { return member(orgId) && role(orgId) in ['owner', 'admin', 'operator']; }
+    match /organizations/{orgId} {
+      allow read: if member(orgId); allow write: if false;
+      match /members/{uid} { allow read: if member(orgId); allow write: if false; }
+      match /{collection}/{docId} {
+        allow read: if member(orgId);
+        allow write: if false;
+      }
+      match /chats/{chatId}/messages/{messageId} { allow read: if member(orgId); allow write: if false; }
+      match /projects/{projectId}/artifacts/{artifactId} { allow read: if member(orgId); allow write: if false; }
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}
+

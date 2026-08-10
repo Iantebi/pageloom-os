@@ -1,0 +1,22 @@
+{
+  "name": "pageloom-os",
+  "version": "0.3.0",
+  "private": true,
+  "description": "AI-native website agency operating system",
+  "workspaces": ["apps/*", "functions", "packages/*"],
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "npm run dev --workspace=@pageloom/web",
+    "dev:firebase": "firebase emulators:start",
+    "build": "npm run build --workspace=@pageloom/core && npm run build --workspace=@pageloom/functions && npm run build --workspace=@pageloom/web",
+    "typecheck": "npm run build --workspace=@pageloom/core && npm run typecheck --workspace=@pageloom/functions && npm run typecheck --workspace=@pageloom/web",
+    "test": "npm run build --workspace=@pageloom/core && npm run test --workspace=@pageloom/core && npm run test --workspace=@pageloom/functions",
+    "lint": "npm run lint --workspaces --if-present",
+    "check": "npm run typecheck && npm test && npm run build",
+    "deploy": "firebase deploy --only hosting,functions,firestore,storage"
+  },
+  "devDependencies": {
+    "firebase-tools": "^14.0.0",
+    "typescript": "^5.9.0"
+  }
+}

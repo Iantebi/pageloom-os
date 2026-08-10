@@ -1,0 +1,3 @@
+import type { AgentDefinition } from "../types.js";
+export const defineAgent=(value:AgentDefinition):AgentDefinition=>Object.freeze({...value,preferredProvider:"gemini",fallbackProvider:"openai"});
+export function buildPrompt(agent:AgentDefinition,input:{objective:string;locale:"en"|"he";context:Record<string,unknown>;constraints:string[]}):string{return `${agent.systemPrompt}\n\nTASK\nObjective: ${input.objective}\nLocale: ${input.locale}\nContext: ${JSON.stringify(input.context)}\nConstraints: ${JSON.stringify(input.constraints)}\n\nReturn only the required structured result. Use fluent Hebrew and RTL-friendly structure for he; use English for en. Never claim a tool action succeeded unless a verified tool result is present.`;}
