@@ -2,6 +2,8 @@ node_modules/
 .next/
 out/
 lib/
+!apps/web/src/lib/
+!apps/web/src/lib/**
 dist/
 coverage/
 .firebase/
