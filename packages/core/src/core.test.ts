@@ -24,4 +24,8 @@ describe("AI-native core", () => {
     expect(routeModel({...base,providerHealth:{openai:true,gemini:true}})).toMatchObject({provider:"gemini",model:"gemini-pro-latest"});
     expect(routeModel({...base,providerHealth:{openai:true,gemini:false}})).toMatchObject({provider:"openai",model:"gpt-5.6-sol"});
   });
+  it("refuses model execution when its maximum cost exceeds the remaining budget",()=>{
+    const base={agent:agents[5]!,priority:"critical" as const,requiresCode:true,requiresGoogleContext:false,budgetRemainingUsd:3,providerHealth:{openai:true,gemini:true}};
+    expect(()=>routeModel(base)).toThrow(/budget exhausted/);
+  });
 });

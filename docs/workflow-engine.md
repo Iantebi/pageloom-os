@@ -10,6 +10,8 @@ The workflow engine is the only component authorized to create project-agent tas
 4. One Firestore transaction updates the workflow instance and project projection, appends history and logs, creates notifications, and queues the required agents.
 5. Completed stage tasks emit the next business event only after every required agent for the same workflow attempt has completed.
 
+The completion event uses a deterministic key derived from project, stage, attempt, and outcome. Concurrent final task updates therefore converge on one event document, and Firebase retry delivery cannot advance a stage twice.
+
 Duplicate event delivery is safe because the event document ID is its idempotency key and processed events are terminal.
 
 ## Storage model
