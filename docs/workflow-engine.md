@@ -29,6 +29,7 @@ Duplicate event delivery is safe because the event document ID is its idempotenc
 - `ApprovalRejected` rolls back to the responsible stage supplied by the approval decision, defaulting safely to UI Design.
 - `AgentTaskFailed` and `StageTimedOut` retry the current stage using its configured attempt limit and backoff.
 - An exhausted retry budget blocks the workflow and notifies the CEO. A human can emit `ManualRetryRequested` after resolving the cause.
+- Stale or failed agent tasks are recovered by replacement, never by changing the original document back to queued. This preserves Firestore trigger semantics and an immutable attempt lineage. Exhausted tasks enter the dead-letter queue for owner review.
 
 ## Security and authority
 

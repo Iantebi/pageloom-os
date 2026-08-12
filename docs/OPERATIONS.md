@@ -30,6 +30,10 @@ Track orchestration success and latency, queue age, model/provider fallback, tok
 
 The authenticated `GET /api/operations/{organizationId}/health` endpoint produces a deterministic health score and signal counts for failed or stale tasks, blocked or timed-out workflows, overdue approvals, and usage without configured pricing. Only owners, administrators, and operators may read it.
 
+## Queue recovery and dead letters
+
+`recoverAgentQueue` runs every five minutes. A running task with a lease older than 15 minutes, a queued task unclaimed for 30 minutes, or a failed task is atomically retired and replaced by a new task document so the Firestore create trigger executes again. Recovery preserves the original task, project, stage, constraints, and lineage. Once `maxAttempts` is exhausted, the task is cancelled and copied to `deadLetters/{taskId}`. Only the organization owner can explicitly retry an open dead letter through `POST /api/operations/{organizationId}/dead-letters/{deadLetterId}/retry`; this creates a fresh task and retains the incident record.
+
 ## AI budget enforcement
 
 Set `aiBudgetUsd` on each organization. Before model inference, the orchestrator subtracts recorded usage and conservative reservations for concurrently running tasks. Work that cannot fit inside the remaining ceiling is moved to `awaiting_approval` with `approvalReason: ai_budget`; it is never silently executed. Model routing also rejects providers whose maximum estimated request cost exceeds the remaining budget. Configure every active model rate card so recorded spend is accurate.

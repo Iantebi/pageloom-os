@@ -5,5 +5,6 @@ export * from "./client-management.js";
 export * from "./workflow.js";
 export * from "./budget.js";
 export * from "./operations-health.js";
+export * from "./queue-recovery.js";
 export * from "./agents/definitions.js";
 export * from "./agents/factory.js";
