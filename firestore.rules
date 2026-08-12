@@ -5,6 +5,9 @@ service cloud.firestore {
     function member(orgId) { return signedIn() && exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)); }
     function role(orgId) { return get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role; }
     function staff(orgId) { return member(orgId) && role(orgId) in ['owner','admin','operator','member']; }
+    function client(orgId) { return member(orgId) && role(orgId) == 'client'; }
+    function clientCustomerId(orgId) { return get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.customerId; }
+    function clientProject(orgId, projectId) { return client(orgId) && get(/databases/$(database)/documents/organizations/$(orgId)/projects/$(projectId)).data.customerId == clientCustomerId(orgId); }
     match /organizations/{orgId} {
       allow read: if staff(orgId); allow write: if false;
       match /members/{uid} { allow read: if staff(orgId); allow write: if false; }
@@ -17,8 +20,9 @@ service cloud.firestore {
       match /customers/{customerId}/documents/{documentId} { allow read: if staff(orgId); allow write: if false; }
       match /chats/{chatId}/messages/{messageId} { allow read: if staff(orgId); allow write: if false; }
       match /projects/{projectId}/artifacts/{artifactId} { allow read: if staff(orgId); allow write: if false; }
-      match /projects/{projectId}/comments/{commentId} { allow read: if staff(orgId); allow write: if false; }
-      match /projects/{projectId}/questionnaires/{questionnaireId} { allow read: if staff(orgId); allow write: if false; }
+      match /projects/{projectId} { allow read: if staff(orgId) || clientProject(orgId, projectId); allow write: if false; }
+      match /projects/{projectId}/comments/{commentId} { allow read: if staff(orgId) || clientProject(orgId, projectId); allow write: if false; }
+      match /projects/{projectId}/questionnaires/{questionnaireId} { allow read: if staff(orgId) || clientProject(orgId, projectId); allow write: if false; }
     }
     match /{document=**} { allow read, write: if false; }
   }

@@ -77,7 +77,7 @@ export const workflowDefinitions:Record<WorkflowStage,WorkflowStageDefinition>={
   ceo_approval:stage("ceo_approval",["qaPassed"],["CEOApproved","CEORejected"],[],"ceo","approval",1440,10080,1,0,["ceo"]),
   production_deployment:stage("production_deployment",["ceoApproved"],["ProductionDeploymentCompleted"],["deployment","firebase"],"ceo","automatic",180,720,3,30,["ceo","project_manager"]),
   customer_review:stage("customer_review",["productionDeployed"],["CustomerApproved","CustomerRequestedRevision"],[],"customer","customer_action",1440,10080,5,240,["ceo","project_manager","customer"]),
-  revision:{...stage("revision",["productionDeployed"],["RevisionCompleted"],["project-manager","ui-ux-designer","content","frontend-builder","qa"],"none","automatic",720,4320,5,120),rollbackStage:"revision"},
+  revision:{...stage("revision",[],["RevisionCompleted"],["project-manager","ui-ux-designer","content","frontend-builder","qa"],"none","automatic",720,4320,5,120),rollbackStage:"revision"},
   final_deployment:stage("final_deployment",["customerApproved"],["FinalDeploymentApproved","FinalDeploymentCompleted"],["deployment","firebase"],"ceo","approval",180,720,3,30,["ceo","project_manager"]),
   completed:stage("completed",["finalDeploymentComplete"],["ProjectCompleted"],["project-manager","maintenance","analytics","support"],"none","automatic",30,1440,3,60,["ceo","project_manager","customer"])
 };
@@ -104,7 +104,7 @@ export const eventTransitions:Partial<Record<WorkflowEventType,{from:WorkflowSta
   QACompleted:{from:["qa"],to:"ceo_approval"},
   QAFailed:{from:["qa"],to:"development"},
   CEOApproved:{from:["ceo_approval"],to:"production_deployment"},
-  CEORejected:{from:["ceo_approval"],to:"revision"},
+  CEORejected:{from:["ceo_approval","final_deployment"],to:"revision"},
   ProductionDeploymentCompleted:{from:["production_deployment"],to:"customer_review"},
   CustomerApproved:{from:["customer_review"],to:"final_deployment"},
   CustomerRequestedRevision:{from:["customer_review"],to:"revision"},
