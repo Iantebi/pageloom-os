@@ -39,3 +39,11 @@ The CEO dashboard refreshes this report every 30 seconds and exposes the recover
 ## AI budget enforcement
 
 Set `aiBudgetUsd` on each organization. Before model inference, the orchestrator subtracts recorded usage and conservative reservations for concurrently running tasks. Work that cannot fit inside the remaining ceiling is moved to `awaiting_approval` with `approvalReason: ai_budget`; it is never silently executed. Model routing also rejects providers whose maximum estimated request cost exceeds the remaining budget. Configure every active model rate card so recorded spend is accurate.
+
+## Disaster recovery
+
+Configure `PAGELOOM_BACKUP_BUCKET` as a dedicated, versioned Cloud Storage bucket with uniform access, a retention policy, and a lifecycle transition to colder storage. Grant the Functions runtime service account only `roles/datastore.importExportAdmin` on Firestore and object-creation access on that bucket. `dailyFirestoreBackup` starts a managed Firestore export at 02:30 Asia/Jerusalem and records the long-running operation under `systemOperations/backups/runs`. Missing configuration and failed export requests are recorded explicitly; they never report a false success.
+
+Production targets are a 24-hour recovery point and a four-hour recovery time. Once per quarter, restore the latest export into an isolated recovery project, verify organization, membership, project, workflow, task, approval, activity, and usage counts, run tenant-isolation tests, and document the measured recovery time. Never test a restore over the production database. Authentication users and Secret Manager values are outside Firestore exports: retain separately controlled identity exports where supported, keep a secret inventory (not secret values), and validate documented rotation/recreation procedures during the drill.
+
+Rollback application releases by selecting the previous known-good Firebase Hosting release and the corresponding source commit. Functions must remain backward compatible with stored documents during rollback; if a data migration is required, ship an additive migration and a separately reviewed reverse procedure before deployment.
