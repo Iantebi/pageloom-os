@@ -1,4 +1,3 @@
-import { google } from "googleapis";
 import { db } from "./firebase.js";
 import { params } from "./config.js";
 import { operationalLog } from "./observability.js";
@@ -15,6 +14,7 @@ export async function exportFirestoreBackup(): Promise<void> {
     return;
   }
   const outputUriPrefix = backupPrefix(bucket);
+  const { google } = await import("googleapis");
   const auth = new google.auth.GoogleAuth({ scopes: ["https://www.googleapis.com/auth/datastore", "https://www.googleapis.com/auth/cloud-platform"] });
   const token = await auth.getAccessToken();
   if (!token) throw new Error("Unable to acquire a Google access token for backup");
