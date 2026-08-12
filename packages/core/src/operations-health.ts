@@ -1,0 +1,8 @@
+export type HealthInput={nowMs:number;tasks:{status?:string;createdAt?:string;updatedAt?:string}[];workflows:{status?:string;timeoutAt?:string}[];approvals:{status?:string;requestedAt?:string}[];usage:{pricingStatus?:string}[]};
+export type HealthReport={status:"healthy"|"degraded"|"critical";score:number;signals:{failedTasks:number;staleQueuedTasks:number;blockedWorkflows:number;timedOutWorkflows:number;overdueApprovals:number;unpricedUsage:number}};
+const age=(now:number,value?:string)=>value?now-Date.parse(value):0;
+export function calculateOperationsHealth(input:HealthInput):HealthReport{
+  const signals={failedTasks:input.tasks.filter(item=>item.status==="failed").length,staleQueuedTasks:input.tasks.filter(item=>item.status==="queued"&&age(input.nowMs,item.createdAt??item.updatedAt)>30*60_000).length,blockedWorkflows:input.workflows.filter(item=>item.status==="blocked").length,timedOutWorkflows:input.workflows.filter(item=>["active","retry_scheduled"].includes(String(item.status))&&Boolean(item.timeoutAt)&&Date.parse(item.timeoutAt!)<=input.nowMs).length,overdueApprovals:input.approvals.filter(item=>item.status==="pending"&&age(input.nowMs,item.requestedAt)>24*60*60_000).length,unpricedUsage:input.usage.filter(item=>item.pricingStatus!=="configured").length};
+  const penalty=signals.failedTasks*12+signals.staleQueuedTasks*8+signals.blockedWorkflows*18+signals.timedOutWorkflows*20+signals.overdueApprovals*5+signals.unpricedUsage*2,score=Math.max(0,100-penalty),status=signals.timedOutWorkflows||signals.blockedWorkflows||signals.failedTasks>2?"critical":score<90?"degraded":"healthy";
+  return{status,score,signals};
+}

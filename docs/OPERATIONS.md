@@ -28,6 +28,8 @@ Disable the affected connector secret or function first, preserve activity/audit
 
 Track orchestration success and latency, queue age, model/provider fallback, token and API cost, task retry/dead-letter rate, approval wait time, integration availability, deployment health, project margin, conversion, and recurring revenue.
 
+The authenticated `GET /api/operations/{organizationId}/health` endpoint produces a deterministic health score and signal counts for failed or stale tasks, blocked or timed-out workflows, overdue approvals, and usage without configured pricing. Only owners, administrators, and operators may read it.
+
 ## AI budget enforcement
 
 Set `aiBudgetUsd` on each organization. Before model inference, the orchestrator subtracts recorded usage and conservative reservations for concurrently running tasks. Work that cannot fit inside the remaining ceiling is moved to `awaiting_approval` with `approvalReason: ai_budget`; it is never silently executed. Model routing also rejects providers whose maximum estimated request cost exceeds the remaining budget. Configure every active model rate card so recorded spend is accurate.
