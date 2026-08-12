@@ -19,6 +19,7 @@ For Workspace delegation, set `GOOGLE_WORKSPACE_SERVICE_ACCOUNT_JSON` and `GOOGL
 - A reviewer validates agent prompts, tool grants, approval boundaries, rate cards, budgets, and data retention.
 - Staging verifies provider fallback, task retry/idempotency, webhook replay, Hebrew RTL, accessibility, and rollback.
 - Production has alerting for task failure, queue age, approval latency, auth failures, connector errors, model spend, API usage, gross margin, and revenue anomalies.
+- Storage paths are part of the tenant boundary. CRM documents require staff membership or an exact client `customerId` match. Questionnaire files include `projectId` and require staff membership or access to that exact project. Changes to either path convention must update the UI, API prefix validation, rules, and isolation tests in the same release.
 
 ## Incident response
 
