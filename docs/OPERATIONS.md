@@ -30,6 +30,8 @@ Track orchestration success and latency, queue age, model/provider fallback, tok
 
 The authenticated `GET /api/operations/{organizationId}/health` endpoint produces a deterministic health score and signal counts for failed or stale tasks, blocked or timed-out workflows, overdue approvals, and usage without configured pricing. Only owners, administrators, and operators may read it.
 
+The CEO dashboard refreshes this report every 30 seconds and exposes the recovery queue beside it. Staff can inspect exhausted work, while only the organization owner can request a replay. Client memberships never load either operational surface.
+
 ## Queue recovery and dead letters
 
 `recoverAgentQueue` runs every five minutes. A running task with a lease older than 15 minutes, a queued task unclaimed for 30 minutes, or a failed task is atomically retired and replaced by a new task document so the Firestore create trigger executes again. Recovery preserves the original task, project, stage, constraints, and lineage. Once `maxAttempts` is exhausted, the task is cancelled and copied to `deadLetters/{taskId}`. Only the organization owner can explicitly retry an open dead letter through `POST /api/operations/{organizationId}/dead-letters/{deadLetterId}/retry`; this creates a fresh task and retains the incident record.
