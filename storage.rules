@@ -2,9 +2,12 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     function member(orgId) { return request.auth != null && firestore.exists(/databases/(default)/documents/organizations/$(orgId)/members/$(request.auth.uid)); }
+    function membership(orgId) { return firestore.get(/databases/(default)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data; }
+    function staff(orgId) { return member(orgId) && membership(orgId).role in ['owner','admin','operator','member']; }
+    function clientProject(orgId, projectId) { return member(orgId) && membership(orgId).role == 'client' && firestore.get(/databases/(default)/documents/organizations/$(orgId)/projects/$(projectId)).data.customerId == membership(orgId).customerId; }
     function safeUpload(orgId, userId) { return member(orgId) && request.auth.uid == userId && request.resource.size < 25 * 1024 * 1024 && request.resource.contentType.matches('(image/.*|application/pdf|text/.*|application/zip|application/vnd.*)'); }
     match /organizations/{orgId}/artifacts/{allPaths=**} { allow read: if member(orgId); allow write: if false; }
-    match /organizations/{orgId}/uploads/{userId}/{allPaths=**} { allow read: if member(orgId); allow write: if safeUpload(orgId,userId); }
+    match /organizations/{orgId}/uploads/{userId}/{projectId}/{allPaths=**} { allow read: if staff(orgId) || clientProject(orgId,projectId); allow write: if safeUpload(orgId,userId) && (staff(orgId) || clientProject(orgId,projectId)); }
     match /organizations/{orgId}/customers/{customerId}/{userId}/{allPaths=**} { allow read: if member(orgId); allow write: if safeUpload(orgId,userId); }
     match /organizations/{orgId}/questionnaires/{questionnaireId}/{fieldId}/{userId}/{allPaths=**} { allow read: if member(orgId); allow write: if safeUpload(orgId,userId); }
     match /{allPaths=**} { allow read, write: if false; }
