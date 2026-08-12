@@ -4,20 +4,30 @@
   "private": true,
   "type": "module",
   "main": "lib/index.js",
-  "engines": { "node": "22" },
-  "scripts": { "build": "tsc -p tsconfig.json", "typecheck": "tsc -p tsconfig.json --noEmit", "test": "vitest run" },
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepare:vendor": "node scripts/prepare-core-vendor.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
   "dependencies": {
     "@google-cloud/cloudbuild": "^5.1.0",
     "@google/genai": "^1.30.0",
-    "@pageloom/core": "0.3.0",
+    "@pageloom/core": "file:vendor/core",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
-    "firebase-admin": "^14.2.0",
+    "firebase-admin": "^13.0.0",
     "firebase-functions": "^6.4.0",
     "googleapis": "^160.0.0",
     "openai": "^5.23.0",
     "stripe": "^18.5.0",
     "zod": "^3.25.76"
   },
-  "devDependencies": { "@types/express": "^5.0.3", "vitest": "^3.2.4" }
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "vitest": "^3.2.4"
+  }
 }

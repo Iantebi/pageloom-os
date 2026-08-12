@@ -21,7 +21,7 @@ describe("AI-native core", () => {
 
   it("uses Gemini 2.5 Pro first and OpenAI GPT only as fallback", () => {
     const base={agent:agents[5]!,priority:"critical" as const,requiresCode:true,requiresGoogleContext:false,budgetRemainingUsd:10};
-    expect(routeModel({...base,providerHealth:{openai:true,gemini:true}})).toMatchObject({provider:"gemini",model:"gemini-2.5-pro"});
+    expect(routeModel({...base,providerHealth:{openai:true,gemini:true}})).toMatchObject({provider:"gemini",model:"gemini-pro-latest"});
     expect(routeModel({...base,providerHealth:{openai:true,gemini:false}})).toMatchObject({provider:"openai",model:"gpt-5.6-sol"});
   });
 });

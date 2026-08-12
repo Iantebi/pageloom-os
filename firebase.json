@@ -1,15 +1,14 @@
 {
-  "functions": [{ "source": "functions", "codebase": "default", "runtime": "nodejs22", "predeploy": ["npm --prefix functions run build"] }],
+  "functions": [{ "source": "functions", "codebase": "default", "runtime": "nodejs22", "predeploy": ["npm --prefix packages/core run build", "npm --prefix functions run prepare:vendor", "npm --prefix functions run build"] }],
   "hosting": {
     "public": "apps/web/out",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "cleanUrls": true,
     "trailingSlash": false,
-    "rewrites": [{ "source": "/api/**", "function": { "functionId": "api", "region": "us-central1", "pinTag": true } }, { "source": "**", "destination": "/index.html" }],
-    "headers": [{ "source": "**", "headers": [{ "key": "X-Content-Type-Options", "value": "nosniff" }, { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }, { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(self)" }, { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" }] }]
+    "rewrites": [{ "source": "/api/**", "function": { "functionId": "api", "region": "europe-west1", "pinTag": true } }, { "source": "**", "destination": "/index.html" }],
+    "headers": [{ "source": "**", "headers": [{ "key": "X-Content-Type-Options", "value": "nosniff" }, { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }, { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(self)" }, { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' 'sha256-3kT48k8DxOHi3QWSQeLd8aQA9GJN6pJr7v05ieRn81M=' 'sha256-E17sgB1WFzmPp+3LGCMJQJ6z3LEeg9uFzI/dGxGcloE=' 'sha256-GxtxDXBEWwVNhopk0OZ1Q2AL25PLTqREjoVVKL4vsSs=' 'sha256-IxrAug7SR5MGX44Bhl6pAl/SNn2aHK4NHbGuzQ4gGOM=' 'sha256-N7W4aCWrZSZGf6/kLUbGHI8DQRMW58mJ/vh64T6OmYA=' 'sha256-OBTN3RiyCV4Bq7dFqZ5a2pAXjnCcCYeTJMO2I/LYKeo=' 'sha256-uB6wNOem0tjppg5PC8v5IUVzTzoM20BCnGkc2HCeLcI=' 'sha256-uITP+015vStbM3HpuUik77B2BLZyD4IU/ZTFmzM7p9I=' 'sha256-VnpwFOveHc+8zO2m9HS5V8cxGTFEEf7mc6HhvCaVzro=' 'sha256-XH126ot8pn4yesfH/AeFyU6CPSRG038GMjlkYW3cyE0=' https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com wss://*.firebaseio.com; frame-src 'self' https://*.firebaseapp.com https://accounts.google.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" }] }]
   },
   "firestore": { "rules": "firestore.rules", "indexes": "firestore.indexes.json" },
   "storage": { "rules": "storage.rules" },
-  "emulators": { "auth": { "port": 9099 }, "functions": { "port": 5001 }, "firestore": { "port": 8080 }, "hosting": { "port": 5000 }, "storage": { "port": 9199 }, "ui": { "enabled": true } }
+  "emulators": { "auth": { "port": 9099 }, "functions": { "port": 5001 }, "firestore": { "port": 8080 }, "hosting": { "port": 5000 }, "storage": { "port": 9199 }, "pubsub": { "port": 8085 }, "ui": { "enabled": true } }
 }
-

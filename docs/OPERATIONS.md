@@ -4,7 +4,7 @@
 
 1. Create Firebase web and Google Cloud projects, enable Authentication (Google provider), Firestore, Storage, Functions, Hosting, Secret Manager, Cloud Build, and the required Google APIs.
 2. Copy `.firebaserc.example` to `.firebaserc` and set the Firebase project alias. Copy `.env.example` to `apps/web/.env.local` and enter only browser-safe Firebase configuration.
-3. Import secrets with `firebase functions:secrets:set NAME`. Configure the Google AI Studio key as `GEMINI_API_KEY` for the primary `gemini-2.5-pro` runtime. Reuse the existing OpenAI key for the `OPENAI_API_KEY` fallback; do not generate or expose another key. Configure only the connector secrets that will be enabled.
+3. Import secrets with `firebase functions:secrets:set NAME`. Configure the Google AI Studio key as `GEMINI_API_KEY` for the primary `gemini-pro-latest` runtime. Reuse the existing OpenAI key for the `OPENAI_API_KEY` fallback; do not generate or expose another key. Configure only the connector secrets that will be enabled.
 4. Create `organizations/{orgId}` and `organizations/{orgId}/members/{uid}` with `uid`, `role: "owner"`, and display metadata using an authenticated administration process.
 5. Add current model rate cards at `system/modelPricing/{provider}_{model}`. Until configured, usage is recorded with `pricingStatus: "unconfigured"` and cost is not guessed.
 6. Run `npm.cmd run check`, test with Firebase Emulator Suite, then deploy using `npm.cmd run deploy`.

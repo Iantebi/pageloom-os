@@ -7,7 +7,7 @@ Agents never call one another directly. The central orchestrator is the sole com
 1. The human CEO records an agreed deal after the phone close. The API atomically creates the project, close evidence, journey event, and first post-close task. Internal jobs and agent chats remain separate from customer communication.
 2. Firestore records a queued task with an agent, objective, locale, priority, context, and creator.
 3. The task trigger transactionally claims the task and the orchestrator loads only organization-scoped context.
-4. The model router sends every task to `gemini-2.5-pro` through Google AI Studio. If that primary provider is unavailable or fails, the orchestrator records a fallback event and retries once with OpenAI GPT through the Responses API.
+4. The model router sends every task to Google AI Studio's supported `gemini-pro-latest` alias. If that primary provider is unavailable or fails, the orchestrator records a fallback event and retries once with OpenAI GPT through the Responses API.
 5. The agent returns a schema-validated result: summary, deliverables, files, risks, metrics, delegated tasks, and requested tools.
 6. The orchestrator stores artifacts, usage, model route, and activity. Delegations become bounded child tasks with parent and depth metadata.
 7. Safe read/draft operations pass through the tool gateway. External messages, spending, deployment, destructive changes, and production writes become approval records.
