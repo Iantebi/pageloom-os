@@ -47,6 +47,9 @@ export interface WorkflowStageDefinition {
 }
 
 export const workflowOrder=workflowStageSchema.options;
+export const workflowDeliverables:Partial<Record<WorkflowStage,readonly string[]>>={
+  closed_won:["onboarding_plan"],onboarding:["questionnaire_schema"],research:["research_report"],brand_strategy:["brand_strategy"],design_system:["design_system"],sitemap:["sitemap"],ux_planning:["ux_plan"],ui_generation:["ui_spec"],copywriting:["website_copy"],seo_optimization:["seo_plan"],development:["website_source"],deployment_preparation:["deployment_manifest"],qa:["qa_report"],production_deployment:["deployment_record"],revision:["revision_report"],final_deployment:["deployment_record"],completed:["completion_report"]
+};
 
 const stage=(
   name:WorkflowStage,entryConditions:WorkflowCondition[],exitEvents:WorkflowEventType[],

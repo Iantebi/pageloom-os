@@ -1,5 +1,5 @@
 import {describe,expect,it} from "vitest";
-import {canStartAgentWork,eventAuthorizesProtectedStage,eventTransitions,resolveWorkflowTransition,stageCreatesAgentTasks,workflowDefinitions,workflowOrder} from "./workflow.js";
+import {canStartAgentWork,eventAuthorizesProtectedStage,eventTransitions,resolveWorkflowTransition,stageCreatesAgentTasks,workflowDefinitions,workflowDeliverables,workflowOrder} from "./workflow.js";
 
 describe("website production workflow",()=>{
   it("defines a complete policy for every ordered stage",()=>{
@@ -19,6 +19,9 @@ describe("website production workflow",()=>{
   });
   it("models every requested production phase independently",()=>{
     expect(workflowOrder).toEqual(expect.arrayContaining(["research","design_system","sitemap","ux_planning","ui_generation","deployment_preparation","customer_review","revision","final_deployment","completed"]));
+  });
+  it("requires a verifiable artifact from every automatic production stage",()=>{
+    for(const current of workflowOrder.filter(stage=>stageCreatesAgentTasks(stage)))expect(workflowDeliverables[current]?.length,current).toBeGreaterThan(0);
   });
   it("allows agents to start only on automatic stages",()=>{
     expect(stageCreatesAgentTasks("research")).toBe(true);
