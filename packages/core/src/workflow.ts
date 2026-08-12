@@ -1,28 +1,134 @@
-import{z}from"zod";import type{AgentId}from"./types.js";
-export const workflowStageSchema=z.enum(["lead","phone_call","won","questionnaire","assets","brand_strategy","website_architecture","ui_design","copywriting","development","seo","qa","customer_approval","deployment","maintenance"]);export type WorkflowStage=z.infer<typeof workflowStageSchema>;
-export const workflowEventTypeSchema=z.enum(["LeadCreated","PhoneCallScheduled","PhoneCallCompleted","LeadWon","ProjectIntakeStarted","QuestionnaireCompleted","AssetsUploaded","AssetsValidated","BrandApproved","ArchitectureCompleted","UIDesignApproved","CopywritingCompleted","DevelopmentStarted","DevelopmentCompleted","SEOCompleted","QACompleted","QAFailed","WebsiteApproved","ApprovalRejected","DeploymentCompleted","MaintenanceStarted","AssetsMissing","StageTimedOut","AgentTaskFailed","ManualRetryRequested"]);export type WorkflowEventType=z.infer<typeof workflowEventTypeSchema>;
-export type WorkflowCondition="leadExists"|"callCompleted"|"dealWon"|"questionnaireComplete"|"assetsComplete"|"brandApproved"|"architectureComplete"|"uiApproved"|"copyApproved"|"developmentComplete"|"seoComplete"|"qaPassed"|"websiteApproved"|"deploymentComplete";
-export interface WorkflowStageDefinition{stage:WorkflowStage;entryConditions:WorkflowCondition[];exitEvents:WorkflowEventType[];requiredAgents:AgentId[];approval:"none"|"ceo"|"customer";timeoutMinutes:number;retry:{maxAttempts:number;backoffMinutes:number};notifications:("ceo"|"project_manager"|"customer")[];estimatedMinutes:number;rollbackStage?:WorkflowStage}
+import {z} from "zod";
+import type {AgentId} from "./types.js";
+
+export const workflowStageSchema=z.enum([
+  "lead","phone_call","closed_won","onboarding","questionnaire","assets","research",
+  "brand_strategy","design_system","sitemap","ux_planning","ui_generation","copywriting",
+  "seo_optimization","development","deployment_preparation","qa","ceo_approval",
+  "production_deployment","customer_review","revision","final_deployment","completed"
+]);
+export type WorkflowStage=z.infer<typeof workflowStageSchema>;
+
+export const workflowEventTypeSchema=z.enum([
+  "LeadCreated","PhoneCallScheduled","PhoneCallCompleted","LeadWon","OnboardingStarted","OnboardingCompleted",
+  "QuestionnaireCompleted","AssetsUploaded","AssetsValidated","ResearchCompleted",
+  "BrandStrategyCompleted","DesignSystemCompleted","SitemapCompleted","UXPlanCompleted",
+  "UIGenerationCompleted","CopywritingCompleted","SEOOptimizationCompleted",
+  "DevelopmentCompleted","DeploymentPrepared","QACompleted","QAFailed","CEOApproved",
+  "CEORejected","ProductionDeploymentCompleted","CustomerApproved","CustomerRequestedRevision",
+  "RevisionCompleted","FinalDeploymentApproved","FinalDeploymentCompleted","ProjectCompleted","AssetsMissing",
+  "StageTimedOut","AgentTaskFailed","ManualRetryRequested"
+]);
+export type WorkflowEventType=z.infer<typeof workflowEventTypeSchema>;
+
+export const workflowConditionSchema=z.enum([
+  "leadExists","callCompleted","dealWon","onboardingComplete","questionnaireComplete",
+  "assetsComplete","researchComplete","brandStrategyComplete","designSystemComplete",
+  "sitemapComplete","uxPlanComplete","uiComplete","copyComplete","seoComplete",
+  "developmentComplete","deploymentPrepared","qaPassed","ceoApproved","productionDeployed",
+  "customerApproved","revisionComplete","finalDeploymentComplete"
+]);
+export type WorkflowCondition=z.infer<typeof workflowConditionSchema>;
+export type WorkflowApproval="none"|"ceo"|"customer";
+export type WorkflowStartMode="automatic"|"manual"|"approval"|"customer_action";
+
+export interface WorkflowStageDefinition {
+  stage:WorkflowStage;
+  entryConditions:WorkflowCondition[];
+  exitEvents:WorkflowEventType[];
+  requiredAgents:AgentId[];
+  approval:WorkflowApproval;
+  startMode:WorkflowStartMode;
+  timeoutMinutes:number;
+  retry:{maxAttempts:number;backoffMinutes:number};
+  notifications:("ceo"|"project_manager"|"customer")[];
+  estimatedMinutes:number;
+  rollbackStage?:WorkflowStage;
+}
+
 export const workflowOrder=workflowStageSchema.options;
+
+const stage=(
+  name:WorkflowStage,entryConditions:WorkflowCondition[],exitEvents:WorkflowEventType[],
+  requiredAgents:AgentId[],approval:WorkflowApproval,startMode:WorkflowStartMode,
+  estimatedMinutes:number,timeoutMinutes=2880,maxAttempts=3,backoffMinutes=60,
+  notifications:WorkflowStageDefinition["notifications"]=["project_manager"]
+):WorkflowStageDefinition=>({stage:name,entryConditions,exitEvents,requiredAgents,approval,startMode,
+  estimatedMinutes,timeoutMinutes,retry:{maxAttempts,backoffMinutes},notifications});
+
 export const workflowDefinitions:Record<WorkflowStage,WorkflowStageDefinition>={
- lead:d("lead",[],["PhoneCallScheduled"],["sales"],"none",1440,3,30,["ceo"],60),
- phone_call:d("phone_call",["leadExists"],["LeadWon"],["sales"],"ceo",2880,2,120,["ceo","project_manager"],60),
- won:d("won",["callCompleted","dealWon"],["ProjectIntakeStarted"],["project-manager"],"ceo",1440,3,60,["ceo","project_manager"],30),
- questionnaire:d("questionnaire",["dealWon"],["QuestionnaireCompleted"],["client-journey"],"none",4320,3,240,["project_manager","customer"],240),
- assets:{...d("assets",["questionnaireComplete"],["AssetsValidated"],["media","project-manager"],"none",4320,3,240,["project_manager","customer"],480),rollbackStage:"assets"},
- brand_strategy:d("brand_strategy",["assetsComplete"],["BrandApproved"],["brand"],"ceo",2880,2,120,["ceo","project_manager"],480),
- website_architecture:d("website_architecture",["brandApproved"],["ArchitectureCompleted"],["website-architect"],"none",1440,3,60,["project_manager"],360),
- ui_design:d("ui_design",["architectureComplete"],["UIDesignApproved"],["ui-ux-designer"],"ceo",2880,3,120,["ceo","project_manager"],720),
- copywriting:d("copywriting",["uiApproved"],["CopywritingCompleted"],["content"],"none",2880,3,120,["project_manager"],600),
- development:{...d("development",["copyApproved"],["DevelopmentCompleted"],["frontend-builder","backend","firebase"],"none",5760,3,180,["project_manager"],1440),rollbackStage:"development"},
- seo:d("seo",["developmentComplete"],["SEOCompleted"],["seo"],"none",1440,3,60,["project_manager"],360),
- qa:d("qa",["seoComplete"],["QACompleted","QAFailed"],["qa"],"none",1440,3,60,["project_manager"],480),
- customer_approval:d("customer_approval",["qaPassed"],["WebsiteApproved","ApprovalRejected"],["project-manager"],"customer",4320,5,240,["ceo","project_manager","customer"],1440),
- deployment:d("deployment",["websiteApproved"],["DeploymentCompleted"],["deployment"],"ceo",720,3,30,["ceo","project_manager"],180),
- maintenance:d("maintenance",["deploymentComplete"],["MaintenanceStarted"],["maintenance","analytics","support"],"none",43200,10,1440,["ceo","project_manager"],43200)
+  lead:stage("lead",[],["PhoneCallScheduled"],["sales"],"none","manual",60,1440,3,30,["ceo"]),
+  phone_call:stage("phone_call",["leadExists"],["PhoneCallCompleted","LeadWon"],["sales"],"none","manual",60,2880,2,120,["ceo"]),
+  closed_won:stage("closed_won",["callCompleted","dealWon"],["OnboardingStarted"],["project-manager"],"none","automatic",30,1440,3,60,["ceo","project_manager"]),
+  onboarding:stage("onboarding",["dealWon"],["OnboardingCompleted"],["client-journey","project-manager"],"none","automatic",120,2880),
+  questionnaire:stage("questionnaire",["onboardingComplete"],["QuestionnaireCompleted"],["client-journey"],"none","customer_action",240,4320,3,240,["project_manager","customer"]),
+  assets:{...stage("assets",["questionnaireComplete"],["AssetsUploaded","AssetsValidated"],["media","project-manager"],"none","customer_action",480,4320,3,240,["project_manager","customer"]),rollbackStage:"assets"},
+  research:stage("research",["assetsComplete"],["ResearchCompleted"],["website-architect","seo"],"none","automatic",360),
+  brand_strategy:stage("brand_strategy",["researchComplete"],["BrandStrategyCompleted"],["brand"],"none","automatic",480),
+  design_system:stage("design_system",["brandStrategyComplete"],["DesignSystemCompleted"],["ui-ux-designer"],"none","automatic",480),
+  sitemap:stage("sitemap",["designSystemComplete"],["SitemapCompleted"],["website-architect","seo"],"none","automatic",360),
+  ux_planning:stage("ux_planning",["sitemapComplete"],["UXPlanCompleted"],["ui-ux-designer","website-architect"],"none","automatic",480),
+  ui_generation:stage("ui_generation",["uxPlanComplete"],["UIGenerationCompleted"],["ui-ux-designer"],"none","automatic",720),
+  copywriting:stage("copywriting",["uiComplete"],["CopywritingCompleted"],["content"],"none","automatic",600),
+  seo_optimization:stage("seo_optimization",["copyComplete"],["SEOOptimizationCompleted"],["seo"],"none","automatic",360),
+  development:{...stage("development",["seoComplete"],["DevelopmentCompleted"],["frontend-builder","backend","firebase"],"none","automatic",1440,5760,3,180),rollbackStage:"development"},
+  deployment_preparation:stage("deployment_preparation",["developmentComplete"],["DeploymentPrepared"],["firebase","deployment"],"none","automatic",240,1440),
+  qa:stage("qa",["deploymentPrepared"],["QACompleted","QAFailed"],["qa"],"none","automatic",480,1440),
+  ceo_approval:stage("ceo_approval",["qaPassed"],["CEOApproved","CEORejected"],[],"ceo","approval",1440,10080,1,0,["ceo"]),
+  production_deployment:stage("production_deployment",["ceoApproved"],["ProductionDeploymentCompleted"],["deployment","firebase"],"ceo","automatic",180,720,3,30,["ceo","project_manager"]),
+  customer_review:stage("customer_review",["productionDeployed"],["CustomerApproved","CustomerRequestedRevision"],[],"customer","customer_action",1440,10080,5,240,["ceo","project_manager","customer"]),
+  revision:{...stage("revision",["productionDeployed"],["RevisionCompleted"],["project-manager","ui-ux-designer","content","frontend-builder","qa"],"none","automatic",720,4320,5,120),rollbackStage:"revision"},
+  final_deployment:stage("final_deployment",["customerApproved"],["FinalDeploymentApproved","FinalDeploymentCompleted"],["deployment","firebase"],"ceo","approval",180,720,3,30,["ceo","project_manager"]),
+  completed:stage("completed",["finalDeploymentComplete"],["ProjectCompleted"],["project-manager","maintenance","analytics","support"],"none","automatic",30,1440,3,60,["ceo","project_manager","customer"])
 };
-function d(stage:WorkflowStage,entryConditions:WorkflowCondition[],exitEvents:WorkflowEventType[],requiredAgents:AgentId[],approval:WorkflowStageDefinition["approval"],timeoutMinutes:number,maxAttempts:number,backoffMinutes:number,notifications:WorkflowStageDefinition["notifications"],estimatedMinutes:number):WorkflowStageDefinition{return{stage,entryConditions,exitEvents,requiredAgents,approval,timeoutMinutes,retry:{maxAttempts,backoffMinutes},notifications,estimatedMinutes}}
-export const eventTransitions:Partial<Record<WorkflowEventType,{from:WorkflowStage[];to:WorkflowStage}>>={PhoneCallScheduled:{from:["lead"],to:"phone_call"},PhoneCallCompleted:{from:["phone_call"],to:"phone_call"},LeadWon:{from:["phone_call"],to:"won"},ProjectIntakeStarted:{from:["won"],to:"questionnaire"},QuestionnaireCompleted:{from:["questionnaire"],to:"assets"},AssetsUploaded:{from:["assets"],to:"assets"},AssetsValidated:{from:["assets"],to:"brand_strategy"},BrandApproved:{from:["brand_strategy"],to:"website_architecture"},ArchitectureCompleted:{from:["website_architecture"],to:"ui_design"},UIDesignApproved:{from:["ui_design"],to:"copywriting"},CopywritingCompleted:{from:["copywriting"],to:"development"},DevelopmentStarted:{from:["development"],to:"development"},DevelopmentCompleted:{from:["development"],to:"seo"},SEOCompleted:{from:["seo"],to:"qa"},QACompleted:{from:["qa"],to:"customer_approval"},QAFailed:{from:["qa"],to:"development"},WebsiteApproved:{from:["customer_approval"],to:"deployment"},ApprovalRejected:{from:["customer_approval"],to:"ui_design"},DeploymentCompleted:{from:["deployment"],to:"maintenance"},AssetsMissing:{from:["brand_strategy","website_architecture","ui_design","copywriting","development","seo","qa"],to:"assets"}};
-export function nextWorkflowStage(stage:WorkflowStage){return workflowOrder[workflowOrder.indexOf(stage)+1]}
-export function workflowProgress(stage:WorkflowStage){return Math.round(workflowOrder.indexOf(stage)/(workflowOrder.length-1)*100)}
-export function resolveWorkflowTransition(stage:WorkflowStage,event:WorkflowEventType){if(event==="LeadCreated")return stage==="lead"?{from:stage,to:stage}:undefined;const transition=eventTransitions[event];return transition?.from.includes(stage)?{from:stage,to:transition.to}:undefined}
+
+export const eventTransitions:Partial<Record<WorkflowEventType,{from:WorkflowStage[];to:WorkflowStage}>>={
+  PhoneCallScheduled:{from:["lead"],to:"phone_call"},
+  PhoneCallCompleted:{from:["phone_call"],to:"phone_call"},
+  LeadWon:{from:["phone_call"],to:"closed_won"},
+  OnboardingStarted:{from:["closed_won"],to:"onboarding"},
+  OnboardingCompleted:{from:["onboarding"],to:"questionnaire"},
+  QuestionnaireCompleted:{from:["questionnaire"],to:"assets"},
+  AssetsUploaded:{from:["assets"],to:"assets"},
+  AssetsValidated:{from:["assets"],to:"research"},
+  ResearchCompleted:{from:["research"],to:"brand_strategy"},
+  BrandStrategyCompleted:{from:["brand_strategy"],to:"design_system"},
+  DesignSystemCompleted:{from:["design_system"],to:"sitemap"},
+  SitemapCompleted:{from:["sitemap"],to:"ux_planning"},
+  UXPlanCompleted:{from:["ux_planning"],to:"ui_generation"},
+  UIGenerationCompleted:{from:["ui_generation"],to:"copywriting"},
+  CopywritingCompleted:{from:["copywriting"],to:"seo_optimization"},
+  SEOOptimizationCompleted:{from:["seo_optimization"],to:"development"},
+  DevelopmentCompleted:{from:["development"],to:"deployment_preparation"},
+  DeploymentPrepared:{from:["deployment_preparation"],to:"qa"},
+  QACompleted:{from:["qa"],to:"ceo_approval"},
+  QAFailed:{from:["qa"],to:"development"},
+  CEOApproved:{from:["ceo_approval"],to:"production_deployment"},
+  CEORejected:{from:["ceo_approval"],to:"revision"},
+  ProductionDeploymentCompleted:{from:["production_deployment"],to:"customer_review"},
+  CustomerApproved:{from:["customer_review"],to:"final_deployment"},
+  CustomerRequestedRevision:{from:["customer_review"],to:"revision"},
+  RevisionCompleted:{from:["revision"],to:"ceo_approval"},
+  FinalDeploymentApproved:{from:["final_deployment"],to:"final_deployment"},
+  FinalDeploymentCompleted:{from:["final_deployment"],to:"completed"},
+  ProjectCompleted:{from:["completed"],to:"completed"},
+  AssetsMissing:{from:["research","brand_strategy","design_system","sitemap","ux_planning","ui_generation","copywriting","seo_optimization","development","deployment_preparation","qa","ceo_approval","revision"],to:"assets"}
+};
+
+export function nextWorkflowStage(current:WorkflowStage){return workflowOrder[workflowOrder.indexOf(current)+1]}
+export function workflowProgress(current:WorkflowStage){return Math.round(workflowOrder.indexOf(current)/(workflowOrder.length-1)*100)}
+export function resolveWorkflowTransition(current:WorkflowStage,event:WorkflowEventType){
+  if(event==="LeadCreated")return current==="lead"?{from:current,to:current}:undefined;
+  const transition=eventTransitions[event];
+  return transition?.from.includes(current)?{from:current,to:transition.to}:undefined;
+}
+export function canStartAgentWork(current:WorkflowStage,dealClosed:boolean){
+  return dealClosed&&workflowOrder.indexOf(current)>=workflowOrder.indexOf("closed_won");
+}
+export function stageCreatesAgentTasks(current:WorkflowStage){
+  const definition=workflowDefinitions[current];
+  return definition.startMode==="automatic"&&definition.requiredAgents.length>0;
+}
+export function eventAuthorizesProtectedStage(current:WorkflowStage,event:WorkflowEventType){
+  return current==="production_deployment"&&event==="CEOApproved"||current==="final_deployment"&&event==="FinalDeploymentApproved";
+}
