@@ -12,6 +12,12 @@ describe("Storage tenant isolation policy", () => {
     expect(rules).toContain("questionnaires/{projectId}/{questionnaireId}/{fieldId}/{userId}");
     expect(rules).toContain("staff(orgId) || clientProject(orgId,projectId)");
   });
+  it("keeps generated artifacts inside the matching project", () => {
+    expect(rules).toContain("projects/{projectId}/artifacts/{allPaths=**}");
+    expect(rules).toContain("staff(orgId) || clientProject(orgId,projectId)");
+    expect(rules).toContain("artifacts/{allPaths=**} { allow read: if staff(orgId)");
+    expect(rules).toContain("internal-artifacts/{allPaths=**} { allow read: if staff(orgId)");
+  });
   it("retains a default deny rule", () => {
     expect(rules).toContain("match /{allPaths=**} { allow read, write: if false; }");
   });

@@ -1,0 +1,3 @@
+export function safeArtifactPath(path:string){return path.replace(/\.\./g,"").replace(/^\/+/,"").replace(/[^a-zA-Z0-9._\-/]/g,"-")}
+export function projectArtifactObject(organizationId:string,projectId:string,taskId:string,path:string){const safe=safeArtifactPath(path);if(!safe)throw new Error("Artifact path is empty");return `organizations/${organizationId}/projects/${projectId}/artifacts/${taskId}/${safe}`}
+export function internalArtifactObject(organizationId:string,taskId:string,path:string){const safe=safeArtifactPath(path);if(!safe)throw new Error("Artifact path is empty");return `organizations/${organizationId}/internal-artifacts/${taskId}/${safe}`}
