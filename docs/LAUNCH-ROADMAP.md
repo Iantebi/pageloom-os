@@ -33,7 +33,7 @@ Status values: `DONE`, `IN PROGRESS`, `NOT STARTED`, and `OWNER BLOCKED`.
 | P1 | Per-user/API rate limits and abuse alerts | 1 day | Functions/Firestore | NOT STARTED |
 | P1 | Automated Firestore and Storage security-rules tests for staff and client roles | 1 day | Firebase test environment | PARTIAL |
 | P1 | Customer-facing progress, approvals, file upload, comments, and final handoff checklist | 1 day | Client portal access | PARTIAL |
-| P1 | First-customer runbook with named owner, acceptance criteria, daily checks, and recovery steps | 0.5 day | Golden-path rehearsal | NOT STARTED |
+| P1 | First-customer runbook with named owner, acceptance criteria, daily checks, and recovery steps | 0.5 day | Golden-path rehearsal | DONE |
 | P1 | Manual lead follow-up and discovery-call checklist | 0.25 day | None | NOT STARTED |
 | P1 | Basic project profitability worksheet using entered revenue and recorded AI/hosting cost | 0.5 day | Manual payment confirmation | PARTIAL |
 
