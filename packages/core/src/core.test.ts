@@ -24,6 +24,7 @@ describe("AI-native core", () => {
     expect(routeModel({...base,providerHealth:{openai:true,gemini:true}})).toMatchObject({provider:"gemini",model:"gemini-pro-latest"});
     expect(routeModel({...base,providerHealth:{openai:true,gemini:false}})).toMatchObject({provider:"openai",model:"gpt-5.6-sol"});
   });
+  it("supports Gemini-only launch routing",()=>{const base={agent:agents[0]!,priority:"critical" as const,requiresCode:true,requiresGoogleContext:false,budgetRemainingUsd:100};expect(routeModel({...base,providerHealth:{gemini:true,openai:false}})).toMatchObject({provider:"gemini",reason:"Google AI Studio single-provider launch mode"});expect(()=>routeModel({...base,providerHealth:{gemini:false,openai:false}})).toThrow(/enabled and healthy/) });
   it("refuses model execution when its maximum cost exceeds the remaining budget",()=>{
     const base={agent:agents[5]!,priority:"critical" as const,requiresCode:true,requiresGoogleContext:false,budgetRemainingUsd:3,providerHealth:{openai:true,gemini:true}};
     expect(()=>routeModel(base)).toThrow(/budget exhausted/);

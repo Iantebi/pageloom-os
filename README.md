@@ -6,7 +6,7 @@ PageLoom OS is an enterprise AI operating system for a human-led web agency. Twe
 
 - Next.js 16, React 19, TypeScript, and Tailwind CSS
 - Firebase Hosting, Authentication, Functions, Firestore, and Cloud Storage
-- Gemini 2.5 Pro through Google AI Studio as the primary runtime, with OpenAI GPT through the Responses API as fallback
+- Gemini through Google AI Studio as the single production runtime for the first-customer launch; OpenAI remains configured but disabled
 - Google Workspace, Business Profile, Maps, Places, Analytics, Search Console, Tag Manager, GitHub, Stripe, PayPal, WhatsApp, Resend, Twilio, CRM, Make, n8n, Cloud Build, and Cloud Run adapters
 
 No CMS or page-builder runtime is used. Websites are delivered as native React/Next.js applications on Firebase and Google Cloud. Customers never interact directly with AI, and outbound communication is executed only after CEO approval.
@@ -24,8 +24,8 @@ No CMS or page-builder runtime is used. Websites are delivered as native React/N
 Requirements: Node.js 22, a Firebase project, and the Firebase CLI.
 
 1. Copy `.env.example` to `apps/web/.env.local` and add the browser-safe Firebase values.
-2. Keep the already-configured `OPENAI_API_KEY` in the ignored root `.env.local`; never copy it into source or any `NEXT_PUBLIC_` variable.
-3. Add `GEMINI_API_KEY` locally when Gemini routing is required. Without it, eligible tasks safely fall back to OpenAI.
+2. Keep the already-configured `OPENAI_API_KEY` in the ignored root `.env.local`; never copy it into source or any `NEXT_PUBLIC_` variable. It is not used while launch single-provider mode is active.
+3. Add `GEMINI_API_KEY` locally. Keep `OPENAI_FALLBACK_ENABLED=false`; enabling fallback requires an explicit owner decision.
 4. Run `npm.cmd install`, then `npm.cmd run dev`.
 
 The dashboard is served at `http://localhost:3000`. Use `npm.cmd run check` before merging.

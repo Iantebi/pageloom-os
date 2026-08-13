@@ -1,0 +1,2 @@
+import{describe,expect,it}from"vitest";import{openAiFallbackEnabled,providerHealthForMode}from"./provider-mode.js";
+describe("launch provider mode",()=>{it("keeps OpenAI disabled by default",()=>{expect(openAiFallbackEnabled(undefined)).toBe(false);expect(openAiFallbackEnabled("false")).toBe(false);expect(providerHealthForMode(false)).toEqual({gemini:true,openai:false})});it("requires an explicit true value to enable fallback",()=>expect(openAiFallbackEnabled(" TRUE ")).toBe(true))});

@@ -10,7 +10,7 @@ Status values: `DONE`, `IN PROGRESS`, `NOT STARTED`, and `OWNER BLOCKED`.
 
 | Priority | Launch requirement | Effort | Dependencies | Status |
 |---|---|---:|---|---|
-| P0 | Fund Gemini production inference and retain OpenAI as a funded fallback | 30 min owner action + 2 h verification | Billing approval | OWNER BLOCKED |
+| P0 | Fund Gemini production inference; OpenAI fallback is not required for customer #1 | 30 min owner action + 2 h verification | Billing approval | OWNER BLOCKED |
 | P0 | Pin a currently supported Gemini production model and pass live inference checks | 2 h | Funded Gemini account | OWNER BLOCKED |
 | P0 | Secure customer invitation and verified-email portal acceptance | 1 day | Firebase Authentication | DONE |
 | P0 | Enforce project-level isolation for generated website artifacts | 0.5 day | Customer/project membership model | DONE |
