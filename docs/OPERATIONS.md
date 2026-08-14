@@ -4,7 +4,7 @@
 
 1. Create Firebase web and Google Cloud projects, enable Authentication (Google provider), Firestore, Storage, Functions, Hosting, Secret Manager, Cloud Build, and the required Google APIs.
 2. Copy `.firebaserc.example` to `.firebaserc` and set the Firebase project alias. Copy `.env.example` to `apps/web/.env.local` and enter only browser-safe Firebase configuration.
-3. Import secrets with `firebase functions:secrets:set NAME`. Configure the Google AI Studio key as `GEMINI_API_KEY` for the primary `gemini-pro-latest` runtime. Customer #1 uses single-provider mode with `OPENAI_FALLBACK_ENABLED=false`. Preserve the existing OpenAI secret but do not invoke it unless the owner explicitly enables fallback.
+3. Set `AI_EXECUTION_MODE=manual` for launch. Existing provider secrets may stay in Secret Manager, but manual mode does not invoke Gemini or OpenAI. Future API inference requires an explicit owner change to `AI_EXECUTION_MODE=api` and provider verification.
 4. Create `organizations/{orgId}` and `organizations/{orgId}/members/{uid}` with `uid`, `role: "owner"`, and display metadata using an authenticated administration process.
 5. Add current model rate cards at `system/modelPricing/{provider}_{model}`. Until configured, usage is recorded with `pricingStatus: "unconfigured"` and cost is not guessed.
 6. Run `npm.cmd run check`, test with Firebase Emulator Suite, then deploy using `npm.cmd run deploy`.
@@ -17,7 +17,7 @@ For Workspace delegation, set `GOOGLE_WORKSPACE_SERVICE_ACCOUNT_JSON` and `GOOGL
 
 - Typecheck, unit tests, production builds, lint, dependency audit, Firebase Rules tests, and tenant-isolation tests pass.
 - A reviewer validates agent prompts, tool grants, approval boundaries, rate cards, budgets, and data retention.
-- Staging verifies Gemini failure handling without fallback, task retry/idempotency, webhook replay, Hebrew RTL, accessibility, and rollback.
+- Staging verifies manual task preparation/submission, malformed-output rejection, required-deliverable enforcement, task retry/idempotency, webhook replay, Hebrew RTL, accessibility, and rollback.
 - Production has alerting for task failure, queue age, approval latency, auth failures, connector errors, model spend, API usage, gross margin, and revenue anomalies.
 - Storage paths are part of the tenant boundary. CRM documents require staff membership or an exact client `customerId` match. Questionnaire files include `projectId` and require staff membership or access to that exact project. Changes to either path convention must update the UI, API prefix validation, rules, and isolation tests in the same release.
 

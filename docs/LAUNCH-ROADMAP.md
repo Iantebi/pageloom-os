@@ -10,11 +10,10 @@ Status values: `DONE`, `IN PROGRESS`, `NOT STARTED`, and `OWNER BLOCKED`.
 
 | Priority | Launch requirement | Effort | Dependencies | Status |
 |---|---|---:|---|---|
-| P0 | Fund Gemini production inference; OpenAI fallback is not required for customer #1 | 30 min owner action + 2 h verification | Billing approval | OWNER BLOCKED |
-| P0 | Pin a currently supported Gemini production model and pass live inference checks | 2 h | Funded Gemini account | OWNER BLOCKED |
+| P0 | Provider-independent manual AI queue prepares prompts, validates owner-submitted output, and resumes workflows | 1 day | Orchestrator | DONE |
 | P0 | Secure customer invitation and verified-email portal acceptance | 1 day | Firebase Authentication | DONE |
 | P0 | Enforce project-level isolation for generated website artifacts | 0.5 day | Customer/project membership model | DONE |
-| P0 | Prove Closed Won → questionnaire → assets → orchestration → build → QA → approvals → release candidate | 2 days | Working AI provider, representative customer brief | NOT STARTED |
+| P0 | Prove Closed Won → questionnaire → assets → orchestration → build → QA → approvals → release candidate | 2 days | Manual AI queue, representative customer brief | NOT STARTED |
 | P0 | Produce deployable Next.js source, lockfile, build manifest, QA evidence, and immutable release record | 2 days | Website factory pipeline | NOT STARTED |
 | P0 | Require CEO approval before production deployment and customer approval before final release | 0.5 day | Approval workflow | PARTIAL |
 | P0 | Validate accessibility, responsive layouts, links, forms, SEO metadata, security headers, and build output | 1 day | Generated release candidate | PARTIAL |
@@ -68,7 +67,7 @@ Status values: `DONE`, `IN PROGRESS`, `NOT STARTED`, and `OWNER BLOCKED`.
 ### Produce and approve
 
 - [x] **MUST / DONE / 0 h / completed questionnaire and assets** — The orchestrator alone starts agent work.
-- [ ] **MUST / NOT STARTED / 2 days / funded AI** — Verify every production stage creates a measurable, project-scoped deliverable.
+- [ ] **MUST / NOT STARTED / 2 days / owner-operated AI queue** — Verify every production stage creates a measurable, project-scoped deliverable.
 - [ ] **MUST / PARTIAL / 1 day / release candidate** — Run automated build, functional, accessibility, responsive, SEO, and security QA.
 - [x] **MUST / DONE / 0 h / QA result** — QA failure rolls back to Development; rejected approvals return to the responsible stage.
 - [x] **MUST / DONE / 0 h / approval record** — Critical deployment action requires CEO approval.

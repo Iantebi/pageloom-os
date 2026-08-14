@@ -6,10 +6,10 @@ Agents never call one another directly. The central orchestrator is the sole com
 
 1. The human CEO records an agreed deal after the phone close. The API atomically creates the project, close evidence, journey event, and first post-close task. Internal jobs and agent chats remain separate from customer communication.
 2. Firestore records a queued task with an agent, objective, locale, priority, context, and creator.
-3. The task trigger transactionally claims the task and the orchestrator loads only organization-scoped context.
-4. The model router sends every launch task to Google AI Studio's supported `gemini-pro-latest` alias. In customer #1 single-provider mode, Gemini failures enter normal retry/recovery handling and never call OpenAI. OpenAI fallback remains disabled until the owner explicitly sets `OPENAI_FALLBACK_ENABLED=true`.
-5. The agent returns a schema-validated result: summary, deliverables, files, risks, metrics, delegated tasks, and requested tools.
-6. The orchestrator stores artifacts, usage, model route, and activity. Delegations become bounded child tasks with parent and depth metadata.
+3. The task trigger loads only organization-scoped context and prepares a provider-independent manual AI job. No model API is called.
+4. The owner copies the prepared package from the Agents page, executes it in ChatGPT or Google AI Studio, and pastes the returned JSON into PageLoom.
+5. The API requires owner authority and validates the full result contract plus every stage-required deliverable.
+6. The orchestrator stores artifacts, completion provenance, and activity. Delegations become bounded child tasks, and the workflow resumes exactly as it would in future API mode.
 7. Safe read/draft operations pass through the tool gateway. External messages, spending, deployment, destructive changes, and production writes become approval records.
 8. Only the organization owner acting as CEO may approve or reject the action. Approved tools execute once using the stored idempotency key and append an audit record.
 
@@ -21,7 +21,7 @@ Agents never call one another directly. The central orchestrator is the sole com
 - Delegation is limited to depth four and twelve child tasks per result.
 - Chat uses the same task pipeline; it is not a privileged model backdoor.
 - Locale travels with every task. Hebrew output and UI use `he` and RTL; English uses `en` and LTR.
-- Failures and fallbacks are visible as activity events and never rewritten as success.
+- Manual preparation and completion are visible as activity events and never rewritten as provider inference.
 
 ## Live state
 

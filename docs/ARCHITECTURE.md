@@ -8,9 +8,11 @@ flowchart LR
   UI --> API["Firebase Functions API"]
   API --> DB["Firestore command store"]
   DB --> O["Central orchestrator"]
-  O --> R["Multi-model router"]
-  R --> GM["Primary: Gemini 2.5 Pro via Google AI Studio"]
-  R --> OA["Fallback: OpenAI GPT Responses API"]
+  O --> X["Provider-independent AI execution interface"]
+  X --> MQ["Launch mode: owner-operated AI task queue"]
+  X -. "future explicit API mode" .-> R["Multi-model router"]
+  R -.-> GM["Gemini adapter"]
+  R -.-> OA["OpenAI Responses adapter"]
   O --> P["Capability and approval policy"]
   P --> A["Human approval queue"]
   P --> G["Secure integration gateway"]
@@ -37,4 +39,6 @@ Agents may prepare sales intelligence, but no agent calls, messages, or closes a
 
 ## Reliability and scale
 
-Task claims use Firestore transactions. Tool executions use organization-scoped idempotency keys. Trigger retries, maximum delegation depth/count, structured outputs, local schema validation, provider fallback, webhook deduplication, immutable activity records, and approval state machines prevent silent or duplicate work. Functions and Hosting scale independently on Google Cloud.
+Task preparation uses Firestore transactions. In launch mode, the orchestrator assembles verified context, instructions, required deliverables, and a strict output contract, then waits in `awaiting_manual_ai`. The owner runs that package in ChatGPT or Google AI Studio and submits the JSON result. Validation occurs before the unchanged workflow resumes. API adapters are reachable only when `AI_EXECUTION_MODE=api` is explicitly configured.
+
+Tool executions use organization-scoped idempotency keys. Trigger retries, maximum delegation depth/count, structured outputs, webhook deduplication, immutable activity records, and approval state machines prevent silent or duplicate work. Functions and Hosting scale independently on Google Cloud.
