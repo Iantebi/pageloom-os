@@ -1,5 +1,5 @@
 import {describe,expect,it} from "vitest";
-import {canStartAgentWork,eventAuthorizesProtectedStage,eventTransitions,resolveWorkflowTransition,stageCreatesAgentTasks,workflowDefinitions,workflowDeliverables,workflowOrder} from "./workflow.js";
+import {canStartAgentWork,eventAuthorizesProtectedStage,eventTransitions,nextWorkflowAttempt,resolveWorkflowTransition,stageCreatesAgentTasks,workflowDefinitions,workflowDeliverables,workflowOrder} from "./workflow.js";
 
 describe("website production workflow",()=>{
   it("defines a complete policy for every ordered stage",()=>{
@@ -45,5 +45,9 @@ describe("website production workflow",()=>{
   it("routes customer revisions through QA and CEO approval again",()=>{
     expect(resolveWorkflowTransition("customer_review","CustomerRequestedRevision")?.to).toBe("revision");
     expect(resolveWorkflowTransition("revision","RevisionCompleted")?.to).toBe("ceo_approval");
+  });
+  it("assigns unique attempts when a workflow re-enters a stage",()=>{
+    expect(nextWorkflowAttempt({},"production_deployment")).toBe(1);
+    expect(nextWorkflowAttempt({production_deployment:1},"production_deployment")).toBe(2);
   });
 });

@@ -120,6 +120,7 @@ export const eventTransitions:Partial<Record<WorkflowEventType,{from:WorkflowSta
 
 export function nextWorkflowStage(current:WorkflowStage){return workflowOrder[workflowOrder.indexOf(current)+1]}
 export function workflowProgress(current:WorkflowStage){return Math.round(workflowOrder.indexOf(current)/(workflowOrder.length-1)*100)}
+export function nextWorkflowAttempt(stageAttempts:Partial<Record<WorkflowStage,number>>,stage:WorkflowStage){return Number(stageAttempts[stage]??0)+1}
 export function resolveWorkflowTransition(current:WorkflowStage,event:WorkflowEventType){
   if(event==="LeadCreated")return current==="lead"?{from:current,to:current}:undefined;
   const transition=eventTransitions[event];
