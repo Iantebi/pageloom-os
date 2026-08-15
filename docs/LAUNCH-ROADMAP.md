@@ -1,5 +1,9 @@
 # PageLoom September 1 Launch Roadmap
 
+## Sprint Alpha Enterprise update — August 16, 2026
+
+The business KPI, pricing, legal-versioning, and dedicated-project planning foundations are complete. Real customer project creation remains blocked behind owner and Billing Account approval. Customer #1 should use the dedicated-project pilot only after a sandbox rehearsal proves provisioning, isolation, backup, monitoring, deployment, and rollback.
+
 ## Launch outcome
 
 By September 1, 2026, PageLoom must take one real customer from a manually confirmed Closed Won deal to an approved, quality-checked Next.js website deployed on Firebase Hosting, with a secure customer handoff and support path.

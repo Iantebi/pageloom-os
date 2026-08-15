@@ -1,0 +1,2 @@
+import{describe,expect,it}from"vitest";import{calculateQuote}from"./pricing.js";
+describe("pricing",()=>{it("prices setup, subscription, hosting, maintenance, add-ons and discounts",()=>{expect(calculateQuote({package:{id:"standard",name:"Standard",tier:"standard",setupFee:5000,monthlySubscription:300,hostingMonthly:100,maintenanceMonthly:200,currency:"ILS",includedAddOns:[],active:true},addOns:[{id:"seo",name:"SEO",setupFee:500,monthlyFee:150}],discountPercent:10,termMonths:12})).toMatchObject({setupTotal:4950,monthlyTotal:675,contractValue:13050})})});
