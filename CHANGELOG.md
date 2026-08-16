@@ -1,5 +1,12 @@
 # Changelog
 
+## Sprint Epsilon — Launch Experience
+
+- Simplified the Hebrew customer portal around progress, assets, website preview, comments, revisions and approval with accessible loading/error/progress states.
+- Added deterministic Lead-to-Delivery journey timing and a complete Golden Customer regression path.
+- Refined customer legal/document presentation and professional Hebrew HTML/PDF output with print layout and page numbering.
+- Added customer, owner and business-readiness launch reports.
+
 ## Sprint Delta — Company Operating System
 
 - Added the governed business blueprint, company wiki, operations manual, financial framework, CEO handbook, reporting cadence, risk register, and launch roadmap.
