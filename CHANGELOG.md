@@ -1,5 +1,11 @@
 # Changelog
 
+## Sprint Delta — Company Operating System
+
+- Added the governed business blueprint, company wiki, operations manual, financial framework, CEO handbook, reporting cadence, risk register, and launch roadmap.
+- Added validated, versioned business rules for delivery, commercial approvals, support, hosting, recovery, retention, and lifecycle policy.
+- Hardened the business report loader and eliminated its unstable-hook lint warning.
+
 ## Sprint Gamma — Business Hardening
 
 - Added a versioned enterprise document engine with Hebrew HTML/PDF rendering, private artifacts, integrity hashes and digital-signature evidence.

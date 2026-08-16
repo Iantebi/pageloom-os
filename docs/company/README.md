@@ -8,6 +8,8 @@ This directory is the internal, English-language operating source of truth for P
 - [Operations manual](OPERATIONS-MANUAL.md)
 - [Financial operating system](FINANCIAL-OPERATING-SYSTEM.md)
 - [CEO handbook](CEO-HANDBOOK.md)
+- [Executive reporting cadence](REPORTING-CADENCE.md)
+- [Versioned business rules](BUSINESS-RULES.md)
 - [Risk register](RISK-REGISTER.md)
 - [Launch readiness and roadmap](LAUNCH-READINESS.md)
 
