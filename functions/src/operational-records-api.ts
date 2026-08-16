@@ -57,3 +57,22 @@ operationalRecordsRouter.patch("/support-tickets/:ticketId", async (req: Authent
     return res.json({ data: { id: ref.id, status: input.status } });
   } catch (error) { return res.status(400).json({ error: { code: "INVALID_SUPPORT_UPDATE", message: error instanceof Error ? error.message : "Invalid support update" } }); }
 });
+
+operationalRecordsRouter.patch("/notifications/:notificationId/read", async (req: AuthenticatedRequest, res) => {
+  const organizationId = z.string().min(1).parse(req.body.organizationId);
+  if (await requireRole(req, res, organizationId, allowed) === undefined) return;
+  const ref = db.doc(`organizations/${organizationId}/notifications/${String(req.params.notificationId)}`), notification = await ref.get();
+  if (!notification.exists) return res.status(404).json({ error: { code: "NOT_FOUND", message: "Notification not found" } });
+  const now = new Date().toISOString(); await ref.update({ read: true, readAt: now, readBy: req.user!.uid });
+  await audit(organizationId, "notification.acknowledged", req.user!.uid, { notificationId: ref.id });
+  return res.json({ data: { id: ref.id, read: true } });
+});
+
+operationalRecordsRouter.patch("/notifications-read-all", async (req: AuthenticatedRequest, res) => {
+  const organizationId = z.string().min(1).parse(req.body.organizationId);
+  if (await requireRole(req, res, organizationId, allowed) === undefined) return;
+  const unread = await db.collection(`organizations/${organizationId}/notifications`).where("read", "==", false).limit(500).get(), batch = db.batch(), now = new Date().toISOString();
+  unread.docs.forEach(doc => batch.update(doc.ref, { read: true, readAt: now, readBy: req.user!.uid })); await batch.commit();
+  await audit(organizationId, "notification.all_acknowledged", req.user!.uid, { count: unread.size });
+  return res.json({ data: { count: unread.size } });
+});
