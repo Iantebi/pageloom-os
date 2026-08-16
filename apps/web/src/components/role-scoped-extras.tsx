@@ -12,4 +12,5 @@ import {FleetOverview} from "./fleet-overview";
 import {ReportsOverview} from "./reports-overview";
 import {OperationalRecords} from "./operational-records";
 import {NotificationInbox} from "./notification-inbox";
-export function RoleScopedExtras(){const{membership}=useOrganization();const pathname=usePathname();if(!membership)return null;if(membership.role==="client")return pathname==="/portal"?<LegalCenter/>:null;return <>{pathname==="/dashboard"&&<><EnterpriseOverview/><BusinessIntelligenceOverview/><NotificationInbox/><OperationalRecords/><FleetOverview/><ReportsOverview/></>}{pathname==="/portal"&&<LegalCenter/>}{pathname==="/agents"&&<ManualAiQueue/>}<ClientManagementWidgets/><OperationsHealthCard/><CustomerPortalAccess/></>}
+import {AgentGovernance} from "./agent-governance";
+export function RoleScopedExtras(){const{membership}=useOrganization();const pathname=usePathname();if(!membership)return null;if(membership.role==="client")return pathname==="/portal"?<LegalCenter/>:null;return <>{pathname==="/dashboard"&&<><EnterpriseOverview/><BusinessIntelligenceOverview/><NotificationInbox/><OperationalRecords/><FleetOverview/><ReportsOverview/></>}{pathname==="/portal"&&<LegalCenter/>}{pathname==="/agents"&&<><AgentGovernance/><ManualAiQueue/></>}<ClientManagementWidgets/><OperationsHealthCard/><CustomerPortalAccess/></>}

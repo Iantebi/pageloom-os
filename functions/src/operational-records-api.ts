@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createFinancialRecordSchema, createSupportTicketSchema, supportDueAt, updateSupportTicketSchema } from "@pageloom/core";
+import { agentIdSchema, createFinancialRecordSchema, createSupportTicketSchema, supportDueAt, updateSupportTicketSchema } from "@pageloom/core";
 import { z } from "zod";
 import { requireProjectAccess, requireRole, type AuthenticatedRequest } from "./auth.js";
 import { db } from "./firebase.js";
@@ -75,4 +75,13 @@ operationalRecordsRouter.patch("/notifications-read-all", async (req: Authentica
   unread.docs.forEach(doc => batch.update(doc.ref, { read: true, readAt: now, readBy: req.user!.uid })); await batch.commit();
   await audit(organizationId, "notification.all_acknowledged", req.user!.uid, { count: unread.size });
   return res.json({ data: { count: unread.size } });
+});
+
+operationalRecordsRouter.put("/agent-settings/:agentId", async (req: AuthenticatedRequest, res) => {
+  const input = z.object({ organizationId: z.string().min(1), maxConcurrentTasks: z.number().int().min(1).max(20), dailyBudgetUsd: z.number().min(0).max(10_000), preferredProvider: z.enum(["manual", "openai", "gemini"]), instructions: z.string().max(5000).default("") }).parse(req.body), agentId = agentIdSchema.parse(req.params.agentId);
+  if (await requireRole(req, res, input.organizationId, ["owner"]) === undefined) return;
+  const { organizationId, ...settings } = input, ref = db.doc(`organizations/${organizationId}/agentSettings/${agentId}`), previous = await ref.get(), now = new Date().toISOString();
+  await ref.set({ id: agentId, ...settings, paused: previous.data()?.paused ?? false, version: Number(previous.data()?.version ?? 0) + 1, updatedAt: now, updatedBy: req.user!.uid }, { merge: true });
+  await audit(organizationId, "agent.settings.updated", req.user!.uid, { agentId, previousVersion: previous.data()?.version ?? 0, settings });
+  return res.json({ data: { id: agentId, version: Number(previous.data()?.version ?? 0) + 1 } });
 });
