@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ref, uploadBytes } from "firebase/storage";
-import { CheckCircle2, Eye, FileText, LoaderCircle, RotateCcw, Send, UploadCloud } from "lucide-react";
+import { CheckCircle2, Eye, FileText, Headphones, LoaderCircle, RotateCcw, Send, UploadCloud } from "lucide-react";
 import { type Project } from "@pageloom/core";
 import { firebaseAuth, firebaseStorage } from "@/lib/firebase";
 import { api } from "@/lib/api";
@@ -21,11 +21,13 @@ const stages: Record<string, string> = {
 
 type QuestionnaireField = { id: string; label: string; type: "short_text" | "long_text" | "email" | "phone" | "url" | "select" | "multi_select" | "boolean" | "file"; required: boolean; options?: string[]; helpText?: string };
 type Questionnaire = { id: string; title: string; version: number; status: string; fields: QuestionnaireField[]; responses?: Record<string, string | boolean | string[]>; filePaths?: string[]; createdAt: string; completedAt?: string };
+type SupportTicket = { id: string; projectId: string; subject: string; description: string; priority: string; status: string; responseDueAt: string; resolution?: string; updatedAt: string };
 
 export default function Portal() {
   const { organizationId, membership } = useOrganization();
   const client = membership?.role === "client";
   const projects = useLiveCollection<Project>(organizationId ? `organizations/${organizationId}/projects` : undefined, "updatedAt", 100, client ? "customerId" : undefined, client ? membership.customerId : undefined);
+  const tickets = useLiveCollection<SupportTicket>(organizationId ? `organizations/${organizationId}/supportTickets` : undefined, "updatedAt", 100, client ? "customerId" : undefined, client ? membership.customerId : undefined);
   const [id, setId] = useState("");
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
@@ -80,9 +82,16 @@ export default function Portal() {
         {(project.workflowStage === "questionnaire" || questionnaires.data.length > 0) && <CustomerQuestionnaire organizationId={organizationId} projectId={project.id} questionnaires={questionnaires} />}
         {websiteUrl && <Card className="lg:col-span-2"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-sm font-semibold">תצוגה מקדימה של האתר</h2><p className="mt-1 text-xs text-[var(--muted)]">הקישור נפתח בחלון חדש. חזרו לכאן כדי לשלוח הערות או אישור.</p></div><a className="button button-secondary" href={websiteUrl} target="_blank" rel="noopener noreferrer"><Eye className="h-4 w-4" />פתיחת האתר</a></div></Card>}
         <Card className="lg:col-span-2"><h2 className="text-sm font-semibold">הערות ואישור</h2><label className="field mt-4"><span>הערה לצוות</span><textarea className="input min-h-28" value={comment} onChange={event => setComment(event.target.value)} placeholder="רכזו כאן הערות מדויקות לפי עמוד או אזור באתר" maxLength={4000} /></label><div className="mt-3 flex flex-wrap gap-2"><Button variant="secondary" disabled={!comment.trim() || busy} onClick={() => void send()}><Send className="h-4 w-4" />שליחת הערה</Button>{project.workflowStage === "customer_review" && <><Button variant="secondary" disabled={busy} onClick={() => void review("CustomerRequestedRevision")}><RotateCcw className="h-4 w-4" />בקשת שינויים</Button><Button disabled={busy} onClick={() => void review("CustomerApproved")}><CheckCircle2 className="h-4 w-4" />אישור האתר</Button></>}</div>{message && <p className="mt-4 rounded-lg bg-green-50 p-3 text-xs text-green-800" role="status">{message}</p>}{error && <p className="mt-4 rounded-lg bg-red-50 p-3 text-xs text-red-700" role="alert">{error}</p>}</Card>
+        <CustomerSupport organizationId={organizationId} projectId={project.id} tickets={tickets.data.filter(ticket => ticket.projectId === project.id)} />
       </div>
     </> : <Card><Empty title="עדיין אין פרויקט להצגה" description="כאשר הפרויקט שלכם יהיה מוכן, הוא יופיע כאן באופן אוטומטי." /></Card>}
   </div>;
+}
+
+function CustomerSupport({ organizationId, projectId, tickets }: { organizationId: string; projectId: string; tickets: SupportTicket[] }) {
+  const [open, setOpen] = useState(false), [busy, setBusy] = useState(false), [message, setMessage] = useState("");
+  async function submit(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); setBusy(true); setMessage(""); const form = new FormData(event.currentTarget); try { const result = await api<{ id: string; responseDueAt: string }>(`/projects/${projectId}/support-tickets`, { method: "POST", body: JSON.stringify({ organizationId, subject: form.get("subject"), description: form.get("description"), priority: form.get("priority") }) }); setMessage(`הפנייה התקבלה. יעד המענה הראשוני: ${new Intl.DateTimeFormat("he-IL", { dateStyle: "short", timeStyle: "short" }).format(new Date(result.responseDueAt))}.`); setOpen(false); } catch (error) { setMessage(error instanceof Error ? error.message : "לא הצלחנו לפתוח את הפנייה. נסו שוב."); } finally { setBusy(false); } }
+  return <Card className="lg:col-span-2"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="flex items-center gap-2 text-sm font-semibold"><Headphones className="h-4 w-4" />תמיכה ושירות</h2><p className="mt-1 text-xs text-[var(--muted)]">פתחו פנייה לפרויקט ועקבו אחר הסטטוס ויעד המענה.</p></div><Button variant="secondary" onClick={() => setOpen(true)}>פתיחת פנייה</Button></div>{tickets.length ? <div className="mt-4 space-y-2">{tickets.map(ticket => <div className="rounded-xl border border-[var(--border)] p-3" key={ticket.id}><div className="flex items-start justify-between gap-3"><div><b className="text-[10px]">{ticket.subject}</b><small className="mt-1 block text-[9px] text-[var(--muted)]">יעד מענה: {new Intl.DateTimeFormat("he-IL", { dateStyle: "short", timeStyle: "short" }).format(new Date(ticket.responseDueAt))}</small></div><Status value={ticket.status} /></div>{ticket.resolution && <p className="mt-2 rounded-lg bg-green-50 p-2 text-[10px] text-green-800">{ticket.resolution}</p>}</div>)}</div> : <p className="mt-4 text-xs text-[var(--muted)]">אין פניות פתוחות בפרויקט.</p>}{message && <p className="mt-4 rounded-lg bg-[#f4f1ff] p-3 text-xs text-[#58429e]" role="status">{message}</p>}{open && <div className="modal-backdrop"><form className="modal text-start" onSubmit={submit}><h2 className="text-lg font-semibold">פתיחת פנייה לתמיכה</h2><label className="field mt-4"><span>נושא</span><input className="input" name="subject" minLength={3} required /></label><label className="field mt-4"><span>תיאור מלא</span><textarea className="input min-h-28" name="description" minLength={10} required /></label><label className="field mt-4"><span>דחיפות</span><select className="input" name="priority" defaultValue="normal"><option value="critical">קריטי — האתר אינו זמין</option><option value="high">גבוהה — פגיעה משמעותית</option><option value="normal">רגילה</option><option value="low">נמוכה</option></select></label><div className="mt-6 flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setOpen(false)}>ביטול</Button><Button disabled={busy} type="submit">{busy ? "שולחים…" : "שליחת הפנייה"}</Button></div></form></div>}</Card>;
 }
 
 function CustomerQuestionnaire({ organizationId, projectId, questionnaires }: { organizationId: string; projectId: string; questionnaires: ReturnType<typeof useLiveCollection<Questionnaire>> }) {

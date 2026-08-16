@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { createFinancialRecordSchema, createSupportTicketSchema, supportDueAt, updateSupportTicketSchema } from "@pageloom/core";
 import { z } from "zod";
-import { requireRole, type AuthenticatedRequest } from "./auth.js";
+import { requireProjectAccess, requireRole, type AuthenticatedRequest } from "./auth.js";
 import { db } from "./firebase.js";
 
 export const operationalRecordsRouter = Router();
@@ -29,6 +29,19 @@ operationalRecordsRouter.post("/support-tickets", async (req: AuthenticatedReque
     await ref.create({ id: ref.id, ...input, status: "open", responseDueAt: supportDueAt(input.priority, now), createdBy: req.user!.uid, createdAt: now, updatedAt: now });
     await audit(input.organizationId, "support.ticket.created", req.user!.uid, { ticketId: ref.id, customerId: input.customerId, projectId: input.projectId ?? null, priority: input.priority });
     return res.status(201).json({ data: { id: ref.id } });
+  } catch (error) { return res.status(400).json({ error: { code: "INVALID_SUPPORT_TICKET", message: error instanceof Error ? error.message : "Invalid support ticket" } }); }
+});
+
+operationalRecordsRouter.post("/projects/:projectId/support-tickets", async (req: AuthenticatedRequest, res) => {
+  try {
+    const input = z.object({ organizationId: z.string().min(1), subject: z.string().min(3).max(200), description: z.string().min(10).max(10_000), priority: z.enum(["critical", "high", "normal", "low"]).default("normal") }).parse(req.body), projectId = String(req.params.projectId);
+    if (await requireProjectAccess(req, res, input.organizationId, projectId) === undefined) return;
+    const project = await db.doc(`organizations/${input.organizationId}/projects/${projectId}`).get();
+    if (!project.exists || !project.data()?.customerId) return res.status(404).json({ error: { code: "NOT_FOUND", message: "Project not found" } });
+    const ref = db.collection(`organizations/${input.organizationId}/supportTickets`).doc(), now = new Date().toISOString();
+    await ref.create({ id: ref.id, ...input, projectId, customerId: project.data()!.customerId, status: "open", responseDueAt: supportDueAt(input.priority, now), source: "customer_portal", createdBy: req.user!.uid, createdAt: now, updatedAt: now });
+    await audit(input.organizationId, "support.ticket.customer_created", req.user!.uid, { ticketId: ref.id, customerId: project.data()!.customerId, projectId, priority: input.priority });
+    return res.status(201).json({ data: { id: ref.id, responseDueAt: supportDueAt(input.priority, now) } });
   } catch (error) { return res.status(400).json({ error: { code: "INVALID_SUPPORT_TICKET", message: error instanceof Error ? error.message : "Invalid support ticket" } }); }
 });
 

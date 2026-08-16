@@ -25,6 +25,7 @@ service cloud.firestore {
       match /projects/{projectId}/questionnaires/{questionnaireId} { allow read: if staff(orgId) || clientProject(orgId, projectId); allow write: if false; }
       match /projects/{projectId}/documents/{documentId} { allow read: if staff(orgId) || (clientProject(orgId, projectId) && resource.data.audience == 'customer'); allow write: if false; }
       match /projects/{projectId}/documents/{documentId}/signatures/{signatureId} { allow read: if staff(orgId); allow write: if false; }
+      match /supportTickets/{ticketId} { allow read: if staff(orgId) || (client(orgId) && resource.data.customerId == clientCustomerId(orgId)); allow write: if false; }
     }
     match /{document=**} { allow read, write: if false; }
   }
