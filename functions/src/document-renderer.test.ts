@@ -1,3 +1,9 @@
-import{describe,expect,it}from"vitest";import{documentTemplateSchema}from"@pageloom/core";import{renderDocumentHtml,renderDocumentPdf}from"./document-renderer.js";
-const template=documentTemplateSchema.parse({id:"delivery-he",type:"website_delivery",name:"מסירה",audience:"customer",version:1,status:"active",titleTemplate:"מסירת אתר — {{customer}}",bodyTemplate:"שלום {{customer}},\nהאתר נמסר בהצלחה.",requiredVariables:["customer"]});
-describe("document rendering",()=>{it("renders safe standalone Hebrew HTML",()=>{const html=renderDocumentHtml(template,{customer:"נועה <script>"});expect(html).toContain('lang="he" dir="rtl"');expect(html).not.toContain("<script>");expect(html).toContain("&lt;script&gt;")});it("generates a valid embedded-font PDF",async()=>{const bytes=await renderDocumentPdf(template,{customer:"נועה"});expect(new TextDecoder("latin1").decode(bytes.slice(0,8))).toContain("%PDF-");expect(bytes.length).toBeGreaterThan(1000)})});
+import { describe, expect, it } from "vitest";
+import { documentTemplateSchema } from "@pageloom/core";
+import { renderDocumentHtml, renderDocumentPdf } from "./document-renderer.js";
+
+const template = documentTemplateSchema.parse({ id: "delivery-he", type: "website_delivery", name: "מסירה", audience: "customer", version: 1, status: "active", titleTemplate: "מסירת אתר — {{customer}}", bodyTemplate: "שלום {{customer}},\nהאתר נמסר בהצלחה.", requiredVariables: ["customer"] });
+describe("document rendering", () => {
+  it("renders safe, responsive Hebrew HTML with professional document chrome", () => { const html = renderDocumentHtml(template, { customer: "נועה <script>" }); expect(html).toContain('lang="he" dir="rtl"'); expect(html).not.toContain("<script>"); expect(html).toContain("&lt;script&gt;"); expect(html).toContain("PAGELOOM"); expect(html).toContain("@page{size:A4"); });
+  it("generates a valid embedded-font PDF", async () => { const bytes = await renderDocumentPdf(template, { customer: "נועה" }); expect(new TextDecoder("latin1").decode(bytes.slice(0, 8))).toContain("%PDF-"); expect(bytes.length).toBeGreaterThan(1000); });
+});
