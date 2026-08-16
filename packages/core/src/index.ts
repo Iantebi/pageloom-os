@@ -15,5 +15,6 @@ export * from "./documents.js";
 export * from "./business-intelligence.js";
 export * from "./fleet.js";
 export * from "./reports.js";
+export * from "./business-automation.js";
 export * from "./agents/definitions.js";
 export * from "./agents/factory.js";
