@@ -13,5 +13,6 @@ export * from "./legal.js";
 export * from "./israel-localization.js";
 export * from "./documents.js";
 export * from "./business-intelligence.js";
+export * from "./fleet.js";
 export * from "./agents/definitions.js";
 export * from "./agents/factory.js";
