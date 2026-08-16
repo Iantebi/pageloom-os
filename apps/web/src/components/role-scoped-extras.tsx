@@ -7,4 +7,5 @@ import {OperationsHealthCard} from "./operations-health-card";
 import {ManualAiQueue} from "./manual-ai-queue";
 import {EnterpriseOverview} from "./enterprise-overview";
 import {LegalCenter} from "./legal-center";
-export function RoleScopedExtras(){const{membership}=useOrganization();const pathname=usePathname();if(!membership)return null;if(membership.role==="client")return pathname==="/portal"?<LegalCenter/>:null;return <>{pathname==="/dashboard"&&<EnterpriseOverview/>}{pathname==="/portal"&&<LegalCenter/>}{pathname==="/agents"&&<ManualAiQueue/>}<ClientManagementWidgets/><OperationsHealthCard/><CustomerPortalAccess/></>}
+import {BusinessIntelligenceOverview} from "./business-intelligence-overview";
+export function RoleScopedExtras(){const{membership}=useOrganization();const pathname=usePathname();if(!membership)return null;if(membership.role==="client")return pathname==="/portal"?<LegalCenter/>:null;return <>{pathname==="/dashboard"&&<><EnterpriseOverview/><BusinessIntelligenceOverview/></>}{pathname==="/portal"&&<LegalCenter/>}{pathname==="/agents"&&<ManualAiQueue/>}<ClientManagementWidgets/><OperationsHealthCard/><CustomerPortalAccess/></>}
