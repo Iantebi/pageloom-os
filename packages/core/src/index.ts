@@ -10,5 +10,6 @@ export * from "./finance.js";
 export * from "./pricing.js";
 export * from "./project-factory.js";
 export * from "./legal.js";
+export * from "./israel-localization.js";
 export * from "./agents/definitions.js";
 export * from "./agents/factory.js";

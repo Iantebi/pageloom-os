@@ -1,5 +1,13 @@
 # Changelog
 
+## Sprint Beta — Israel Localization
+
+- Defaulted customer and website-project records to Hebrew while preserving English engineering operations.
+- Added client-specific Hebrew/RTL shell behavior and localized the customer portal, authentication, and legal center.
+- Added reusable Hebrew email and WhatsApp draft templates.
+- Added versioned Hebrew customer-document contracts and Israel-ready tax/invoice domain models.
+- Added localization tests and operational documentation without changing provider, workflow, or infrastructure architecture.
+
 ## Unreleased
 
 ### Added
