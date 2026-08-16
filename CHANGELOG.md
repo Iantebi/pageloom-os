@@ -1,5 +1,13 @@
 # Changelog
 
+## Sprint Gamma — Business Hardening
+
+- Added a versioned enterprise document engine with Hebrew HTML/PDF rendering, private artifacts, integrity hashes and digital-signature evidence.
+- Added the CEO command center, business intelligence, approval-gated fleet manager and customer infrastructure health model.
+- Added seven business report families with verified PDF/CSV exports.
+- Added idempotent business-risk monitoring for domains, SSL, backups, inactivity, stalled delivery and negative profitability.
+- Hardened API errors, Firestore/Storage isolation, shared-core packaging and browser source control.
+
 ## Sprint Beta — Israel Localization
 
 - Defaulted customer and website-project records to Hebrew while preserving English engineering operations.
