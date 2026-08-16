@@ -10,4 +10,5 @@ import {LegalCenter} from "./legal-center";
 import {BusinessIntelligenceOverview} from "./business-intelligence-overview";
 import {FleetOverview} from "./fleet-overview";
 import {ReportsOverview} from "./reports-overview";
-export function RoleScopedExtras(){const{membership}=useOrganization();const pathname=usePathname();if(!membership)return null;if(membership.role==="client")return pathname==="/portal"?<LegalCenter/>:null;return <>{pathname==="/dashboard"&&<><EnterpriseOverview/><BusinessIntelligenceOverview/><FleetOverview/><ReportsOverview/></>}{pathname==="/portal"&&<LegalCenter/>}{pathname==="/agents"&&<ManualAiQueue/>}<ClientManagementWidgets/><OperationsHealthCard/><CustomerPortalAccess/></>}
+import {OperationalRecords} from "./operational-records";
+export function RoleScopedExtras(){const{membership}=useOrganization();const pathname=usePathname();if(!membership)return null;if(membership.role==="client")return pathname==="/portal"?<LegalCenter/>:null;return <>{pathname==="/dashboard"&&<><EnterpriseOverview/><BusinessIntelligenceOverview/><OperationalRecords/><FleetOverview/><ReportsOverview/></>}{pathname==="/portal"&&<LegalCenter/>}{pathname==="/agents"&&<ManualAiQueue/>}<ClientManagementWidgets/><OperationsHealthCard/><CustomerPortalAccess/></>}
