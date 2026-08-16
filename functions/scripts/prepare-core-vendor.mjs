@@ -10,6 +10,7 @@ const sourcePackage = JSON.parse(await readFile(resolve(coreRoot, "package.json"
 await rm(destination, {recursive: true, force: true});
 await mkdir(destination, {recursive: true});
 await cp(resolve(coreRoot, "lib"), resolve(destination, "lib"), {recursive: true});
+await cp(resolve(coreRoot, "src"), resolve(destination, "src"), {recursive: true});
 await writeFile(resolve(destination, "package.json"), `${JSON.stringify({
   name: sourcePackage.name,
   version: sourcePackage.version,

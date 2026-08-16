@@ -21,4 +21,5 @@ describe("Storage tenant isolation policy", () => {
   it("retains a default deny rule", () => {
     expect(rules).toContain("match /{allPaths=**} { allow read, write: if false; }");
   });
+  it("does not expose generated document and report storage directly",()=>{expect(rules).not.toContain("/documents/{allPaths=**}");expect(rules).not.toContain("/reports/{allPaths=**}");expect(rules).toContain("match /{allPaths=**} { allow read, write: if false; }")});
 });

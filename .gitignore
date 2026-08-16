@@ -3,6 +3,8 @@ functions/vendor/
 .next/
 out/
 lib/
+!apps/web/src/lib/
+!apps/web/src/lib/**
 dist/
 coverage/
 .firebase/
