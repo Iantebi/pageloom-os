@@ -19,5 +19,6 @@ export * from "./business-automation.js";
 export * from "./business-rules.js";
 export * from "./customer-experience.js";
 export * from "./operations.js";
+export * from "./sales-enablement.js";
 export * from "./agents/definitions.js";
 export * from "./agents/factory.js";

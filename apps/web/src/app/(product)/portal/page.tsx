@@ -72,7 +72,8 @@ export default function Portal() {
   }
 
   return <div className="space-y-6" dir="rtl" lang="he">
-    <PageHeader eyebrow="האזור האישי שלכם" title="פורטל הלקוחות" description="עקבו אחר ההתקדמות, העלו חומרים, צפו באתר והשאירו החלטה ברורה לצוות הפרויקט." />
+    <PageHeader eyebrow="האזור האישי שלכם" title="ברוכים הבאים ל-PageLoom" description="מכאן מתחילים: מלאו את שאלון ההיכרות, העלו את חומרי המותג ועקבו אחר כל שלב עד להשקת האתר." />
+    <Card><div className="grid gap-3 md:grid-cols-4">{["1. שאלון היכרות","2. העלאת חומרים","3. בנייה ובדיקות","4. אישור והשקה"].map((step,index)=><div className="rounded-xl bg-[#fafaf8] p-4" key={step}><b className="text-xs">{step}</b><p className="mt-2 text-[10px] leading-4 text-[var(--muted)]">{index<2?"הפעולה שלכם נדרשת כדי שנוכל להתקדם.":"צוות PageLoom יעדכן את הסטטוס כאן בזמן אמת."}</p></div>)}</div></Card>
     {projects.error && <Card role="alert"><p className="text-xs text-red-700">לא הצלחנו לטעון את הפרויקטים. רעננו את העמוד; אם הבעיה נמשכת, פנו לתמיכה.</p></Card>}
     {projects.loading && !projects.data.length ? <Card aria-busy="true"><div className="flex min-h-40 items-center justify-center gap-2 text-xs text-[var(--muted)]"><LoaderCircle className="h-4 w-4 animate-spin" />טוענים את הפרויקט שלכם…</div></Card> : project ? <>
       {projects.data.length > 1 && <Card><label className="field"><span>בחירת פרויקט</span><select className="input" value={project.id} onChange={event => setId(event.target.value)}>{projects.data.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label></Card>}
