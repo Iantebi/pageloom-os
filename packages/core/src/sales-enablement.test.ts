@@ -10,6 +10,7 @@ describe("WhatsApp sales outreach", () => {
   it("refuses incomplete context", () => expect(() => buildWhatsAppOutreach({ firstName: "", businessName: "Studio", observation: "No CTA", bookingUrl: "https://cal.example" })).toThrow("Complete all outreach fields"));
 });
 describe("sales flow", () => {
+  it("publishes complete packages with deposits and positioning", async () => { const { salesPackages } = await import("./sales-enablement.js"); expect(salesPackages.every(item => item.depositPercent > 0 && item.idealFor && item.outcomes.length === 3)).toBe(true); });
   it("generates a package-specific proposal", () => expect(generateProposal({ prospectName: "Dana", businessName: "Studio", challenge: "Increase qualified inquiries", packageId: "growth", validUntil: "2026-09-01" })).toContain("Recommended package: Growth"));
   it("calculates pipeline metrics", () => expect(calculateSalesMetrics([{ status: "won", value: 12000 }, { status: "qualified", value: 8000, nextCallAt: "2026-09-01T09:00:00Z" }], new Date("2026-08-19T00:00:00Z"))).toEqual({ leads: 2, calls: 1, conversionRate: 50, revenue: 12000 }));
 });

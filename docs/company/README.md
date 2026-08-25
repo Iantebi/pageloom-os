@@ -18,16 +18,16 @@ This directory is the internal, English-language operating source of truth for P
 | Function | Primary source | Supporting source |
 |---|---|---|
 | Business | Business blueprint | `../BUSINESS-OPERATIONS.md` |
-| Sales | Operations manual: lead-to-close | `../FIRST-CUSTOMER-RUNBOOK.md` |
+| Sales | Operations manual: lead-to-close | `../FIRST-CUSTOMER-RUNBOOK.md`, `../CUSTOMER-COMMUNICATION-LIBRARY.md` |
 | Marketing | Blueprint: growth strategy | CEO handbook: growth review |
-| Support | Operations manual: support | `../SUPPORT-PLAYBOOK.md` |
+| Support | Operations manual: support | `../SUPPORT-PLAYBOOK.md`, `../CUSTOMER-COMMUNICATION-LIBRARY.md` |
 | Operations | Operations manual | `../OPERATIONS.md` |
 | Legal | Operations manual: contract gates | `../SPRINT-GAMMA-BUSINESS-HARDENING.md` |
 | Finance | Financial operating system | `../BUSINESS-OPERATIONS.md` |
 | Infrastructure | Blueprint: infrastructure strategy | `../ARCHITECTURE.md`, `../SECURITY.md` |
 | AI | Blueprint: AI strategy | `../AGENT-COMMUNICATION.md` |
 | Development | Operational standards | `../RELEASE-ACCEPTANCE.md` |
-| Customer success | Operations manual: delivery through offboarding | `../SUPPORT-PLAYBOOK.md` |
+| Customer success | Operations manual: delivery through offboarding | `../SUPPORT-PLAYBOOK.md`, `../CUSTOMER-COMMUNICATION-LIBRARY.md` |
 | Templates | Versioned document templates in the application | `../ISRAEL-LOCALIZATION.md` |
 | SOPs | Operations manual | Workflow-specific runbooks above |
 

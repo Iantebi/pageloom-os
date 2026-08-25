@@ -13,11 +13,11 @@ export function buildWhatsAppOutreach(context: OutreachContext): WhatsAppStep[] 
   ];
 }
 
-export type SalesPackage = { id: "launch" | "growth" | "authority"; name: string; price: number; timelineWeeks: number; outcomes: readonly string[] };
+export type SalesPackage = { id: "launch" | "growth" | "authority"; name: string; price: number; depositPercent: number; timelineWeeks: number; idealFor: string; outcomes: readonly string[] };
 export const salesPackages: readonly SalesPackage[] = [
-  { id: "launch", name: "Launch", price: 6500, timelineWeeks: 3, outcomes: ["Conversion-focused website", "Mobile optimization", "Lead capture setup"] },
-  { id: "growth", name: "Growth", price: 12000, timelineWeeks: 5, outcomes: ["Strategy and messaging", "Custom conversion journey", "Analytics and SEO foundation"] },
-  { id: "authority", name: "Authority", price: 22000, timelineWeeks: 8, outcomes: ["Premium content system", "Advanced integrations", "90-day optimization plan"] },
+  { id: "launch", name: "Launch", price: 6500, depositPercent: 50, timelineWeeks: 3, idealFor: "A focused service business that needs a credible conversion-ready presence", outcomes: ["Up to 5 conversion-focused pages", "Mobile optimization", "Lead capture and analytics setup"] },
+  { id: "growth", name: "Growth", price: 12000, depositPercent: 50, timelineWeeks: 5, idealFor: "A growing business that needs positioning, content, and a complete lead journey", outcomes: ["Strategy and messaging", "Up to 10 custom pages", "SEO, analytics, and CRM-ready lead capture"] },
+  { id: "authority", name: "Authority", price: 22000, depositPercent: 40, timelineWeeks: 8, idealFor: "An established brand that needs a premium content and conversion platform", outcomes: ["Premium content system", "Advanced integrations", "90-day optimization plan"] },
 ];
 export type ProposalContext = { prospectName: string; businessName: string; challenge: string; packageId: SalesPackage["id"]; validUntil: string };
 export function generateProposal(context: ProposalContext): string { const selected = salesPackages.find(item => item.id === context.packageId); if (!selected || !context.prospectName.trim() || !context.businessName.trim() || !context.challenge.trim()) throw new Error("Complete the proposal details"); return [`PageLoom proposal for ${context.businessName}`, `Prepared for ${context.prospectName}`, "", `Priority: ${context.challenge.trim()}`, `Recommended package: ${selected.name}`, `Investment: ₪${selected.price.toLocaleString("en-US")}`, `Delivery target: ${selected.timelineWeeks} weeks`, "", "Included outcomes:", ...selected.outcomes.map(item => `• ${item}`), "", `Valid until: ${context.validUntil}`, "Next step: select the package and confirm the kickoff call."].join("\n"); }

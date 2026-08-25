@@ -1,0 +1,24 @@
+.notice {
+  margin-top: 12px;
+  border: 1px solid;
+  border-radius: 9px;
+  padding: 10px 12px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.notice-success { border-color: #cfe7d7; background: #f1faf4; color: #286745; }
+.notice-error { border-color: #f0cccc; background: #fff4f4; color: #a52f2f; }
+:where(a, button, input, select, textarea):focus-visible { outline: 3px solid #7357ff55; outline-offset: 2px; }
+@media (max-width: 639px) {
+  .topbar { padding-inline: 16px; }
+  .product-main { padding: 24px 16px 56px; }
+  .card { padding: 16px; }
+  .stat { min-height: 112px; padding: 15px; }
+  .stat strong { margin-top: 20px; font-size: 22px; }
+  .modal { padding: 18px; }
+  .toast { right: 16px; bottom: 16px; left: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}
