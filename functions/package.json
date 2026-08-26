@@ -11,7 +11,8 @@
     "build": "tsc -p tsconfig.json",
     "prepare:vendor": "node scripts/prepare-core-vendor.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --exclude vendor/**"
+    "test": "vitest run --exclude vendor/**",
+    "provision:owner": "node scripts/provision-platform-owner.mjs"
   },
   "dependencies": {
     "@fontsource/noto-sans-hebrew": "^5.3.0",

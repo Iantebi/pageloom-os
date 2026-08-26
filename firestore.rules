@@ -2,15 +2,16 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
+    function platformAdmin() { return signedIn() && request.auth.token.platformRole in ['owner','admin']; }
     function member(orgId) { return signedIn() && exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) && get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.disabled != true; }
     function role(orgId) { return get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role; }
-    function staff(orgId) { return member(orgId) && role(orgId) in ['owner','admin','operator','member']; }
+    function staff(orgId) { return platformAdmin() || (member(orgId) && role(orgId) in ['owner','admin','operator','member']); }
     // Financial, infrastructure and security-sensitive collections: owner/admin/operator only.
     // 'member' is intentionally excluded (least privilege) even though it is a staff role.
-    function privileged(orgId) { return member(orgId) && role(orgId) in ['owner','admin','operator']; }
+    function privileged(orgId) { return platformAdmin() || (member(orgId) && role(orgId) in ['owner','admin','operator']); }
     function client(orgId) { return member(orgId) && role(orgId) == 'client'; }
     function clientCustomerId(orgId) { return get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.customerId; }
-    function clientProject(orgId, projectId) { return client(orgId) && get(/databases/$(database)/documents/organizations/$(orgId)/projects/$(projectId)).data.customerId == clientCustomerId(orgId) && (!('projectIds' in get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data) || projectId in get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.projectIds); }
+    function clientProject(orgId, projectId) { return client(orgId) && get(/databases/$(database)/documents/organizations/$(orgId)/projects/$(projectId)).data.customerId == clientCustomerId(orgId) && (!('projectIds' in get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data) || get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.projectIds.size() == 0 || projectId in get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.projectIds); }
     match /organizations/{orgId} {
       allow read: if staff(orgId); allow write: if false;
       match /members/{uid} { allow read: if staff(orgId); allow write: if false; }
@@ -66,6 +67,7 @@ service cloud.firestore {
       match /reports/{docId} { allow read: if staff(orgId); allow write: if false; }
       match /websites/{docId} { allow read: if staff(orgId); allow write: if false; }
       match /websites/{websiteId}/content/{contentId} { allow read: if staff(orgId) || (client(orgId) && resource.data.customerId == clientCustomerId(orgId)); allow write: if false; }
+      match /websites/{websiteId}/contentSubmissions/{submissionId} { allow read: if privileged(orgId); allow write: if false; }
       match /websites/{websiteId}/contentRevisions/{revisionId} { allow read: if privileged(orgId); allow write: if false; }
       match /websiteVersions/{docId} { allow read: if staff(orgId); allow write: if false; }
       match /templates/{docId} { allow read: if staff(orgId); allow write: if false; }

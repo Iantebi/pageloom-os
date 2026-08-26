@@ -15,12 +15,17 @@ export const createSupportTicketSchema = z.object({
   projectId: z.string().min(1).optional(),
   subject: z.string().min(3).max(200),
   description: z.string().min(10).max(10_000),
+  category: z.enum(["website_issue", "content", "domain", "billing", "maintenance", "other"]).default("other"),
+  attachmentPaths: z.array(z.string().min(1).max(1000)).max(10).default([]),
   priority: supportPrioritySchema.default("normal"),
 });
 export const updateSupportTicketSchema = z.object({
   organizationId: z.string().min(1),
   status: supportStatusSchema,
   resolution: z.string().min(3).max(10_000).optional(),
+  priority: supportPrioritySchema.optional(),
+  assignedTo: z.string().max(200).optional(),
+  internalNote: z.string().min(1).max(10_000).optional(),
 }).superRefine((value, context) => {
   if (["resolved", "closed"].includes(value.status) && !value.resolution) context.addIssue({ code: "custom", path: ["resolution"], message: "Resolution evidence is required" });
 });

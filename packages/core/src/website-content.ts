@@ -106,7 +106,7 @@ export function defaultContentPermissions(): Record<string, boolean> { return Ob
 
 export interface WebsiteContentDocument { id: "draft" | "published"; values: Record<string, unknown>; updatedAt: string; updatedBy: string }
 export interface WebsiteContentPermissions { id: "permissions"; publishMode: "direct" | "approval"; fields: Record<string, boolean>; showPrices: boolean; updatedAt: string; updatedBy: string }
-export interface WebsiteContentSubmission { id: "current"; status: "pending" | "approved" | "rejected"; fieldIds: string[]; values: Record<string, unknown>; submittedBy: string; submittedAt: string; decidedBy?: string; decidedAt?: string; reason?: string }
+export interface WebsiteContentSubmission { id: "current"; status: "pending" | "approved" | "rejected" | "changes_requested"; fieldIds: string[]; values: Record<string, unknown>; submittedBy: string; submittedAt: string; decidedBy?: string; decidedAt?: string; reason?: string }
 export type ContentRevision =
   | { id: string; type: "field_change"; fieldId: string; previousValue: unknown; newValue: unknown; status: "draft" | "published" | "rejected"; actorId: string; actorRole: string; createdAt: string }
   | { id: string; type: "snapshot"; reason: "publish" | "approve" | "rollback"; values: Record<string, unknown>; actorId: string; actorRole: string; createdAt: string };

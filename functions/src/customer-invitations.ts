@@ -19,7 +19,7 @@ export async function claimCustomerInvitations(identity:InvitationIdentity){
       if(!current.exists||current.data()?.status!=="pending"||new Date(String(current.data()?.expiresAt)).getTime()<=now.getTime())return;
       const customerId=String(current.data()?.customerId??"");
       if(!customerId)return;
-      transaction.set(organization.collection("members").doc(identity.uid),{uid:identity.uid,email,role:"client",customerId,invitationId:invitation.id,joinedAt:now.toISOString(),updatedAt:now.toISOString()},{merge:true});
+      transaction.set(organization.collection("members").doc(identity.uid),{uid:identity.uid,email,role:"client",customerId,projectIds:current.data()?.projectIds??[],websiteIds:current.data()?.websiteIds??[],permissions:current.data()?.permissions??{contentEdit:true,support:true,comments:true,assets:true},disabled:false,invitationId:invitation.id,joinedAt:now.toISOString(),updatedAt:now.toISOString()},{merge:true});
       transaction.update(invitation.ref,{status:"accepted",acceptedBy:identity.uid,acceptedAt:now.toISOString(),updatedAt:now.toISOString()});
       accepted++;
     });

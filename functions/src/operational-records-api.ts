@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { agentIdSchema, createFinancialRecordSchema, createSupportTicketSchema, supportDueAt, updateSupportTicketSchema } from "@pageloom/core";
 import { z } from "zod";
-import { requireProjectAccess, requireRole, type AuthenticatedRequest } from "./auth.js";
+import { customerPermission, requireProjectAccess, requireRole, type AuthenticatedRequest } from "./auth.js";
 import { db } from "./firebase.js";
 
 export const operationalRecordsRouter = Router();
@@ -34,12 +34,16 @@ operationalRecordsRouter.post("/support-tickets", async (req: AuthenticatedReque
 
 operationalRecordsRouter.post("/projects/:projectId/support-tickets", async (req: AuthenticatedRequest, res) => {
   try {
-    const input = z.object({ organizationId: z.string().min(1), subject: z.string().min(3).max(200), description: z.string().min(10).max(10_000), priority: z.enum(["critical", "high", "normal", "low"]).default("normal") }).parse(req.body), projectId = String(req.params.projectId);
-    if (await requireProjectAccess(req, res, input.organizationId, projectId) === undefined) return;
+    const input = z.object({ organizationId: z.string().min(1), subject: z.string().min(3).max(200), description: z.string().min(10).max(10_000), category: z.enum(["website_issue", "content", "domain", "billing", "maintenance", "other"]).default("other"), attachmentPaths: z.array(z.string().min(1).max(1000)).max(10).default([]), priority: z.enum(["critical", "high", "normal", "low"]).default("normal") }).parse(req.body), projectId = String(req.params.projectId);
+    const member = await requireProjectAccess(req, res, input.organizationId, projectId); if (member === undefined) return;
+    if (!customerPermission(member, "support")) return res.status(403).json({ error: { code: "SUPPORT_PERMISSION_REQUIRED", message: "Support access is disabled for this portal user" } });
     const project = await db.doc(`organizations/${input.organizationId}/projects/${projectId}`).get();
     if (!project.exists || !project.data()?.customerId) return res.status(404).json({ error: { code: "NOT_FOUND", message: "Project not found" } });
     const ref = db.collection(`organizations/${input.organizationId}/supportTickets`).doc(), now = new Date().toISOString();
+    const prefix = `organizations/${input.organizationId}/uploads/${req.user!.uid}/${projectId}/`;
+    if (input.attachmentPaths.some(path => !path.startsWith(prefix))) return res.status(403).json({ error: { code: "INVALID_SUPPORT_ATTACHMENT", message: "Support attachments must belong to this user and project" } });
     await ref.create({ id: ref.id, ...input, projectId, customerId: project.data()!.customerId, status: "open", responseDueAt: supportDueAt(input.priority, now), source: "customer_portal", createdBy: req.user!.uid, createdAt: now, updatedAt: now });
+    await db.collection(`organizations/${input.organizationId}/notifications`).add({ audience: "owner", customerId: project.data()!.customerId, projectId, ticketId: ref.id, title: "New customer support request", body: input.subject, severity: input.priority === "critical" ? "critical" : "warning", type: "support_ticket_created", read: false, createdAt: now });
     await audit(input.organizationId, "support.ticket.customer_created", req.user!.uid, { ticketId: ref.id, customerId: project.data()!.customerId, projectId, priority: input.priority });
     return res.status(201).json({ data: { id: ref.id, responseDueAt: supportDueAt(input.priority, now) } });
   } catch (error) { return res.status(400).json({ error: { code: "INVALID_SUPPORT_TICKET", message: error instanceof Error ? error.message : "Invalid support ticket" } }); }
@@ -51,8 +55,11 @@ operationalRecordsRouter.patch("/support-tickets/:ticketId", async (req: Authent
     if (await requireRole(req, res, input.organizationId, allowed) === undefined) return;
     const ref = db.doc(`organizations/${input.organizationId}/supportTickets/${String(req.params.ticketId)}`), ticket = await ref.get();
     if (!ticket.exists) return res.status(404).json({ error: { code: "NOT_FOUND", message: "Support ticket not found" } });
-    const now = new Date().toISOString(), terminal = ["resolved", "closed"].includes(input.status);
-    await ref.update({ status: input.status, resolution: input.resolution ?? null, updatedBy: req.user!.uid, updatedAt: now, ...(terminal ? { resolvedAt: now, resolvedBy: req.user!.uid } : {}) });
+    const now = new Date().toISOString(), terminal = ["resolved", "closed"].includes(input.status), note = input.internalNote ? ticket.ref.collection("internalNotes").doc() : undefined, batch = db.batch();
+    batch.update(ref, { status: input.status, resolution: input.resolution ?? null, ...(input.priority ? { priority: input.priority } : {}), ...(input.assignedTo !== undefined ? { assignedTo: input.assignedTo || null } : {}), updatedBy: req.user!.uid, updatedAt: now, ...(terminal ? { resolvedAt: now, resolvedBy: req.user!.uid } : {}) });
+    if (note) batch.create(note, { id: note.id, body: input.internalNote, createdBy: req.user!.uid, createdAt: now });
+    if (terminal) { const notification = db.collection(`organizations/${input.organizationId}/notifications`).doc(); batch.create(notification, { audience: "customer", customerId: ticket.data()?.customerId, projectId: ticket.data()?.projectId, ticketId: ref.id, title: "Support request resolved", body: input.resolution, type: "support_ticket_resolved", read: false, createdAt: now }); }
+    await batch.commit();
     await audit(input.organizationId, "support.ticket.status_changed", req.user!.uid, { ticketId: ref.id, from: ticket.data()?.status, to: input.status, resolution: input.resolution ?? null });
     return res.json({ data: { id: ref.id, status: input.status } });
   } catch (error) { return res.status(400).json({ error: { code: "INVALID_SUPPORT_UPDATE", message: error instanceof Error ? error.message : "Invalid support update" } }); }
