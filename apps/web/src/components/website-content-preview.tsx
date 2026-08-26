@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import { Eye, History, RotateCcw } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button, Card, CardHeader, Empty, Status, dateTime } from "./product-ui";
@@ -68,10 +69,10 @@ function WebsitePreview({values}:{values:Record<string,unknown>}){
   const gallery=Array.isArray(values.galleryImages)?values.galleryImages as string[]:[];
   const faq=Array.isArray(values.faqItems)?values.faqItems as {question:string;answer:string}[]:[];
   return <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white">
-    <section className="relative min-h-64 bg-[#151814] p-8 text-white">{heroImage&&<img className="absolute inset-0 h-full w-full object-cover opacity-35" src={heroImage} alt=""/>}<div className="relative max-w-xl"><p className="text-[10px] uppercase tracking-[.2em]">Secure draft preview</p><h3 className="mt-4 text-3xl font-semibold">{String(values.heroHeading||"Website heading")}</h3><p className="mt-3 text-sm text-white/75">{String(values.heroSubheading||values.heroBody||"")}</p>{cta&&<span className="mt-5 inline-flex rounded-full bg-white px-4 py-2 text-xs font-bold text-black">{cta}</span>}</div></section>
+    <section className="relative min-h-64 bg-[#151814] p-8 text-white">{heroImage&&<Image unoptimized fill sizes="(max-width: 1024px) 100vw, 50vw" className="object-cover opacity-35" src={heroImage} alt=""/>}<div className="relative max-w-xl"><p className="text-[10px] uppercase tracking-[.2em]">Secure draft preview</p><h3 className="mt-4 text-3xl font-semibold">{String(values.heroHeading||"Website heading")}</h3><p className="mt-3 text-sm text-white/75">{String(values.heroSubheading||values.heroBody||"")}</p>{cta&&<span className="mt-5 inline-flex rounded-full bg-white px-4 py-2 text-xs font-bold text-black">{cta}</span>}</div></section>
     <section className="p-7"><h4 className="text-xl font-semibold">{String(values.aboutHeading||"About")}</h4><p className="mt-2 whitespace-pre-wrap text-xs leading-6 text-[var(--muted)]">{String(values.aboutBody||"")}</p>
       {services.length>0&&<div className="mt-6 grid gap-3 sm:grid-cols-2">{services.map((service,index)=><article className="rounded-xl bg-[#f7f7f5] p-4" key={`${service.title}-${index}`}><b className="text-xs">{service.title}</b><p className="mt-2 text-[10px] leading-5 text-[var(--muted)]">{service.description}</p>{service.priceLabel&&<small>{service.priceLabel}</small>}</article>)}</div>}
-      {gallery.length>0&&<div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3">{gallery.map(path=><img className="aspect-square rounded-xl object-cover" src={path} alt="" key={path}/>)}</div>}
+      {gallery.length>0&&<div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3">{gallery.map(path=><span className="relative aspect-square" key={path}><Image unoptimized fill sizes="(max-width: 640px) 50vw, 20vw" className="rounded-xl object-cover" src={path} alt=""/></span>)}</div>}
       {faq.length>0&&<div className="mt-6 space-y-2">{faq.map((item,index)=><details className="rounded-xl border p-3" key={`${item.question}-${index}`}><summary className="text-xs font-semibold">{item.question}</summary><p className="mt-2 text-[10px] text-[var(--muted)]">{item.answer}</p></details>)}</div>}
       <p className="mt-6 text-[10px] text-[var(--muted)]">{[values.phone,values.email,values.address].filter(Boolean).map(String).join(" · ")}</p>
     </section>

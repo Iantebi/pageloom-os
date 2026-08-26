@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { agentIdSchema, createFinancialRecordSchema, createSupportTicketSchema, supportDueAt, updateSupportTicketSchema } from "@pageloom/core";
 import { z } from "zod";
-import { customerPermission, requireProjectAccess, requireRole, type AuthenticatedRequest } from "./auth.js";
+import { customerPermission, requirePlatformOrRole, requireProjectAccess, requireRole, type AuthenticatedRequest } from "./auth.js";
 import { db } from "./firebase.js";
 
 export const operationalRecordsRouter = Router();
@@ -52,7 +52,7 @@ operationalRecordsRouter.post("/projects/:projectId/support-tickets", async (req
 operationalRecordsRouter.patch("/support-tickets/:ticketId", async (req: AuthenticatedRequest, res) => {
   try {
     const input = updateSupportTicketSchema.parse(req.body);
-    if (await requireRole(req, res, input.organizationId, allowed) === undefined) return;
+    if (await requirePlatformOrRole(req, res, input.organizationId, allowed) === undefined) return;
     const ref = db.doc(`organizations/${input.organizationId}/supportTickets/${String(req.params.ticketId)}`), ticket = await ref.get();
     if (!ticket.exists) return res.status(404).json({ error: { code: "NOT_FOUND", message: "Support ticket not found" } });
     const now = new Date().toISOString(), terminal = ["resolved", "closed"].includes(input.status), note = input.internalNote ? ticket.ref.collection("internalNotes").doc() : undefined, batch = db.batch();

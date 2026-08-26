@@ -48,4 +48,8 @@ describe("website content API security", () => {
     expect(source).toContain("/platform/content-submissions");
     expect(source).toContain("requirePlatformAdmin");
   });
+  it("uses a valid fixed submission document path", () => {
+    expect(source).toContain("contentSubmissions/current");
+    expect(source).not.toContain("content/submissions/current");
+  });
 });
