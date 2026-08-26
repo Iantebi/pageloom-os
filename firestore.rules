@@ -2,19 +2,73 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    function member(orgId) { return signedIn() && exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)); }
+    function member(orgId) { return signedIn() && exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) && get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.disabled != true; }
     function role(orgId) { return get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role; }
     function staff(orgId) { return member(orgId) && role(orgId) in ['owner','admin','operator','member']; }
+    // Financial, infrastructure and security-sensitive collections: owner/admin/operator only.
+    // 'member' is intentionally excluded (least privilege) even though it is a staff role.
+    function privileged(orgId) { return member(orgId) && role(orgId) in ['owner','admin','operator']; }
     function client(orgId) { return member(orgId) && role(orgId) == 'client'; }
     function clientCustomerId(orgId) { return get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.customerId; }
-    function clientProject(orgId, projectId) { return client(orgId) && get(/databases/$(database)/documents/organizations/$(orgId)/projects/$(projectId)).data.customerId == clientCustomerId(orgId); }
+    function clientProject(orgId, projectId) { return client(orgId) && get(/databases/$(database)/documents/organizations/$(orgId)/projects/$(projectId)).data.customerId == clientCustomerId(orgId) && (!('projectIds' in get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data) || projectId in get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.projectIds); }
     match /organizations/{orgId} {
       allow read: if staff(orgId); allow write: if false;
       match /members/{uid} { allow read: if staff(orgId); allow write: if false; }
-      match /{collection}/{docId} {
-        allow read: if staff(orgId);
-        allow write: if false;
-      }
+
+      // Privileged-only: financial ledgers, infrastructure, and security/admin records.
+      match /revenue/{docId} { allow read: if privileged(orgId); allow write: if false; }
+      match /expenses/{docId} { allow read: if privileged(orgId); allow write: if false; }
+      match /agentSettings/{docId} { allow read: if privileged(orgId); allow write: if false; }
+      match /infrastructurePlans/{docId} { allow read: if privileged(orgId); allow write: if false; }
+      match /backupRuns/{docId} { allow read: if privileged(orgId); allow write: if false; }
+      match /domains/{docId} { allow read: if privileged(orgId); allow write: if false; }
+      match /certificates/{docId} { allow read: if privileged(orgId); allow write: if false; }
+      match /fleetResources/{docId} { allow read: if privileged(orgId); allow write: if false; }
+      match /incidents/{docId} { allow read: if privileged(orgId); allow write: if false; }
+      match /alerts/{docId} { allow read: if privileged(orgId); allow write: if false; }
+      match /securityEvents/{docId} { allow read: if privileged(orgId); allow write: if false; }
+      match /deadLetters/{docId} { allow read: if privileged(orgId); allow write: if false; }
+      match /executions/{docId} { allow read: if privileged(orgId); allow write: if false; }
+      match /apiKeys/{docId} { allow read: if privileged(orgId); allow write: if false; }
+      match /secrets/{docId} { allow read: if privileged(orgId); allow write: if false; }
+      match /auditLogs/{docId} { allow read: if privileged(orgId); allow write: if false; }
+      match /scheduledJobs/{docId} { allow read: if privileged(orgId); allow write: if false; }
+      match /maintenanceRequests/{docId} { allow read: if privileged(orgId); allow write: if false; }
+      match /reviews/{docId} { allow read: if privileged(orgId); allow write: if false; }
+      match /pricingPackages/{docId} { allow read: if privileged(orgId); allow write: if false; }
+      match /legalDocuments/{docId} { allow read: if privileged(orgId); allow write: if false; }
+      match /projects/{projectId}/legalAcceptances/{acceptanceId} { allow read: if privileged(orgId); allow write: if false; }
+      match /customers/{customerId}/closing/{docId} { allow read: if privileged(orgId); allow write: if false; }
+
+      // Staff-broad operational collections (any of owner/admin/operator/member).
+      // Firestore ORs every matching rule for a path, so each collection that must
+      // stay privileged-only above is intentionally NOT covered by a wildcard here —
+      // a wildcard would re-grant 'member' access and silently undo the restriction.
+      match /leads/{docId} { allow read: if staff(orgId); allow write: if false; }
+      match /customers/{docId} { allow read: if staff(orgId); allow write: if false; }
+      match /tasks/{docId} { allow read: if staff(orgId); allow write: if false; }
+      match /approvals/{docId} { allow read: if staff(orgId); allow write: if false; }
+      match /usage/{docId} { allow read: if staff(orgId); allow write: if false; }
+      match /metrics/{docId} { allow read: if staff(orgId); allow write: if false; }
+      match /communicationDrafts/{docId} { allow read: if staff(orgId); allow write: if false; }
+      match /deployments/{docId} { allow read: if staff(orgId); allow write: if false; }
+      match /builds/{docId} { allow read: if staff(orgId); allow write: if false; }
+      match /activity/{docId} { allow read: if staff(orgId); allow write: if false; }
+      match /journeyEvents/{docId} { allow read: if staff(orgId); allow write: if false; }
+      match /workflowInstances/{docId} { allow read: if staff(orgId); allow write: if false; }
+      match /workflowEvents/{docId} { allow read: if staff(orgId); allow write: if false; }
+      match /workflowHistory/{docId} { allow read: if staff(orgId); allow write: if false; }
+      match /workflowLogs/{docId} { allow read: if staff(orgId); allow write: if false; }
+      match /notifications/{docId} { allow read: if staff(orgId); allow write: if false; }
+      match /calendarEvents/{docId} { allow read: if staff(orgId); allow write: if false; }
+      match /customerInvitations/{docId} { allow read: if staff(orgId); allow write: if false; }
+      match /documentTemplates/{docId} { allow read: if staff(orgId); allow write: if false; }
+      match /reports/{docId} { allow read: if staff(orgId); allow write: if false; }
+      match /websites/{docId} { allow read: if staff(orgId); allow write: if false; }
+      match /websites/{websiteId}/content/{contentId} { allow read: if staff(orgId) || (client(orgId) && resource.data.customerId == clientCustomerId(orgId)); allow write: if false; }
+      match /websites/{websiteId}/contentRevisions/{revisionId} { allow read: if privileged(orgId); allow write: if false; }
+      match /websiteVersions/{docId} { allow read: if staff(orgId); allow write: if false; }
+      match /templates/{docId} { allow read: if staff(orgId); allow write: if false; }
       match /leads/{leadId}/notes/{noteId} { allow read: if staff(orgId); allow write: if false; }
       match /customers/{customerId}/contacts/{contactId} { allow read: if staff(orgId); allow write: if false; }
       match /customers/{customerId}/documents/{documentId} { allow read: if staff(orgId); allow write: if false; }
