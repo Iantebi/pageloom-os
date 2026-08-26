@@ -22,4 +22,6 @@ describe("Storage tenant isolation policy", () => {
     expect(rules).toContain("match /{allPaths=**} { allow read, write: if false; }");
   });
   it("does not expose generated document and report storage directly",()=>{expect(rules).not.toContain("/documents/{allPaths=**}");expect(rules).not.toContain("/reports/{allPaths=**}");expect(rules).toContain("match /{allPaths=**} { allow read, write: if false; }")});
+  it("isolates website media by customer, project, website and uploading user",()=>{expect(rules).toContain("website-media/{customerId}/{projectId}/{websiteId}/{userId}/{fileName}");expect(rules).toContain("clientCustomer(orgId,customerId) && clientProject(orgId,projectId)");expect(rules).toContain("request.auth.uid == userId");expect(rules).toContain("image/jpeg|image/png|image/webp|image/gif|video/mp4|video/webm")});
+  it("denies disabled members and honors optional project assignments",()=>{expect(rules).toContain("data.disabled != true");expect(rules).toContain("'projectIds' in membership(orgId)");expect(rules).toContain("projectId in membership(orgId).projectIds")});
 });

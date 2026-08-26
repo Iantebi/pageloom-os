@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import { useOrganization } from "@/lib/organization";
 import { useLiveCollection } from "@/lib/live-data";
 import { Button, Card, Empty, PageHeader, Status } from "@/components/product-ui";
+import { WebsiteContentWorkspace } from "@/components/website-content-workspace";
 
 const stages: Record<string, string> = {
   lead: "ליד", questionnaire: "שאלון", assets: "איסוף חומרים", research: "מחקר",
@@ -82,6 +83,7 @@ export default function Portal() {
         <Card><h2 className="text-sm font-semibold">חומרים לפרויקט</h2><p className="mt-2 text-xs leading-5 text-[var(--muted)]">העלו לוגו, תמונות, טקסטים ומסמכים שישמשו באתר. יש להעלות רק חומרים שבבעלותכם או שקיבלתם רשות להשתמש בהם.</p><label className="button button-secondary mt-5 cursor-pointer justify-center"><UploadCloud className="h-4 w-4" />{busy ? "מעלים…" : "בחירת קובץ"}<input className="sr-only" type="file" disabled={busy} onChange={upload} /></label></Card>
         {(project.workflowStage === "questionnaire" || questionnaires.data.length > 0) && <CustomerQuestionnaire organizationId={organizationId} projectId={project.id} questionnaires={questionnaires} />}
         {websiteUrl && <Card className="lg:col-span-2"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-sm font-semibold">תצוגה מקדימה של האתר</h2><p className="mt-1 text-xs text-[var(--muted)]">הקישור נפתח בחלון חדש. חזרו לכאן כדי לשלוח הערות או אישור.</p></div><a className="button button-secondary" href={websiteUrl} target="_blank" rel="noopener noreferrer"><Eye className="h-4 w-4" />פתיחת האתר</a></div></Card>}
+        <WebsiteContentWorkspace organizationId={organizationId} projectId={project.id} customerMode={client} />
         <Card className="lg:col-span-2"><h2 className="text-sm font-semibold">הערות ואישור</h2><label className="field mt-4"><span>הערה לצוות</span><textarea className="input min-h-28" value={comment} onChange={event => setComment(event.target.value)} placeholder="רכזו כאן הערות מדויקות לפי עמוד או אזור באתר" maxLength={4000} /></label><div className="mt-3 flex flex-wrap gap-2"><Button variant="secondary" disabled={!comment.trim() || busy} onClick={() => void send()}><Send className="h-4 w-4" />שליחת הערה</Button>{project.workflowStage === "customer_review" && <><Button variant="secondary" disabled={busy} onClick={() => void review("CustomerRequestedRevision")}><RotateCcw className="h-4 w-4" />בקשת שינויים</Button><Button disabled={busy} onClick={() => void review("CustomerApproved")}><CheckCircle2 className="h-4 w-4" />אישור האתר</Button></>}</div>{message && <p className="mt-4 rounded-lg bg-green-50 p-3 text-xs text-green-800" role="status">{message}</p>}{error && <p className="mt-4 rounded-lg bg-red-50 p-3 text-xs text-red-700" role="alert">{error}</p>}</Card>
         <CustomerSupport organizationId={organizationId} projectId={project.id} tickets={tickets.data.filter(ticket => ticket.projectId === project.id)} />
       </div>
