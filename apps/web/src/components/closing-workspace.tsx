@@ -18,20 +18,27 @@ export function ClosingWorkspace() {
   const [customerId, setCustomerId] = useState("");
   const selected = customerId || customers.data[0]?.id || "";
   const [state, setState] = useState<ClosingState>();
-  const [loading, setLoading] = useState(false);
+  // Which customer `state` actually belongs to, and which customer the last fetch attempt was
+  // for — both set only from promise callbacks (never synchronously in the effect body) so a
+  // switch between customers can't flash the previous customer's proposal/contract/payments,
+  // and `loading` below can be a plain derived value instead of its own effect-driven state.
+  const [stateFor, setStateFor] = useState("");
+  const [attemptedFor, setAttemptedFor] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({ customer: "", business: "", packageId: "growth" as "launch" | "growth" | "authority", challenge: "", validUntil: "", startAt: "" });
   const [signature, setSignature] = useState("");
 
+  const loading = Boolean(selected) && attemptedFor !== selected;
+  const data = stateFor === selected ? state : undefined;
+
   useEffect(() => {
-    if (!organizationId || !selected) { setState(undefined); return; }
+    if (!organizationId || !selected) return;
     let cancelled = false;
-    setLoading(true); setError("");
     api<ClosingState>(`/customers/${selected}/closing?organizationId=${organizationId}`)
-      .then(value => { if (!cancelled) setState(value); })
+      .then(value => { if (!cancelled) { setState(value); setStateFor(selected); setError(""); } })
       .catch(reason => { if (!cancelled) setError(reason instanceof Error ? reason.message : "Could not load the closing workspace"); })
-      .finally(() => { if (!cancelled) setLoading(false); });
+      .finally(() => { if (!cancelled) setAttemptedFor(selected); });
     return () => { cancelled = true; };
   }, [organizationId, selected]);
 
@@ -40,7 +47,7 @@ export function ClosingWorkspace() {
     setBusy(true); setError("");
     try {
       const result = await api<ClosingState>(`/customers/${selected}/closing/proposals`, { method: "POST", body: JSON.stringify({ organizationId, ...form }) });
-      setState(result); setSignature("");
+      setState(result); setStateFor(selected); setSignature("");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not generate the proposal"); }
     finally { setBusy(false); }
   }
@@ -49,7 +56,7 @@ export function ClosingWorkspace() {
     setBusy(true); setError("");
     try {
       const result = await api<ClosingState>(`/customers/${selected}/closing/sign`, { method: "POST", body: JSON.stringify({ organizationId, typedSignature: signature }) });
-      setState(result);
+      setState(result); setStateFor(selected);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Signature does not match the customer name on the proposal"); }
     finally { setBusy(false); }
   }
@@ -58,14 +65,14 @@ export function ClosingWorkspace() {
     setBusy(true); setError("");
     try {
       const result = await api<ClosingState>(`/customers/${selected}/closing/payments/${paymentId}/paid`, { method: "POST", body: JSON.stringify({ organizationId }) });
-      setState(result);
+      setState(result); setStateFor(selected);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not mark the payment as paid"); }
     finally { setBusy(false); }
   }
 
   async function toggleChecklist(itemId: string, complete: boolean) {
-    if (!state) return;
-    setState({ ...state, checklist: state.checklist.map(item => item.id === itemId ? { ...item, complete } : item) });
+    if (!data) return;
+    setState({ ...data, checklist: data.checklist.map(item => item.id === itemId ? { ...item, complete } : item) });
     try {
       await api(`/customers/${selected}/closing/checklist/${itemId}`, { method: "PATCH", body: JSON.stringify({ organizationId, complete }) });
     } catch (reason) {
@@ -74,8 +81,8 @@ export function ClosingWorkspace() {
     }
   }
 
-  const proposal = state?.proposal;
-  const signed = Boolean(state?.contract);
+  const proposal = data?.proposal;
+  const signed = Boolean(data?.contract);
 
   return <section className="space-y-4">
     <Card>
@@ -96,14 +103,14 @@ export function ClosingWorkspace() {
       {error && <p className="mt-4 text-xs text-red-700" role="alert">{error}</p>}
     </Card>
     {loading && <Loading label="Loading the closing workspace…" />}
-    {proposal && <>
+    {proposal && data && <>
       <div className="grid gap-4 lg:grid-cols-2">
         <Card><div className="flex justify-between"><h2 className="text-sm font-semibold">Proposal · {proposal.package.name}</h2><Status value={proposal.status} /></div><p className="mt-3 text-xs">{proposal.challenge}</p><div className="mt-4 grid grid-cols-3 gap-2"><Metric label="Investment" value={money(proposal.investment)} /><Metric label="Deposit" value={money(proposal.deposit)} /><Metric label="Balance" value={money(proposal.balance)} /></div>{proposal.package.outcomes.map(item => <p key={item} className="mt-2 text-xs">✓ {item}</p>)}</Card>
         <Card><h2 className="text-sm font-semibold">Digital contract</h2><p className="mt-2 text-xs text-[var(--muted)]">Agreement v1.0 · package, scope, payment schedule, and delivery target attached to this proposal.</p><label className="field mt-4"><span>Type &ldquo;{proposal.customer}&rdquo; to sign</span><input disabled={signed || busy} className="input" value={signature} onChange={e => setSignature(e.target.value)} /></label><Button className="mt-3" disabled={signed || busy || !signature.trim()} onClick={() => void sign()}>{signed ? "Contract signed" : "Accept and sign"}</Button></Card>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card><h2 className="text-sm font-semibold">Onboarding checklist</h2>{state.checklist.map(item => <label key={item.id} className="mt-3 flex items-center gap-3 text-xs"><input type="checkbox" checked={item.complete} disabled={busy} onChange={() => void toggleChecklist(item.id, !item.complete)} /><span className="flex-1">{item.label}</span><small>{item.owner}</small></label>)}</Card>
-        <Card><h2 className="text-sm font-semibold">Payment tracking</h2>{state.payments.length ? state.payments.map(item => <div key={item.id} className="mt-3 flex items-center justify-between rounded-xl border p-3"><span><b className="block text-xs">{item.label}</b><small>{money(item.amount)}</small></span><Button variant="secondary" disabled={item.status === "paid" || busy} onClick={() => void paid(item.id)}>{item.status === "paid" ? "Paid" : "Mark paid"}</Button></div>) : <Empty title="No payment schedule" description="Set a kickoff date when generating the proposal to create a payment schedule." />}</Card>
+        <Card><h2 className="text-sm font-semibold">Onboarding checklist</h2>{data.checklist.map(item => <label key={item.id} className="mt-3 flex items-center gap-3 text-xs"><input type="checkbox" checked={item.complete} disabled={busy} onChange={() => void toggleChecklist(item.id, !item.complete)} /><span className="flex-1">{item.label}</span><small>{item.owner}</small></label>)}</Card>
+        <Card><h2 className="text-sm font-semibold">Payment tracking</h2>{data.payments.length ? data.payments.map(item => <div key={item.id} className="mt-3 flex items-center justify-between rounded-xl border p-3"><span><b className="block text-xs">{item.label}</b><small>{money(item.amount)}</small></span><Button variant="secondary" disabled={item.status === "paid" || busy} onClick={() => void paid(item.id)}>{item.status === "paid" ? "Paid" : "Mark paid"}</Button></div>) : <Empty title="No payment schedule" description="Set a kickoff date when generating the proposal to create a payment schedule." />}</Card>
       </div>
     </>}
   </section>;
