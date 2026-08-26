@@ -59,6 +59,9 @@
 .master-metric>span { display: block; color: #7d857e; font-size: 9px; font-weight: 600; }
 .master-metric strong { display: block; margin-top: 23px; overflow: hidden; color: #eef2ee; font-size: 19px; font-weight: 620; letter-spacing: -.035em; text-overflow: ellipsis; text-transform: capitalize; }
 .master-status-dot { position: absolute; top: 16px; right: 15px; width: 6px; height: 6px; border-radius: 50%; background: #53cc77; box-shadow: 0 0 9px #53cc7770; }.master-status-dot.warn { background: #e5a23c; box-shadow: 0 0 9px #e5a23c70; }.master-status-dot.bad { background: #e85b5b; box-shadow: 0 0 9px #e85b5b70; }
+.master-table-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.master-search-inline { max-width: none; flex: 1 1 240px; margin: 0; }
+.master-filter-select { border: 1px solid var(--master-border); border-radius: 9px; background: var(--master-panel); padding: 10px 12px; color: #cfd4d0; font-size: 10px; }
 .master-table-wrap { overflow: auto; border: 1px solid var(--master-border); border-radius: 12px; background: var(--master-panel); }
 .master-table { width: 100%; min-width: 1080px; border-collapse: collapse; text-align: left; }
 .master-table th { border-bottom: 1px solid var(--master-border); background: #151815; padding: 12px 14px; color: #626b63; font-size: 8px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
