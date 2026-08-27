@@ -1,0 +1,26 @@
+export const masterContentPage = {
+  he: {
+    eyebrow: "מרכז השליטה הראשי · תוכן האתר",
+    title: "בקרת תוכן האתר",
+    description: "הגדירו אילו שדות ניתנים לעריכת לקוח, בדקו טיוטות, פרסמו שינויים מאושרים והגנו על תוכן בבעלות המערכת.",
+    backToMaster: "מרכז השליטה הראשי",
+    projectFieldLabel: "אתר הפרויקט",
+    selectProject: "בחירת פרויקט",
+    adminRequiredTitle: "נדרשת הרשאת מנהל/ת מערכת",
+    adminRequiredDescription: "בקרת תוכן האתר זמינה רק לבעלים ולמנהלי/ות מערכת מורשים של PageLoom.",
+    selectWebsiteTitle: "בחרו אתר לקוח",
+    selectWebsiteDescription: "בחרו פרויקט כדי להגדיר ולנהל את תוכן האתר המובנה שלו.",
+  },
+  en: {
+    eyebrow: "BACKEND MASTER · WEBSITE CONTENT",
+    title: "Website content control",
+    description: "Configure customer-editable fields, review drafts, publish approved changes, and protect system-owned content.",
+    backToMaster: "Master control",
+    projectFieldLabel: "Project website",
+    selectProject: "Select a project",
+    adminRequiredTitle: "Administrator access required",
+    adminRequiredDescription: "Website content controls are restricted to PageLoom Owner and authorized Admin roles.",
+    selectWebsiteTitle: "Select a customer website",
+    selectWebsiteDescription: "Choose a project to configure and manage its structured website content.",
+  },
+} as const;

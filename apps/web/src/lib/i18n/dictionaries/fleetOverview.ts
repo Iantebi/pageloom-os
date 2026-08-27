@@ -1,0 +1,28 @@
+export const fleetOverview = {
+  he: {
+    title: "צי התשתיות",
+    subtitle: (healthy: number, total: number, cost: string, failures: number) => `${healthy}/${total} תקינים · ${cost} לחודש · ${failures} כשלי גיבוי`,
+    customerProject: "פרויקט לקוח",
+    region: "אזור",
+    hosting: "אירוח",
+    storage: "אחסון",
+    backup: "גיבוי",
+    monitoring: "ניטור",
+    cost: "עלות",
+    emptyTitle: "לא הוקצו משאבי תשתית",
+    emptyDescription: "תשתית לקוחות מאושרת תופיע כאן לאחר הרישום.",
+  },
+  en: {
+    title: "Infrastructure fleet",
+    subtitle: (healthy: number, total: number, cost: string, failures: number) => `${healthy}/${total} healthy · ${cost} monthly · ${failures} backup failures`,
+    customerProject: "Customer project",
+    region: "Region",
+    hosting: "Hosting",
+    storage: "Storage",
+    backup: "Backup",
+    monitoring: "Monitoring",
+    cost: "Cost",
+    emptyTitle: "No provisioned fleet resources",
+    emptyDescription: "Approved customer infrastructure appears here after registration.",
+  },
+} as const;
