@@ -20,3 +20,15 @@ describe("client project access", () => {
     expect(source).toContain("administrator.data()?.active!==false");
   });
 });
+
+describe("token revocation check", () => {
+  it("still checks revocation in production (or any real deployment) — only skips it under the Functions emulator", () => {
+    // verifyIdToken's checkRevoked=true performs a live call to the Identity Toolkit backend, which needs
+    // Application Default Credentials the Functions emulator has no way to obtain without `firebase login` —
+    // it hangs for ~90s probing the (nonexistent, off-GCE) metadata server before failing. That delay routinely
+    // exceeds upstream proxy timeouts, turning a clean 401 into an opaque, content-type-less 500. Skipping the
+    // revocation round-trip only when FUNCTIONS_EMULATOR==="true" keeps production behavior identical while
+    // making local dev actually work; it does not weaken any authorization check itself.
+    expect(source).toContain('auth.verifyIdToken(header.slice(7),process.env.FUNCTIONS_EMULATOR!=="true")');
+  });
+});
