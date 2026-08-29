@@ -35,7 +35,7 @@ export const operationalRecords = {
     ticket: "פנייה",
     ticketMeta: (customer: string, due: string) => `${customer} · יעד מענה: ${due}`,
     start: "התחלת טיפול",
-    waitForCustomer: "ממתין ללקוח",
+    waitForCustomer: "המתנה ללקוח",
     resolve: "פתרון",
     resolutionPrompt: "תיעוד הפתרון",
     noTicketsTitle: "אין פניות תמיכה פתוחות",

@@ -1,10 +1,10 @@
 export const authErrors = {
   he: {
-    unauthorizedDomain: "הכתובת הזו עדיין לא מורשית לכניסה דרך Firebase. ב-Firebase Console, עברו אל Authentication ← Settings ← Authorized domains והוסיפו את הכתובת המדויקת הזו (כולל הפורט בסביבת פיתוח מקומית).",
+    unauthorizedDomain: "הכתובת הזו עדיין לא מורשית לכניסה דרך Firebase. ב-Firebase Console, עברו אל Authentication → Settings → Authorized domains והוסיפו את הכתובת המדויקת הזו (כולל הפורט בסביבת פיתוח מקומית).",
     popupBlocked: "חלון הכניסה נחסם על ידי הדפדפן. אפשרו חלונות קופצים לאתר זה ונסו שוב.",
     popupClosed: "חלון הכניסה נסגר לפני השלמת ההתחברות. נסו שוב.",
     networkError: "שגיאת רשת בתחילת ההתחברות. בדקו את החיבור לאינטרנט ונסו שוב.",
-    operationNotAllowed: "הכניסה דרך Google עדיין לא מופעלת בפרויקט הזה. הפעילו את ספק Google תחת Authentication ← Sign-in method.",
+    operationNotAllowed: "הכניסה דרך Google עדיין לא מופעלת בפרויקט הזה. הפעילו את ספק Google תחת Authentication → Sign-in method.",
     generic: "לא ניתן היה להתחיל את תהליך ההתחברות. נסו שוב.",
   },
   en: {

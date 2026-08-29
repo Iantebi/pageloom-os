@@ -1,7 +1,7 @@
 export const customerPortalAccess = {
   he: {
     title: "הרשאת גישה לפורטל הלקוחות",
-    subtitle: "הענקת גישה לכתובת אימייל מאומתת של לקוח, לפרויקטים ולקבצים שלו בלבד",
+    subtitle: "הענקת גישה לכתובת אימייל מאומתת של לקוח, המוגבלת לפרויקטים ולקבצים שלו בלבד",
     noCustomersTitle: "אין לקוחות זמינים",
     noCustomersDescription: "הוסיפו לקוח לפני יצירת גישה לפורטל.",
     customerLabel: "לקוח",

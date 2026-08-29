@@ -53,7 +53,7 @@ export const masterControlCenter = {
       fallbackEnv: "פלטפורמה",
     },
     unknownStatus: "לא ידוע",
-    hours: (n: number) => `${n.toFixed(1)} שעות`,
+    hours: (n: number) => `${n.toFixed(1)} ${n.toFixed(1) === "1.0" ? "שעה" : "שעות"}`,
   },
   en: {
     loadingTitle: "Loading platform telemetry",

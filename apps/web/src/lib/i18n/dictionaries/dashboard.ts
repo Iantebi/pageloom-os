@@ -11,7 +11,7 @@ export const dashboard = {
     grossProfitNote: (costs: string) => `סה"כ עלויות ${costs}`,
     pipeline: "צבר עסקאות",
     pipelineNote: (leadCount: number) => `${leadCount} לידים פעילים`,
-    aiCosts: "עלויות AI ו-API",
+    aiCosts: "עלויות AI/API",
     aiCostsNote: (tokens: string) => `${tokens} טוקנים`,
     todaysActivity: "פעילות היום",
     todaysActivitySubtitle: "עבודה שהושלמה ומתבצעת בכל החברה",

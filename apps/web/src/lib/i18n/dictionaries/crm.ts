@@ -40,7 +40,7 @@ export const crm = {
     upload: "העלאה",
     emptySelectCustomerTitle: "בחרו לקוח",
     emptySelectCustomerDescription: "פתחו פרופיל כדי לנהל אנשי קשר, פרטי עסק, מסמכים, תגיות והיסטוריה.",
-    wonLeadOptional: "ליד שנסגר (אופציונלי)",
+    wonLeadOptional: "ליד שנסגר בהצלחה (אופציונלי)",
     none: "ללא",
     fieldLabels: {
       name: "שם",

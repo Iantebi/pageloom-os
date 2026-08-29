@@ -1,7 +1,7 @@
 export const closingWorkspace = {
   he: {
     title: "סגירת עסקה",
-    subtitle: "הצעה ← חוזה ← תשלום ← קליטה ← פתיחת פרויקט.",
+    subtitle: "הצעת מחיר ← חוזה ← תשלום ← קליטה ← פתיחת פרויקט.",
     noCustomersTitle: "אין עדיין לקוחות",
     noCustomersDescription: "הוסיפו לקוח במערכת ה-CRM לפני התחלת תהליך סגירה.",
     customerFieldLabel: "לקוח",
@@ -20,7 +20,7 @@ export const closingWorkspace = {
     markPaidError: "סימון התשלום כשולם נכשל",
     checklistSaveError: "שמירת השינוי ברשימת המשימות נכשלה",
     loadingLabel: "טוען את מרכז סגירת העסקה…",
-    proposalTitle: (packageName: string) => `הצעה · ${packageName}`,
+    proposalTitle: (packageName: string) => `הצעת מחיר · ${packageName}`,
     investmentLabel: "השקעה",
     depositLabel: "מקדמה",
     balanceLabel: "יתרה",

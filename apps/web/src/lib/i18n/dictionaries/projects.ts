@@ -2,7 +2,7 @@ export const projects = {
   he: {
     eyebrow: "אספקה",
     title: "פרויקטים",
-    description: "צרו ותפעלו מעורבויות אתרים ללקוחות עם סטטוס אספקה, אתר וביצוע AI בזמן אמת.",
+    description: "צרו ותפעלו התקשרויות אתרים ללקוחות, עם סטטוס אספקה, אתר וביצוע AI בזמן אמת.",
     createProject: "יצירת פרויקט",
     tableCustomer: "לקוח",
     tableStage: "שלב",

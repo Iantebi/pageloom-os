@@ -15,7 +15,7 @@ export const portalQuestionnaire = {
     fileUploadError: (label: string) => `לא הצלחנו להעלות את הקובץ עבור „${label}”. בדקו את סוג וגודל הקובץ ונסו שוב.`,
     yes: "כן",
     uploadingFile: "מעלים את הקובץ…",
-    fileSaved: "הקובץ נשמר בהצלחה",
+    fileSaved: "הקובץ נשמר בהצלחה.",
     selectPlaceholder: "בחירת תשובה",
   },
   en: {
@@ -34,7 +34,7 @@ export const portalQuestionnaire = {
     fileUploadError: (label: string) => `We couldn't upload the file for "${label}". Check the file type and size and try again.`,
     yes: "Yes",
     uploadingFile: "Uploading the file…",
-    fileSaved: "The file was saved successfully",
+    fileSaved: "The file was saved successfully.",
     selectPlaceholder: "Select an answer",
   },
 } as const;

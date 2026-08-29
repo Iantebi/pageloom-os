@@ -73,6 +73,54 @@ export const websiteContentWorkspace = {
   },
 } as const;
 
+// Mirrors the field ids defined in packages/core/src/website-content.ts (websiteContentFields) —
+// keep in sync if a field is added/renamed there.
+const contentFieldLabelsHe = {
+  heroHeading: "כותרת ראשית",
+  heroSubheading: "כותרת משנה",
+  heroBody: "פסקת פתיחה",
+  heroImage: "תמונת פתיחה",
+  ctaLabel: "טקסט כפתור הפעולה",
+  ctaUrl: "קישור כפתור הפעולה",
+  aboutHeading: "כותרת אודות",
+  aboutBody: "תיאור העסק",
+  phone: "מספר טלפון",
+  email: "אימייל ליצירת קשר",
+  address: "כתובת העסק",
+  hours: "שעות פתיחה",
+  socialLinks: "קישורים לרשתות חברתיות",
+  services: "שירותים",
+  galleryImages: "תמונות גלריה",
+  videos: "סרטונים",
+  testimonials: "המלצות לקוחות",
+  faqItems: "שאלות נפוצות",
+  seoTitle: "כותרת SEO",
+  seoDescription: "תיאור SEO",
+} as const;
+
+const contentFieldLabelsEn = {
+  heroHeading: "Hero heading",
+  heroSubheading: "Hero subheading",
+  heroBody: "Hero paragraph",
+  heroImage: "Hero image",
+  ctaLabel: "Call-to-action text",
+  ctaUrl: "Call-to-action link",
+  aboutHeading: "About heading",
+  aboutBody: "Business description",
+  phone: "Phone number",
+  email: "Contact email",
+  address: "Business address",
+  hours: "Opening hours",
+  socialLinks: "Social links",
+  services: "Services",
+  galleryImages: "Gallery images",
+  videos: "Videos",
+  testimonials: "Testimonials",
+  faqItems: "FAQ",
+  seoTitle: "SEO title",
+  seoDescription: "SEO description",
+} as const;
+
 export const websiteContentPreview = {
   he: {
     previewTitleCustomer: "תצוגה מקדימה מאובטחת",
@@ -87,7 +135,8 @@ export const websiteContentPreview = {
     historySubtitle: "גרסאות שפורסמו הן קבועות; שחזור יוצר גרסה חדשה.",
     reasonFallback: "פרסום",
     snapshotLabel: (reason: string, version: string | number) => `${reason} · גרסה ${version}`,
-    changedFieldLabel: (fieldId: string) => `עודכן השדה ${fieldId}`,
+    fieldLabels: contentFieldLabelsHe,
+    changedFieldLabel: (fieldId: string) => `עודכן השדה ${contentFieldLabelsHe[fieldId as keyof typeof contentFieldLabelsHe] ?? fieldId}`,
     previewRevision: "תצוגה מקדימה של הגרסה",
     noRevisionsTitle: "אין עדיין גרסאות",
     noRevisionsDescription: "עריכות טיוטה, פרסומים, אישורים ושחזורי גרסה יופיעו כאן.",
@@ -112,7 +161,8 @@ export const websiteContentPreview = {
     historySubtitle: "Published snapshots remain immutable; rollback creates a new version",
     reasonFallback: "publish",
     snapshotLabel: (reason: string, version: string | number) => `${reason} · version ${version}`,
-    changedFieldLabel: (fieldId: string) => `Changed ${fieldId}`,
+    fieldLabels: contentFieldLabelsEn,
+    changedFieldLabel: (fieldId: string) => `Changed ${contentFieldLabelsEn[fieldId as keyof typeof contentFieldLabelsEn] ?? fieldId}`,
     previewRevision: "Preview revision",
     noRevisionsTitle: "No revisions yet",
     noRevisionsDescription: "Draft edits, publishes, approvals, and rollbacks will appear here.",

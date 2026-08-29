@@ -14,7 +14,7 @@ const journeyStagesEn: Record<string, string> = {
 
 export const operationsOverview = {
   he: {
-    ariaLabel: "מערכות תפעול המנכ\"ל",
+    ariaLabel: "מערכות התפעול של המנכ\"ל",
     journeyStageLabel: (stage: string) => journeyStagesHe[stage] ?? stage.replaceAll("_", " "),
     journeyEyebrow: "מסע הלקוח",
     journeyTitle: "תהליך האספקה לאחר סגירת עסקה",

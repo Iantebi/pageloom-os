@@ -1,6 +1,6 @@
 export const portalSupport = {
   he: {
-    title: "תמיכה ושירות",
+    title: "תמיכה",
     description: "פתחו פנייה לפרויקט ועקבו אחר הסטטוס ויעד המענה.",
     openTicket: "פתיחת פנייה",
     responseDueLabel: (date: string) => `יעד מענה: ${date}`,

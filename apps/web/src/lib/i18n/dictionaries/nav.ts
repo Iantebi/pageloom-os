@@ -17,7 +17,7 @@ export const nav = {
     roleOperator: "מפעיל/ה",
     roleMember: "חבר/ת צוות",
     roleClient: "לקוח",
-    ownerFallbackName: "מנכ\"ל",
+    ownerFallbackName: "מנכ״ל",
     clientFallbackName: "לקוח",
   },
   en: {

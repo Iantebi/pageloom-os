@@ -1,7 +1,7 @@
 export const documentCenter = {
   he: {
     generateTitle: "יצירת מסמך",
-    generateSubtitle: "הפקת גרסת HTML ו-PDF בלתי ניתנת לשינוי מתוך תבנית מאושרת",
+    generateSubtitle: "הפקת גרסת HTML/PDF בלתי ניתנת לשינוי מתוך תבנית מאושרת",
     templateFieldLabel: "תבנית",
     chooseTemplateOption: "בחרו תבנית פעילה",
     templateOption: (name: string, version: number) => `${name} · גרסה ${version}`,
