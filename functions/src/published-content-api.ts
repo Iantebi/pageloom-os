@@ -2,11 +2,17 @@ import { Router } from "express";
 import { resolvePublishedWebsiteContent } from "@pageloom/core";
 import { z } from "zod";
 import { db, storage } from "./firebase.js";
+import { clientIpKey, rateLimit } from "./rate-limit.js";
 
 export const publishedContentRouter = Router();
 const id = z.string().min(1).max(200).regex(/^[A-Za-z0-9_-]+$/);
 
-publishedContentRouter.get("/public/organizations/:organizationId/websites/:websiteId/content", async (req, res) => {
+// The one fully public, unauthenticated route in this API — there is no uid to key by, so this
+// keys by client IP (see clientIpKey in rate-limit.ts for why req.ip is trustworthy here). The
+// response is already cached at the edge (Cache-Control below, max-age=60/s-maxage=300), so real
+// visitor traffic rarely reaches this handler at all; 60 requests/minute per IP is generous for
+// direct hits (page loads, cache misses, previews) while stopping a scraping/DoS script cold.
+publishedContentRouter.get("/public/organizations/:organizationId/websites/:websiteId/content", rateLimit("public-content", { windowMs: 60_000, max: 60 }, clientIpKey), async (req, res) => {
   try {
     const organizationId = id.parse(req.params.organizationId), websiteId = id.parse(req.params.websiteId);
     const website = await db.doc(`organizations/${organizationId}/websites/${websiteId}`).get();

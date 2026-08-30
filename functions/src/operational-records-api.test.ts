@@ -6,4 +6,10 @@ describe("operational records API", () => {
   it("lets platform administrators operate the cross-organization support queue", () => {
     expect(source).toContain("requirePlatformOrRole(req, res, input.organizationId, allowed)");
   });
+  it("writes structured type/params on support notifications alongside the English title/body, so a frontend dictionary can localize them", () => {
+    expect(source).toContain('type: "support_ticket_created"');
+    expect(source).toContain("params: { subject: input.subject, priority: input.priority }");
+    expect(source).toContain('type: "support_ticket_resolved"');
+    expect(source).toContain('params: { resolution: input.resolution ?? "" }');
+  });
 });

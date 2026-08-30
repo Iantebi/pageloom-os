@@ -3,6 +3,7 @@ import { agentIdSchema, createFinancialRecordSchema, createSupportTicketSchema, 
 import { z } from "zod";
 import { customerPermission, requirePlatformOrRole, requireProjectAccess, requireRole, type AuthenticatedRequest } from "./auth.js";
 import { db } from "./firebase.js";
+import { rateLimit, uidKey } from "./rate-limit.js";
 
 export const operationalRecordsRouter = Router();
 const allowed = ["owner", "admin", "operator"];
@@ -24,7 +25,9 @@ operationalRecordsRouter.post("/finance/:kind", async (req: AuthenticatedRequest
   } catch (error) { return res.status(400).json({ error: { code: "INVALID_FINANCIAL_RECORD", message: error instanceof Error ? error.message : "Invalid financial record" } }); }
 });
 
-operationalRecordsRouter.post("/support-tickets", async (req: AuthenticatedRequest, res) => {
+// Staff-created support tickets: keyed by the creating staff uid. 30 per 15 minutes covers a busy
+// operator logging tickets on behalf of several customers in one sitting.
+operationalRecordsRouter.post("/support-tickets", rateLimit("support-ticket-staff", { windowMs: 15 * 60_000, max: 30 }, uidKey), async (req: AuthenticatedRequest, res) => {
   try {
     const input = createSupportTicketSchema.parse(req.body);
     if (await requireRole(req, res, input.organizationId, allowed) === undefined) return;
@@ -37,7 +40,10 @@ operationalRecordsRouter.post("/support-tickets", async (req: AuthenticatedReque
   } catch (error) { return res.status(400).json({ error: { code: "INVALID_SUPPORT_TICKET", message: error instanceof Error ? error.message : "Invalid support ticket" } }); }
 });
 
-operationalRecordsRouter.post("/projects/:projectId/support-tickets", async (req: AuthenticatedRequest, res) => {
+// Customer-portal ticket creation: the audit's flagged abuse vector — a portal user could script
+// rapid-fire ticket creation. Keyed per portal uid; 10 per 15 minutes is well above what any real
+// customer submits (one ticket per real issue) while stopping a scripted loop quickly.
+operationalRecordsRouter.post("/projects/:projectId/support-tickets", rateLimit("support-ticket-portal", { windowMs: 15 * 60_000, max: 10 }, uidKey), async (req: AuthenticatedRequest, res) => {
   try {
     const input = z.object({ organizationId: z.string().min(1), subject: z.string().min(3).max(200), description: z.string().min(10).max(10_000), category: z.enum(["website_issue", "content", "domain", "billing", "maintenance", "other"]).default("other"), attachmentPaths: z.array(z.string().min(1).max(1000)).max(10).default([]), priority: z.enum(["critical", "high", "normal", "low"]).default("normal") }).parse(req.body), projectId = String(req.params.projectId);
     const member = await requireProjectAccess(req, res, input.organizationId, projectId); if (member === undefined) return;
@@ -48,7 +54,7 @@ operationalRecordsRouter.post("/projects/:projectId/support-tickets", async (req
     const prefix = `organizations/${input.organizationId}/uploads/${req.user!.uid}/${projectId}/`;
     if (input.attachmentPaths.some(path => !path.startsWith(prefix))) return res.status(403).json({ error: { code: "INVALID_SUPPORT_ATTACHMENT", message: "Support attachments must belong to this user and project" } });
     await ref.create({ id: ref.id, ...input, projectId, customerId: project.data()!.customerId, status: "open", responseDueAt: supportDueAt(input.priority, now), source: "customer_portal", createdBy: req.user!.uid, createdAt: now, updatedAt: now });
-    await db.collection(`organizations/${input.organizationId}/notifications`).add({ audience: "owner", customerId: project.data()!.customerId, projectId, ticketId: ref.id, title: "New customer support request", body: input.subject, severity: input.priority === "critical" ? "critical" : "warning", type: "support_ticket_created", read: false, createdAt: now });
+    await db.collection(`organizations/${input.organizationId}/notifications`).add({ audience: "owner", customerId: project.data()!.customerId, projectId, ticketId: ref.id, title: "New customer support request", body: input.subject, params: { subject: input.subject, priority: input.priority }, severity: input.priority === "critical" ? "critical" : "warning", type: "support_ticket_created", read: false, createdAt: now });
     await audit(input.organizationId, "support.ticket.customer_created", req.user!.uid, { ticketId: ref.id, customerId: project.data()!.customerId, projectId, priority: input.priority });
     return res.status(201).json({ data: { id: ref.id, responseDueAt: supportDueAt(input.priority, now) } });
   } catch (error) { return res.status(400).json({ error: { code: "INVALID_SUPPORT_TICKET", message: error instanceof Error ? error.message : "Invalid support ticket" } }); }
@@ -63,7 +69,7 @@ operationalRecordsRouter.patch("/support-tickets/:ticketId", async (req: Authent
     const now = new Date().toISOString(), terminal = ["resolved", "closed"].includes(input.status), note = input.internalNote ? ticket.ref.collection("internalNotes").doc() : undefined, batch = db.batch();
     batch.update(ref, { status: input.status, resolution: input.resolution ?? null, ...(input.priority ? { priority: input.priority } : {}), ...(input.assignedTo !== undefined ? { assignedTo: input.assignedTo || null } : {}), updatedBy: req.user!.uid, updatedAt: now, ...(terminal ? { resolvedAt: now, resolvedBy: req.user!.uid } : {}) });
     if (note) batch.create(note, { id: note.id, body: input.internalNote, createdBy: req.user!.uid, createdAt: now });
-    if (terminal) { const notification = db.collection(`organizations/${input.organizationId}/notifications`).doc(); batch.create(notification, { audience: "customer", customerId: ticket.data()?.customerId, projectId: ticket.data()?.projectId, ticketId: ref.id, title: "Support request resolved", body: input.resolution, type: "support_ticket_resolved", read: false, createdAt: now }); }
+    if (terminal) { const notification = db.collection(`organizations/${input.organizationId}/notifications`).doc(); batch.create(notification, { audience: "customer", customerId: ticket.data()?.customerId, projectId: ticket.data()?.projectId, ticketId: ref.id, title: "Support request resolved", body: input.resolution, params: { resolution: input.resolution ?? "" }, type: "support_ticket_resolved", read: false, createdAt: now }); }
     await batch.commit();
     await audit(input.organizationId, "support.ticket.status_changed", req.user!.uid, { ticketId: ref.id, from: ticket.data()?.status, to: input.status, resolution: input.resolution ?? null });
     return res.json({ data: { id: ref.id, status: input.status } });
