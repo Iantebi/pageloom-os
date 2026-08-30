@@ -28,3 +28,23 @@ describe("closing workspace API authority", () => {
     expect(source.match(/db\.runTransaction/g)?.length).toBe(2);
   });
 });
+
+describe("closing workspace unexpected-error handling", () => {
+  it("no longer reports every unexpected failure as a fixed 409, only a deliberately thrown status", () => {
+    expect(source).toContain('const status = (error as { status?: number }).status;');
+    expect(source).toContain('if (typeof status === "number") return res.status(status)');
+    expect(source).not.toContain('return res.status(409).json({ error: { code: "CLOSING_OPERATION_FAILED"');
+  });
+  it("logs unexpected failures that reach the generic handler", () => {
+    expect(source).toContain('operationalLog("error", "closing.operation.failed"');
+    expect(source).toContain("safeErrorName(error)");
+  });
+  it("falls back to a generic 500 instead of the raw error for unexpected failures", () => {
+    expect(source).toContain('code: "INTERNAL_ERROR"');
+    expect(source).toContain('message: "The operation failed"');
+  });
+  it("still lets the sign/payment domain errors (CONTRACT_NOT_READY, PAYMENT_NOT_FOUND) report their own status and message", () => {
+    expect(source).toContain('code: "CONTRACT_NOT_READY"');
+    expect(source).toContain('code: "PAYMENT_NOT_FOUND"');
+  });
+});

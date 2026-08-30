@@ -1,6 +1,22 @@
 import { params } from "./config.js";
+import { db } from "./firebase.js";
 import { operationalLog, safeErrorName } from "./observability.js";
 import { isFirestoreBackupStale, isStorageBackupStale, isRelevantActiveServiceHealthEvent, latestBackupFolderDate } from "./watchdog-policy.js";
+
+// Cloud Logging alone is not actionable for an owner who isn't watching logs, so every warning or
+// error signal below is also persisted here for the /platform/system-health endpoint to surface -
+// the same "never report a false success, never fail silently" rule the backup job already follows.
+async function recordAlert(type: string, severity: "warning" | "error", detail: Record<string, string | number | boolean | undefined> = {}): Promise<void> {
+  try {
+    const ref = db.collection("systemOperations/watchdog/alerts").doc();
+    await ref.set({ id: ref.id, type, severity, ...detail, createdAt: new Date().toISOString() });
+  } catch (error) {
+    // Alerting must never become a new failure point: a Firestore hiccup here should not stop the
+    // remaining checks or the heartbeat write from running, so it is logged and swallowed here
+    // rather than left to propagate out of whichever check called this.
+    operationalLog("warning", "watchdog.alert_write_failed", { type, reason: safeErrorName(error) });
+  }
+}
 
 async function accessToken(): Promise<string> {
   const { google } = await import("googleapis");
@@ -21,16 +37,17 @@ async function checkFirestoreFreshness(now: Date): Promise<void> {
     const latest = latestBackupFolderDate(result.prefixes ?? []);
     if (!latest) {
       operationalLog("warning", "watchdog.check_failed", { check: "firestore", reason: "no_backup_folders_found" });
+      await recordAlert("firestore_check_failed", "warning", { reason: "no_backup_folders_found" });
       return;
     }
     if (isFirestoreBackupStale(now, latest)) {
-      operationalLog("error", "watchdog.firestore_backup_stale", {
-        latestBackupDate: latest.toISOString(),
-        hoursSinceLastBackup: Math.round((now.getTime() - latest.getTime()) / 3_600_000),
-      });
+      const hoursSinceLastBackup = Math.round((now.getTime() - latest.getTime()) / 3_600_000);
+      operationalLog("error", "watchdog.firestore_backup_stale", { latestBackupDate: latest.toISOString(), hoursSinceLastBackup });
+      await recordAlert("firestore_backup_stale", "error", { latestBackupDate: latest.toISOString(), hoursSinceLastBackup });
     }
   } catch (error) {
     operationalLog("warning", "watchdog.check_failed", { check: "firestore", reason: safeErrorName(error) });
+    await recordAlert("firestore_check_failed", "warning", { reason: safeErrorName(error) });
   }
 }
 
@@ -52,17 +69,18 @@ async function checkStorageFreshness(now: Date): Promise<void> {
     const latestEnd = successEndTimes.at(-1);
     if (!latestEnd) {
       operationalLog("warning", "watchdog.check_failed", { check: "storage", reason: "no_successful_operations_found" });
+      await recordAlert("storage_check_failed", "warning", { reason: "no_successful_operations_found" });
       return;
     }
     const latestDate = new Date(latestEnd);
     if (isStorageBackupStale(now, latestDate)) {
-      operationalLog("error", "watchdog.storage_backup_stale", {
-        lastSuccessTime: latestDate.toISOString(),
-        hoursSinceLastSuccess: Math.round((now.getTime() - latestDate.getTime()) / 3_600_000),
-      });
+      const hoursSinceLastSuccess = Math.round((now.getTime() - latestDate.getTime()) / 3_600_000);
+      operationalLog("error", "watchdog.storage_backup_stale", { lastSuccessTime: latestDate.toISOString(), hoursSinceLastSuccess });
+      await recordAlert("storage_backup_stale", "error", { lastSuccessTime: latestDate.toISOString(), hoursSinceLastSuccess });
     }
   } catch (error) {
     operationalLog("warning", "watchdog.check_failed", { check: "storage", reason: safeErrorName(error) });
+    await recordAlert("storage_check_failed", "warning", { reason: safeErrorName(error) });
   }
 }
 
@@ -79,13 +97,13 @@ async function checkServiceHealth(): Promise<void> {
     const result = (await response.json()) as { events?: Array<{ title?: string; state?: string; relevance?: string }> };
     const relevant = (result.events ?? []).filter(isRelevantActiveServiceHealthEvent);
     if (relevant.length > 0) {
-      operationalLog("error", "watchdog.service_health_incident", {
-        count: relevant.length,
-        titles: relevant.map((event) => event.title).filter(Boolean).join("; ").slice(0, 400),
-      });
+      const titles = relevant.map((event) => event.title).filter(Boolean).join("; ").slice(0, 400);
+      operationalLog("error", "watchdog.service_health_incident", { count: relevant.length, titles });
+      await recordAlert("service_health_incident", "error", { count: relevant.length, titles });
     }
   } catch (error) {
     operationalLog("warning", "watchdog.check_failed", { check: "serviceHealth", reason: safeErrorName(error) });
+    await recordAlert("service_health_check_failed", "warning", { reason: safeErrorName(error) });
   }
 }
 
@@ -95,4 +113,12 @@ export async function runBackupFreshnessWatchdog(): Promise<void> {
   await checkStorageFreshness(now);
   await checkServiceHealth();
   operationalLog("info", "watchdog.heartbeat", { checkedAt: now.toISOString() });
+  // Persisted separately from the per-check alerts above so a stuck/broken schedule (the case Cloud
+  // Logging alone would never surface to an owner who isn't tailing logs) is itself detectable: a
+  // stale heartbeat here means the watchdog stopped running, not that everything is healthy.
+  try {
+    await db.doc("systemOperations/watchdogHeartbeat").set({ checkedAt: now.toISOString() });
+  } catch (error) {
+    operationalLog("warning", "watchdog.heartbeat_write_failed", { reason: safeErrorName(error) });
+  }
 }

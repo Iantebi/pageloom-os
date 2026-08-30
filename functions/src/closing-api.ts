@@ -3,6 +3,7 @@ import { acceptDigitalContract, createClosingProposal, markPaymentPaid, onboardi
 import { z } from "zod";
 import { requireRole, type AuthenticatedRequest } from "./auth.js";
 import { db } from "./firebase.js";
+import { operationalLog, safeErrorName } from "./observability.js";
 
 export const closingRouter = Router();
 
@@ -25,7 +26,14 @@ function docRef(organizationId: string, customerId: string) {
 
 function fail(error: unknown, res: import("express").Response) {
   if (error instanceof z.ZodError) return res.status(422).json({ error: { code: "VALIDATION_ERROR", message: error.issues.map(issue => issue.message).join(", ") } });
-  return res.status(409).json({ error: { code: "CLOSING_OPERATION_FAILED", message: error instanceof Error ? error.message : "Closing operation failed" } });
+  // Only a deliberately thrown, already-classified domain error (e.g. "payment not found") should
+  // reach the client with its own message and status. Anything else is unexpected (a Firestore
+  // hiccup, a bug) and must not be reported as a 409 conflict with a leaked internal error message -
+  // it needs to be logged like every other router's unhandled failure and answered generically.
+  const status = (error as { status?: number }).status;
+  if (typeof status === "number") return res.status(status).json({ error: { code: "CLOSING_OPERATION_FAILED", message: error instanceof Error ? error.message : "Closing operation failed" } });
+  operationalLog("error", "closing.operation.failed", { errorType: safeErrorName(error) });
+  return res.status(500).json({ error: { code: "INTERNAL_ERROR", message: "The operation failed" } });
 }
 
 closingRouter.get("/customers/:customerId/closing", async (req: AuthenticatedRequest, res) => {

@@ -23,4 +23,12 @@ platformMasterRouter.get("/platform/master",async(req:AuthenticatedRequest,res)=
 
 platformMasterRouter.get("/platform/support-tickets",async(req:AuthenticatedRequest,res)=>{if(await requirePlatformAdmin(req,res)===undefined)return;const organizations=await db.collection("organizations").limit(200).get(),items:Item[]=[];for(const organization of organizations.docs){const tickets=await organization.ref.collection("supportTickets").orderBy("updatedAt","desc").limit(500).get();items.push(...tickets.docs.map(ticket=>({id:ticket.id,...ticket.data(),organizationId:organization.id,organizationName:organization.data().name??organization.id})))}items.sort((a,b)=>timestamp(b).localeCompare(timestamp(a)));return res.json({data:items})});
 
+// Surfaces the backup/service-health watchdog's findings (functions/src/watchdog.ts) and the
+// dedicated Firestore export job so a platform admin has one authenticated, in-app place to see
+// them instead of relying on Cloud Logging. Backup run docs don't share one timestamp field across
+// every status branch (see backup.ts), so sorting happens here with the same fallback chain as
+// `timestamp()` above rather than a Firestore orderBy, which would silently drop docs missing
+// whichever single field it ordered on.
+platformMasterRouter.get("/platform/system-health",async(req:AuthenticatedRequest,res)=>{if(await requirePlatformAdmin(req,res)===undefined)return;const[backupRuns,watchdogAlerts,heartbeat]=await Promise.all([db.collection("systemOperations/backups/runs").limit(20).get(),db.collection("systemOperations/watchdog/alerts").orderBy("createdAt","desc").limit(20).get(),db.doc("systemOperations/watchdogHeartbeat").get()]);const latestBackupRuns=backupRuns.docs.map(doc=>({id:doc.id,...doc.data()})).sort((a,b)=>timestamp(b).localeCompare(timestamp(a))).slice(0,5);return res.json({data:{latestBackupRuns,watchdogAlerts:watchdogAlerts.docs.map(doc=>({id:doc.id,...doc.data()})),watchdogHeartbeat:heartbeat.exists?heartbeat.data():null}})});
+
 function averageDuration(items:Item[],start:string,end:string){const completed=items.filter(item=>item[start]&&item[end]),total=completed.reduce((value,item)=>value+Math.max(0,Date.parse(String(item[end]))-Date.parse(String(item[start]))),0);return completed.length?total/completed.length/3_600_000:0;}
