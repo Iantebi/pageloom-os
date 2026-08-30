@@ -7,8 +7,8 @@ const categoryLabelsEn: Record<string, string> = {
   labor: "Labor", software: "Software", tax: "Tax", other: "Other",
 };
 
-const priorityLabelsHe: Record<string, string> = { critical: "דחוף", high: "גבוה", normal: "רגיל", low: "נמוך" };
-const priorityLabelsEn: Record<string, string> = { critical: "Critical", high: "High", normal: "Normal", low: "Low" };
+export const priorityLabelsHe: Record<string, string> = { critical: "דחוף", high: "גבוה", normal: "רגיל", low: "נמוך" };
+export const priorityLabelsEn: Record<string, string> = { critical: "Critical", high: "High", normal: "Normal", low: "Low" };
 
 const ticketStatusLabelsHe: Record<string, string> = {
   open: "פתוח", in_progress: "בטיפול", waiting_customer: "ממתין ללקוח", resolved: "נפתר", closed: "סגור",

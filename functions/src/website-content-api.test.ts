@@ -52,4 +52,12 @@ describe("website content API security", () => {
     expect(source).toContain("contentSubmissions/current");
     expect(source).not.toContain("content/submissions/current");
   });
+  it("writes structured type/params on every content notification alongside the English title/body, so a frontend dictionary can localize them", () => {
+    expect(source).toContain('type: "website_content_submitted"');
+    expect(source).toContain("params: { siteName: scope.website.name ?? scope.project.name ?? scope.website.id }");
+    expect(source).toContain("type: `website_content_${input.decision}`");
+    expect(source).toContain("params: { reason: input.reason!.trim() }");
+    expect(source).toContain('type: "website_content_published"');
+    expect(source).toContain("params: { version }");
+  });
 });

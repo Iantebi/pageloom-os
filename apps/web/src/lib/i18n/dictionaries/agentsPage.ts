@@ -1,4 +1,4 @@
-const agentNamesHe: Record<string, string> = {
+export const agentNamesHe: Record<string, string> = {
   ceo: "סוכן המנכ\"ל",
   sales: "סוכן המכירות",
   "client-journey": "סוכן מסע הלקוח",
@@ -22,7 +22,7 @@ const agentNamesHe: Record<string, string> = {
   automation: "סוכן האוטומציה",
   crm: "סוכן ה-CRM",
 };
-const agentNamesEn: Record<string, string> = {
+export const agentNamesEn: Record<string, string> = {
   ceo: "CEO Agent",
   sales: "Sales Agent",
   "client-journey": "Client Journey Agent",

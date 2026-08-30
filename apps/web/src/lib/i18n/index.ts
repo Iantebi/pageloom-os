@@ -12,6 +12,7 @@ import { portalAccessCenter } from "./dictionaries/portalAccessCenter";
 import { portalUserManager } from "./dictionaries/portalUserManager";
 import { supportCenter } from "./dictionaries/supportCenter";
 import { notificationInbox } from "./dictionaries/notificationInbox";
+import { notifications } from "./dictionaries/notifications";
 import { teamAccess } from "./dictionaries/teamAccess";
 import { documentCenter } from "./dictionaries/documentCenter";
 import { legalCenter } from "./dictionaries/legalCenter";
@@ -40,6 +41,7 @@ import { businessIntelligenceOverview } from "./dictionaries/businessIntelligenc
 import { enterpriseOverview } from "./dictionaries/enterpriseOverview";
 import { fleetOverview } from "./dictionaries/fleetOverview";
 import { workflowTimeline } from "./dictionaries/workflowTimeline";
+import { appearanceSettings } from "./dictionaries/appearanceSettings";
 
 const dictionaries = {
   common,
@@ -56,6 +58,7 @@ const dictionaries = {
   portalUserManager,
   supportCenter,
   notificationInbox,
+  notifications,
   teamAccess,
   documentCenter,
   legalCenter,
@@ -85,6 +88,7 @@ const dictionaries = {
   enterpriseOverview,
   fleetOverview,
   workflowTimeline,
+  appearanceSettings,
 } as const;
 
 type Dictionaries = typeof dictionaries;
