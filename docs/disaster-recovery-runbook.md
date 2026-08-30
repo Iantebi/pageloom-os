@@ -1,6 +1,6 @@
 # PageLoom OS — Disaster Recovery Runbook
 
-Firebase project: `pageloom-os-production`. This runbook assumes the reader has (or can regain) the Google account `iantebi5@gmail.com`, which is both the Firebase project owner and the PageLoom platform Owner (`platformRole: owner`).
+Firebase project: `pageloom-os-production`. Two Google accounts hold full, equal Firebase project Owner and PageLoom platform Owner (`platformRole: owner`) status: `pageloom.studio@gmail.com` (the primary business identity — use this for day-to-day CLI/administration) and `iantebi5@gmail.com` (the original personal account, kept active specifically as an emergency fallback — see §8c). This runbook assumes the reader has, or can regain, at least one of the two.
 
 ## 1. Laptop lost, stolen, or destroyed
 
@@ -18,7 +18,7 @@ git clone https://github.com/Iantebi/pageloom-os.git
 cd pageloom-os
 npm install
 ```
-Then re-establish credentials — see §8 (Firebase CLI login) and §8b (gcloud ADC), both interactive one-time browser sign-ins with the same Google account. No secrets need to be manually copied; `functions/.env.pageloom-os-production` and Secret Manager values are pulled by the CLI/emulator once authenticated.
+Then re-establish credentials — see §8 (Firebase CLI login) and §8b (gcloud ADC), both interactive one-time browser sign-ins with `pageloom.studio@gmail.com` (or `iantebi5@gmail.com` if the primary account is unavailable — see §8c). No secrets need to be manually copied; `functions/.env.pageloom-os-production` and Secret Manager values are pulled by the CLI/emulator once authenticated.
 
 ## 3. Corrupted or lost local git repository
 
@@ -58,7 +58,7 @@ Not a data-loss scenario — the customer's project data is untouched. Fix: Owne
 cd pageloom-os
 node_modules\.bin\firebase.cmd login
 ```
-Opens a browser for Google sign-in with `iantebi5@gmail.com`.
+Opens a browser for Google sign-in — use `pageloom.studio@gmail.com` (primary). If that account is unavailable, sign in with `iantebi5@gmail.com` instead (see §8c); both hold identical Firebase project Owner access.
 
 **8b. Re-establish gcloud Application Default Credentials** (needed for any Admin SDK script run outside the Functions emulator, and for direct Firestore/Cloud API access):
 ```bash
@@ -66,7 +66,7 @@ gcloud auth application-default login
 gcloud auth application-default set-quota-project pageloom-os-production
 ```
 
-**8c. Lost the Owner Google account itself**: this is the actual single point of failure in the current design — `platformRole: owner` and the `systemAdministrators` registry both key off one Firebase Auth UID tied to one Google account. If that account is permanently lost, recovery requires Google Account recovery for `iantebi5@gmail.com` (Google's own account-recovery flow) — there is currently no second platform-owner account provisioned as a break-glass fallback. **Recommendation**: consider provisioning a second, rarely-used Owner account via `functions/scripts/provision-platform-owner.mjs` purely as a break-glass credential, stored securely offline.
+**8c. Lost the primary Owner Google account (`pageloom.studio@gmail.com`)**: no longer a single point of failure — `iantebi5@gmail.com` is a second, independently-provisioned platform Owner account (own Firebase Auth UID, own `platformRole: owner` claim, own active `systemAdministrators` entry, own org membership with full permissions), kept specifically as a break-glass fallback rather than for routine use. If `pageloom.studio@gmail.com` is ever lost, sign in with `iantebi5@gmail.com` instead — no recovery flow needed, it already has full, working Owner access today. Google Account recovery is only needed in the (much less likely) event that *both* accounts are lost simultaneously. If a *third*, rarely-used break-glass account is ever wanted in addition to these two, provision it the same way via `functions/scripts/provision-platform-owner.mjs`.
 
 ## 9. Open backup decisions (not yet resolved)
 
