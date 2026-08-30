@@ -18,6 +18,7 @@ jobs:
   verify:
     name: Install, typecheck, lint, test, build
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -43,6 +44,26 @@ jobs:
 
       - name: Test
         run: npm test
+
+      # Behavioral rules tests run the REAL firestore.rules/storage.rules files through the
+      # actual Firestore/Storage emulator rules engine (see functions/src/*.behavioral.test.ts),
+      # unlike the string-match rules tests above. They need a JVM (for the Firestore emulator)
+      # and the emulators themselves, so they're kept out of the regular `npm test` step and run
+      # here instead, against demo (non-billable, no-auth-required) Firebase projects only.
+      - name: Set up Java (for Firestore emulator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Behavioral Firestore/Storage rules tests (real emulator)
+        # `emulators:exec` starts the emulators, waits for them to be healthy, runs the given
+        # command, and always tears the emulators down afterwards - it fails (non-zero exit)
+        # if the emulators never become healthy, so this step fails closed rather than silently
+        # skipping the suite. No production credentials are used or required: this only ever
+        # talks to demo-* project IDs on the local emulator, never real Firestore/Storage.
+        run: npx firebase emulators:exec --project demo-pageloom-rules-fs --only firestore,storage "npm run test:behavioral --workspace=@pageloom/functions"
+        timeout-minutes: 10
 
       - name: Build
         run: npm run build
