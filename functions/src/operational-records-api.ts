@@ -6,6 +6,11 @@ import { db } from "./firebase.js";
 
 export const operationalRecordsRouter = Router();
 const allowed = ["owner", "admin", "operator"];
+// Notifications are staff-broad in firestore.rules (owner/admin/operator/member can all read
+// organizations/{orgId}/notifications) — acknowledging one's own inbox carries no financial or
+// security sensitivity, so the write-side check must match that broader tier rather than the
+// privileged-only `allowed` list used for financial/ticket-management routes below.
+const staffBroad = ["owner", "admin", "operator", "member"];
 const audit = (organizationId: string, type: string, actorId: string, payload: Record<string, unknown>) => db.collection(`organizations/${organizationId}/activity`).add({ type, actorId, payload, createdAt: new Date().toISOString() });
 
 operationalRecordsRouter.post("/finance/:kind", async (req: AuthenticatedRequest, res) => {
@@ -67,7 +72,7 @@ operationalRecordsRouter.patch("/support-tickets/:ticketId", async (req: Authent
 
 operationalRecordsRouter.patch("/notifications/:notificationId/read", async (req: AuthenticatedRequest, res) => {
   const organizationId = z.string().min(1).parse(req.body.organizationId);
-  if (await requireRole(req, res, organizationId, allowed) === undefined) return;
+  if (await requireRole(req, res, organizationId, staffBroad) === undefined) return;
   const ref = db.doc(`organizations/${organizationId}/notifications/${String(req.params.notificationId)}`), notification = await ref.get();
   if (!notification.exists) return res.status(404).json({ error: { code: "NOT_FOUND", message: "Notification not found" } });
   const now = new Date().toISOString(); await ref.update({ read: true, readAt: now, readBy: req.user!.uid });
@@ -77,7 +82,7 @@ operationalRecordsRouter.patch("/notifications/:notificationId/read", async (req
 
 operationalRecordsRouter.patch("/notifications-read-all", async (req: AuthenticatedRequest, res) => {
   const organizationId = z.string().min(1).parse(req.body.organizationId);
-  if (await requireRole(req, res, organizationId, allowed) === undefined) return;
+  if (await requireRole(req, res, organizationId, staffBroad) === undefined) return;
   const unread = await db.collection(`organizations/${organizationId}/notifications`).where("read", "==", false).limit(500).get(), batch = db.batch(), now = new Date().toISOString();
   unread.docs.forEach(doc => batch.update(doc.ref, { read: true, readAt: now, readBy: req.user!.uid })); await batch.commit();
   await audit(organizationId, "notification.all_acknowledged", req.user!.uid, { count: unread.size });
