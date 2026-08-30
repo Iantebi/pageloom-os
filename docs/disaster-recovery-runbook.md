@@ -55,12 +55,30 @@ Google Cloud Console → Firestore → Import/Export offers the same operation w
 ## 6. Corrupted customer content / lost media
 
 - **Website content**: every field change is recorded as an immutable revision (`organizations/{orgId}/websites/{websiteId}/contentRevisions`) before being applied — the existing in-app "Rollback" action in the Website Content Editor restores a prior published snapshot without needing any infrastructure-level restore.
-- **Media (Cloud Storage)**: no object versioning is enabled yet (see §9) — an overwritten or deleted media file is **not currently recoverable** today. Until Storage versioning is enabled, treat media uploads as append-only in practice (avoid overwriting a file path with different content) where possible.
+- **Media (Cloud Storage)**: **implemented 2026-08-30.** Object Versioning is enabled on the production media bucket, and a weekly Storage Transfer job copies everything to an isolated backup bucket. Two independent recovery paths now exist for an overwritten/deleted media file — see below.
 
-**Proposed Storage backup design** (not yet implemented — requires an explicit go-ahead, see §9 for cost):
-1. Enable **Object Versioning** on `pageloom-os-production.firebasestorage.app` — Google keeps prior versions of an object when it's overwritten or deleted, restorable via `gsutil cp gs://bucket/object#<generation> gs://bucket/object` or the Console's "Manage versions" view. This is the direct, minimal fix for "overwritten/deleted media is unrecoverable."
-2. Pair it with a **lifecycle rule** that expires noncurrent versions after a bounded window (e.g. 30–90 days, mirroring the existing Firestore backup bucket's 90-day rule in §9), so versioning doesn't accumulate storage cost indefinitely.
-3. Customer uploads currently go through `safeUpload()`/`safeWebsiteMedia()` in `storage.rules`, which already caps file size and content-type — versioning cost scales with how often files are *overwritten*, not just uploaded, and PageLoom's current usage pattern (mostly new uploads, infrequent overwrites of the same path) should keep the added cost modest, but the actual amount depends on real customer usage once onboarding starts (see Mission 6 in the accompanying report).
+**Storage backup architecture (implemented 2026-08-30):**
+
+| Item | Value |
+|---|---|
+| Production media bucket | `pageloom-os-production.firebasestorage.app` (region `europe-west1`) |
+| Object Versioning (production bucket) | Enabled |
+| Production bucket lifecycle | Delete noncurrent versions after 90 days: `{"isLive": false, "daysSinceNoncurrentTime": 90}` — only ever targets old, superseded versions; a current/live object is never touched by this rule |
+| Backup bucket | `pageloom-os-production-media-backups` (location `EU`, Standard class, uniform bucket-level access, public access prevention enforced) — a separate GCP resource, not referenced anywhere in application code, not reachable via `storage.rules`, isolated from the customer-facing app |
+| Backup bucket versioning + lifecycle | Same policy as the production bucket: versioning enabled, noncurrent versions deleted after 90 days |
+| Transfer mechanism | Google Cloud Storage Transfer Service job `transferJobs/13003081908546702248`, source = production media bucket, sink = backup bucket |
+| Transfer schedule | Weekly (`repeatInterval: 604800s`), starting 2026-08-30 at 03:00 UTC |
+| Transfer mode | Incremental (`overwriteWhen: DIFFERENT` — only copies new/changed objects); no delete options configured, so the job never deletes from either bucket |
+| IAM (Storage Transfer Service agent: `project-386075478217@storage-transfer-service.iam.gserviceaccount.com`, Google-managed, no downloadable key) | Bucket-scoped only, no project-level roles: `roles/storage.objectViewer` + `roles/storage.legacyBucketReader` (read-only) on the production bucket; `roles/storage.objectAdmin` + `roles/storage.legacyBucketReader` (read/write) on the backup bucket. `legacyBucketReader` is required alongside `objectViewer`/`objectAdmin` because those roles alone don't include `storage.buckets.get`, which the Transfer Service needs to resolve each bucket's location. |
+
+**Why the backup bucket uses a versioning-based lifecycle instead of the Firestore backup bucket's simple `age: 90` rule** (§9): the transfer job's `overwriteWhen: DIFFERENT` setting deliberately skips re-writing files that haven't changed, so an unchanged backup copy's `timeCreated` never refreshes even after many weekly runs. An age-based rule would eventually delete that still-current, still-only copy simply because it's old — which is unsafe. Keying deletion off `daysSinceNoncurrentTime` instead means a version is only ever deleted 90 days after it stopped being the current version, which only happens when it's actually superseded by a newer copy.
+
+**Restore procedure**:
+- **Same-bucket restore** (object was overwritten in place, e.g. `safeWebsiteMedia()` upload replacing an existing path): restore a prior version directly from the production bucket's own version history — `gsutil cp gs://pageloom-os-production.firebasestorage.app/<path>#<generation> gs://pageloom-os-production.firebasestorage.app/<path>` — or via the Console's "Manage versions" view. This is the fastest path and doesn't touch the backup bucket at all.
+- **Object deleted, or production bucket itself compromised**: restore from the backup bucket instead — `gsutil cp gs://pageloom-os-production-media-backups/<path> gs://pageloom-os-production.firebasestorage.app/<path>` (or download via the Storage JSON API `?alt=media` and re-upload). Never overwrite a live production object during a *test* restore — see §10; a real incident restore is the one case this is intentionally written back to production.
+- Because the transfer runs weekly, a restore from the backup bucket can lose up to ~7 days of the most recent changes to a given file; a same-bucket version restore (above) has no such gap since Object Versioning captures every change immediately.
+
+**Verification performed 2026-08-30**: ran the transfer job manually (rather than waiting for the weekly schedule) against the 7 existing rehearsal-data objects under `organizations/pageloom/` — result `SUCCESS`, `objectsCopiedToSink: 7`, `bytesCopiedToSink: 6435`, MD5 hashes in the backup bucket verified to match the source exactly. Fetched one file's content directly from the backup bucket (`brand-direction.txt`) to confirm it reads back correctly — a live restore drill, not just a config check. The production bucket's 7 live objects were re-verified byte-for-byte and generation-for-generation identical to their pre-implementation state; nothing in production was modified by this work. No real customer data existed on this bucket at the time (7 rehearsal/test objects only), so no production customer data was involved in this test.
 
 ## 7. Lost access to a customer's portal account
 
@@ -92,7 +110,7 @@ gcloud auth application-default set-quota-project pageloom-os-production
 | Firestore (all data) | `gs://pageloom-os-production-backups/firestore/{date}/` | Daily, `30 2 * * *` agency-timezone via `dailyFirestoreBackup` | 90 days (bucket lifecycle rule, auto-delete; bucket has Object Versioning enabled) |
 | Source code + all config (`firestore.rules`, `storage.rules`, `firestore.indexes.json`, `firebase.json`, Functions/web source) | GitHub `origin/main` | Every commit | Indefinite (full git history) |
 | Website content | Firestore `contentRevisions` subcollection | Every edit | Indefinite (no pruning implemented) |
-| Cloud Storage / customer media | **Not backed up** | — | — (see the proposed design in §6) |
+| Cloud Storage / customer media | `gs://pageloom-os-production-media-backups/` (mirrors the production bucket's paths) | Weekly, `604800s` interval via Storage Transfer Service job `transferJobs/13003081908546702248` | 90 days after a version becomes noncurrent, on both the production bucket and the backup bucket (Object Versioning enabled on both — see §6) |
 | `.env.pageloom-os-production`, Secret Manager values | Not separately backed up — recreated from source if lost | — | — |
 
 **Verified 2026-08-30**: 19 consecutive daily Firestore export folders present with no gaps (2026-08-12 through 2026-08-30), each containing complete, non-empty export data.
@@ -101,11 +119,10 @@ gcloud auth application-default set-quota-project pageloom-os-production
 
 **How failures are currently detected: manually only.** There is no automated alerting on this project today — Cloud Monitoring has zero notification channels and zero alert policies configured (verified 2026-08-30). The only way to learn of a backup or scheduler failure right now is to check Cloud Logging directly, exactly as this investigation did. Recommended (not yet implemented, requires approval — see the accompanying report's cost model, though these specific features are free): a Cloud Monitoring alert policy on `dailyFirestoreBackup`'s error rate, and Essential Contacts entries for `pageloom.studio@gmail.com` (+ `iantebi5@gmail.com` fallback) so a real failure reaches a human without anyone needing to remember to check.
 
-**Remaining open decisions**, both cost-bearing, both require an explicit owner decision before enabling:
+**Remaining open decisions**, cost-bearing, requires an explicit owner decision before enabling:
 - Firestore **Point-in-Time Recovery: disabled**. Adds ongoing storage cost proportional to write volume (Google bills PITR storage separately from normal document storage). Enabling it would let a restore target any point in the last 1–7 days, not just the most recent daily export.
-- Cloud Storage **Object Versioning for customer media: disabled** (design proposed in §6). Adds ongoing storage cost for retained noncurrent object versions, bounded by a lifecycle rule once enabled.
 
-Firestore **delete protection: enabled** (free, no cost — done). GitHub is the verified, working backup for source code (`origin/main` confirmed in sync).
+Firestore **delete protection: enabled** (free, no cost — done). Cloud Storage **Object Versioning + weekly backup for customer media: enabled** (2026-08-30, see §6). GitHub is the verified, working backup for source code (`origin/main` confirmed in sync).
 
 ## 10. Restore verification policy
 
