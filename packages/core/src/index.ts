@@ -4,6 +4,7 @@ export * from "./customer-journey.js";
 export * from "./client-management.js";
 export * from "./workflow.js";
 export * from "./budget.js";
+export * from "./agency-day-window.js";
 export * from "./operations-health.js";
 export * from "./queue-recovery.js";
 export * from "./finance.js";
