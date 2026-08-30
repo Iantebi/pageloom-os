@@ -6,6 +6,7 @@ import {app} from "./api.js";import {params,runtimeSecrets} from "./config.js";i
 import {WorkflowEngine} from "./workflow-engine.js";
 import {QueueRecovery} from "./queue-recovery.js";
 import {exportFirestoreBackup} from "./backup.js";
+import {runBackupFreshnessWatchdog} from "./watchdog.js";
 import {aiExecutionMode} from "./ai-execution-mode.js";
 import {runBusinessAutomationScan} from "./business-automation.js";
 
@@ -18,4 +19,5 @@ export const monitorWorkflowTimeouts=onSchedule({schedule:"every 10 minutes",reg
 export const recoverAgentQueue=onSchedule({schedule:"every 5 minutes",region:params.region,retryCount:3},async()=>new QueueRecovery().scan());
 export const dailyFirestoreBackup=onSchedule({schedule:"30 2 * * *",timeZone:params.agencyTimezone,region:params.region,retryCount:3,timeoutSeconds:540,serviceAccount:params.backupServiceAccount},exportFirestoreBackup);
 export const monitorBusinessRisks=onSchedule({schedule:"every 1 hours",region:params.region,retryCount:3,memory:"512MiB"},runBusinessAutomationScan);
+export const backupFreshnessWatchdog=onSchedule({schedule:"every 6 hours",region:params.region,retryCount:3},runBackupFreshnessWatchdog);
 export const dailyCeoReport=onSchedule({schedule:"0 8 * * *",timeZone:params.agencyTimezone,region:params.region,retryCount:3,memory:"512MiB"},async()=>{const orgs=await db.collection("organizations").where("autonomyEnabled","==",true).get();for(const org of orgs.docs){const key=new Date().toLocaleDateString("en-CA",{timeZone:params.agencyTimezone.value()});const ref=db.doc(`organizations/${org.id}/scheduledJobs/ceo-daily-${key}`);try{await ref.create({createdAt:new Date().toISOString()})}catch{continue}const task=db.collection(`organizations/${org.id}/tasks`).doc();await task.set({id:task.id,organizationId:org.id,agentId:"ceo",objective:"Produce today's executive report from verified operating data. Analyze priorities, projects, pipeline, analytics, revenue, cost, API usage, and agent performance; delegate urgent internal outcomes.",locale:org.data().defaultLocale??"en",priority:"high",status:"queued",context:{schedule:"daily-ceo",date:key,internalOnly:true},constraints:["Use only verified data","Never contact customers","Protected actions require CEO approval"],createdBy:"scheduler",createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),attempt:0})}});

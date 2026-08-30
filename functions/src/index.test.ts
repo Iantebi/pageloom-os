@@ -18,3 +18,9 @@ describe("scheduled function memory allocation", () => {
     expect(indexSource).toMatch(/dailyCeoReport=onSchedule\(\{[^}]*memory:"512MiB"/);
   });
 });
+
+describe("backup freshness watchdog wiring", () => {
+  it("schedules backupFreshnessWatchdog every 6 hours", () => {
+    expect(indexSource).toMatch(/backupFreshnessWatchdog=onSchedule\(\{schedule:"every 6 hours"/);
+  });
+});
