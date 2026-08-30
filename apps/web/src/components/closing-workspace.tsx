@@ -103,7 +103,7 @@ export function ClosingWorkspace() {
         <label className="field"><span>{s.validUntilLabel}</span><input required type="date" className="input" value={form.validUntil} onChange={e => setForm({ ...form, validUntil: e.target.value })} /></label>
         <Button type="submit" disabled={busy}>{busy ? s.generatingButton : proposal ? s.regenerateButton : s.generateButton}</Button>
       </form>}
-      {error && <p className="mt-4 text-xs text-red-700" role="alert">{error}</p>}
+      {error && <p className="mt-4 text-xs text-[var(--danger-text)]" role="alert">{error}</p>}
     </Card>
     {loading && <Loading label={s.loadingLabel} />}
     {proposal && data && <>
@@ -119,4 +119,4 @@ export function ClosingWorkspace() {
   </section>;
 }
 function Field({ label, value, set }: { label: string; value: string; set: (value: string) => void }) { return <label className="field"><span>{label}</span><input required className="input" value={value} onChange={e => set(e.target.value)} /></label>; }
-function Metric({ label, value }: { label: string; value: string }) { return <div className="rounded-xl bg-[#fafaf8] p-3"><small>{label}</small><b className="mt-1 block text-sm">{value}</b></div>; }
+function Metric({ label, value }: { label: string; value: string }) { return <div className="rounded-xl bg-[var(--surface-2)] p-3"><small>{label}</small><b className="mt-1 block text-sm">{value}</b></div>; }

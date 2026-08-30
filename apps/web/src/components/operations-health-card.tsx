@@ -55,7 +55,7 @@ export function OperationsHealthCard() {
       <CardHeader icon={health?.status === "healthy" ? CheckCircle2 : ShieldAlert} title={s.title} subtitle={s.subtitle} action={health && <Status value={health.status} />} />
       {health ? <>
         <div className="mt-3 flex items-end gap-3"><b className="text-4xl">{health.score}</b><span className="pb-1 text-[9px] text-[var(--muted)]">{s.reliabilityScoreSuffix}</span></div>
-        <div className="mt-5 grid grid-cols-2 gap-2 md:grid-cols-3">{Object.entries(health.signals).map(([label, value]) => <div className={`rounded-xl p-3 ${value ? "bg-[#fff4e5]" : "bg-[#f5f6f2]"}`} key={label}><b className="block text-lg">{value}</b><span className="text-[8px] text-[var(--muted)]">{s.signalLabel(label)}</span></div>)}</div>
+        <div className="mt-5 grid grid-cols-2 gap-2 md:grid-cols-3">{Object.entries(health.signals).map(([label, value]) => <div className={`rounded-xl p-3 ${value ? "bg-[var(--warn-bg)]" : "bg-[var(--surface-2)]"}`} key={label}><b className="block text-lg">{value}</b><span className="text-[8px] text-[var(--muted)]">{s.signalLabel(label)}</span></div>)}</div>
       </> : <Empty title={s.healthUnavailableTitle} description={error || s.waitingForFirstCheck} />}
     </Card>
     <Card>

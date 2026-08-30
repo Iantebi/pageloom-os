@@ -73,7 +73,7 @@ export function TeamAccess() {
     </div>
     {pending.length > 0 && <div className="mt-5 border-t border-[var(--border)] pt-4">
       <b className="text-[10px]">{s.pendingInvitationsTitle}</b>
-      <div className="mt-2 space-y-1">{pending.map(item => <div className="flex items-center justify-between rounded-lg bg-[#fafaf8] p-2 text-[10px]" key={item.id}><span>{item.email}</span><Status value={item.role} label={roleLabel(item.role)} /></div>)}</div>
+      <div className="mt-2 space-y-1">{pending.map(item => <div className="flex items-center justify-between rounded-lg bg-[var(--surface-2)] p-2 text-[10px]" key={item.id}><span>{item.email}</span><Status value={item.role} label={roleLabel(item.role)} /></div>)}</div>
     </div>}
   </Card>;
 }

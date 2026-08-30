@@ -55,7 +55,7 @@ export function SupportCenter() {
     {tickets.error && <p className="notice notice-error mt-3" role="alert">{s.loadError}</p>}
     <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1.2fr]">
       <div className="max-h-[520px] space-y-2 overflow-auto">
-        {filtered.length ? filtered.map(ticket => <button key={ticket.id} onClick={() => open(ticket)} className={`w-full rounded-xl border p-3 text-start ${selected?.id === ticket.id ? "border-[#7357ff] bg-[#f7f5ff]" : "border-[var(--border)]"}`}>
+        {filtered.length ? filtered.map(ticket => <button key={ticket.id} onClick={() => open(ticket)} className={`w-full rounded-xl border p-3 text-start ${selected?.id === ticket.id ? "border-[var(--accent)] bg-[var(--accent-soft)]" : "border-[var(--border)]"}`}>
           <div className="flex items-start justify-between gap-2"><b className="text-[11px]">{ticket.subject}</b><Status value={ticket.status} label={s.statusLabels[ticket.status]} /></div>
           <small className="mt-1 block text-[9px] text-[var(--muted)]">{ticket.category ?? s.categoryOther} · {s.priorityLabels[ticket.priority] ?? ticket.priority} · {s.dueLabel(dateTime(ticket.responseDueAt))}</small>
         </button>) : <Empty title={s.emptyListTitle} description={s.emptyListDescription} icon={<Headphones className="h-4 w-4" />} />}
@@ -78,7 +78,7 @@ export function SupportCenter() {
           {error && <p className="notice notice-error mt-3" role="alert">{error}</p>}
           <div className="mt-5 border-t border-[var(--border)] pt-4">
             <b className="text-[10px]">{s.internalNotesTitle}</b>
-            {notes.data.length ? notes.data.map(item => <div key={item.id} className="mt-2 rounded-lg bg-[#fafaf8] p-2"><p className="text-[10px]">{item.body}</p><small className="text-[8px] text-[var(--muted)]">{dateTime(item.createdAt)}</small></div>) : <p className="mt-2 text-[9px] text-[var(--muted)]">{s.noInternalNotes}</p>}
+            {notes.data.length ? notes.data.map(item => <div key={item.id} className="mt-2 rounded-lg bg-[var(--surface-2)] p-2"><p className="text-[10px]">{item.body}</p><small className="text-[8px] text-[var(--muted)]">{dateTime(item.createdAt)}</small></div>) : <p className="mt-2 text-[9px] text-[var(--muted)]">{s.noInternalNotes}</p>}
           </div>
         </> : <Empty title={s.selectTicketTitle} description={s.selectTicketDescription} icon={<MessageSquareText className="h-4 w-4" />} />}
       </Card>
