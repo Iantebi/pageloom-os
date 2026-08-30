@@ -12,6 +12,17 @@ service cloud.firestore {
     function client(orgId) { return member(orgId) && role(orgId) == 'client'; }
     function clientCustomerId(orgId) { return get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.customerId; }
     function clientProject(orgId, projectId) { return client(orgId) && get(/databases/$(database)/documents/organizations/$(orgId)/projects/$(projectId)).data.customerId == clientCustomerId(orgId) && (!('projectIds' in get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data) || get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.projectIds.size() == 0 || projectId in get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.projectIds); }
+    // List-query-safe equivalent of clientProject, used only at the top-level projects/{projectId}
+    // match below. Firestore cannot prove a list/query rule safe for every possible result when it
+    // depends on an explicit get() of the very document being evaluated (clientProject's redundant
+    // get(.../projects/$(projectId)) instead of the already-available `resource`) — it rejects the
+    // whole query outright with PERMISSION_DENIED regardless of what real data would return. Using
+    // resource.data/resource.id directly (identical semantics, same customerId + projectIds checks,
+    // same single fixed get() on the requester's own membership doc) is the form Firestore can prove
+    // safe for a list/query. clientProject(orgId, projectId) is kept as-is for sub-collection matches
+    // below (comments/questionnaires/documents), where the parent projectId is fixed by the path and
+    // this limitation does not apply.
+    function clientProjectList(orgId) { return client(orgId) && resource.data.customerId == clientCustomerId(orgId) && (!('projectIds' in get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data) || get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.projectIds.size() == 0 || resource.id in get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.projectIds); }
     match /organizations/{orgId} {
       allow read: if staff(orgId); allow write: if false;
       match /members/{uid} { allow read: if staff(orgId); allow write: if false; }
@@ -77,7 +88,7 @@ service cloud.firestore {
       match /customers/{customerId}/documents/{documentId} { allow read: if staff(orgId); allow write: if false; }
       match /chats/{chatId}/messages/{messageId} { allow read: if staff(orgId); allow write: if false; }
       match /projects/{projectId}/artifacts/{artifactId} { allow read: if staff(orgId); allow write: if false; }
-      match /projects/{projectId} { allow read: if staff(orgId) || clientProject(orgId, projectId); allow write: if false; }
+      match /projects/{projectId} { allow read: if staff(orgId) || clientProjectList(orgId); allow write: if false; }
       match /projects/{projectId}/comments/{commentId} { allow read: if staff(orgId) || clientProject(orgId, projectId); allow write: if false; }
       match /projects/{projectId}/questionnaires/{questionnaireId} { allow read: if staff(orgId) || clientProject(orgId, projectId); allow write: if false; }
       match /projects/{projectId}/documents/{documentId} { allow read: if staff(orgId) || (clientProject(orgId, projectId) && resource.data.audience == 'customer'); allow write: if false; }

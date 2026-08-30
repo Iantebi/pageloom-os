@@ -10,3 +10,31 @@ describe("website content isolation",()=>{it("allows customers to read only cont
 describe("customer access lifecycle",()=>{it("denies disabled members and honors optional project assignments",()=>{expect(rules).toContain("data.disabled != true");expect(rules).toContain("'projectIds' in get(");expect(rules).toContain("projectId in get(")});it("treats an empty projectIds list as unrestricted, not as a deny-all list",()=>expect(rules).toContain(".data.projectIds.size() == 0 ||"))});
 describe("platform administrators",()=>{it("uses an immutable Firebase claim for cross-organization read access",()=>{expect(rules).toContain("request.auth.token.platformRole in ['owner','admin']");expect(rules).toContain("function staff(orgId) { return platformAdmin()")});it("keeps content submissions server-write-only",()=>expect(rules).toContain("contentSubmissions/{submissionId} { allow read: if privileged(orgId); allow write: if false; }"))});
 describe("staff invitations and support internal notes",()=>{it("restricts pending staff invitations to privileged staff and denies direct writes",()=>{expect(rules).toContain("match /staffInvitations/{docId} { allow read: if privileged(orgId); allow write: if false; }")});it("keeps support ticket internal notes staff-only, never client-readable",()=>{expect(rules).toContain("match /supportTickets/{ticketId}/internalNotes/{noteId} { allow read: if staff(orgId); allow write: if false; }")})});
+describe("client project list-query safety (clientProjectList)",()=>{
+  const clientProjectListSrc=(rules.match(/function clientProjectList\(orgId\) \{[^}]*\}/)??[""])[0];
+  it("defines clientProjectList and wires it into the top-level projects list/query match instead of the get()-based clientProject",()=>{
+    expect(clientProjectListSrc).not.toBe("");
+    expect(rules).toContain("match /projects/{projectId} { allow read: if staff(orgId) || clientProjectList(orgId); allow write: if false; }");
+  });
+  it("a. lets a client list/query only projects bearing its own customerId, using resource.data directly rather than a redundant self-get()",()=>{
+    expect(clientProjectListSrc).toContain("client(orgId) && resource.data.customerId == clientCustomerId(orgId)");
+    // This redundant get() on the very document being evaluated is the exact bug being fixed: Firestore
+    // cannot prove a list/query rule safe when it depends on an explicit get() of the document under
+    // evaluation, and rejects the whole query with PERMISSION_DENIED regardless of the real data.
+    expect(clientProjectListSrc).not.toContain("get(/databases/$(database)/documents/organizations/$(orgId)/projects/$(projectId))");
+  });
+  it("b. cannot match another customer's project, since resource.data.customerId is compared against the caller's own clientCustomerId",()=>{
+    expect(clientProjectListSrc).toContain("resource.data.customerId == clientCustomerId(orgId)");
+  });
+  it("c. cannot match an unassigned project, preserving the optional projectIds allow-list keyed by resource.id",()=>{
+    expect(clientProjectListSrc).toContain("'projectIds' in get(");
+    expect(clientProjectListSrc).toContain(".data.projectIds.size() == 0 ||");
+    expect(clientProjectListSrc).toContain("resource.id in get(");
+  });
+  it("d. leaves staff/owner project read access unchanged and keeps clientProject intact for fixed-path subcollections",()=>{
+    expect(rules).toContain("match /projects/{projectId} { allow read: if staff(orgId) || clientProjectList(orgId); allow write: if false; }");
+    expect(rules).toContain("function staff(orgId) { return platformAdmin() || (member(orgId) && role(orgId) in ['owner','admin','operator','member']); }");
+    expect(rules).toContain("function clientProject(orgId, projectId)");
+    expect(rules).toContain("match /projects/{projectId}/comments/{commentId} { allow read: if staff(orgId) || clientProject(orgId, projectId); allow write: if false; }");
+  });
+});

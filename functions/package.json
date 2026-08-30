@@ -32,6 +32,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@types/express": "^5.0.3",
     "vitest": "^3.2.4"
   }
