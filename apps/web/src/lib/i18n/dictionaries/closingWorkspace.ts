@@ -1,5 +1,27 @@
+const checklistItemLabelsHe: Record<string, string> = {
+  contract: "חוזה נחתם",
+  deposit: "מקדמה התקבלה",
+  questionnaire: "שאלון עסקי הושלם",
+  assets: "נכסי מותג הועלו",
+  kickoff: "שיחת פתיחה נקבעה",
+};
+const checklistItemLabelsEn: Record<string, string> = {
+  contract: "Contract signed",
+  deposit: "Deposit received",
+  questionnaire: "Business questionnaire completed",
+  assets: "Brand assets uploaded",
+  kickoff: "Kickoff call scheduled",
+};
+const checklistOwnerLabelsHe: Record<string, string> = { customer: "לקוח", owner: "בעלים" };
+const checklistOwnerLabelsEn: Record<string, string> = { customer: "Customer", owner: "Owner" };
+const paymentItemLabelsHe: Record<string, string> = { deposit: "מקדמת פרויקט", balance: "יתרה סופית" };
+const paymentItemLabelsEn: Record<string, string> = { deposit: "Project deposit", balance: "Final balance" };
+
 export const closingWorkspace = {
   he: {
+    checklistItemLabels: checklistItemLabelsHe,
+    checklistOwnerLabels: checklistOwnerLabelsHe,
+    paymentItemLabels: paymentItemLabelsHe,
     title: "סגירת עסקה",
     subtitle: "הצעת מחיר ← חוזה ← תשלום ← קליטה ← פתיחת פרויקט.",
     noCustomersTitle: "אין עדיין לקוחות",
@@ -37,6 +59,9 @@ export const closingWorkspace = {
     noPaymentScheduleDescription: "קבעו תאריך התחלה בעת יצירת ההצעה כדי ליצור לוח תשלומים.",
   },
   en: {
+    checklistItemLabels: checklistItemLabelsEn,
+    checklistOwnerLabels: checklistOwnerLabelsEn,
+    paymentItemLabels: paymentItemLabelsEn,
     title: "Closing workspace",
     subtitle: "Proposal → contract → payment → onboarding → kickoff.",
     noCustomersTitle: "No customers yet",

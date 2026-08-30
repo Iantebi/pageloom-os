@@ -1,3 +1,97 @@
+// Mirrors the section ids defined in packages/core/src/website-content.ts (websiteContentSections) —
+// keep in sync if a section is added/renamed there.
+const contentSectionLabelsHe = {
+  hero: "פתיחה",
+  about: "אודות העסק",
+  contact: "פרטי יצירת קשר",
+  social: "קישורים חברתיים",
+  services: "שירותים",
+  gallery: "גלריה",
+  videos: "סרטונים",
+  testimonials: "המלצות",
+  faq: "שאלות נפוצות",
+  seo: "נראות בחיפוש",
+} as const;
+
+const contentSectionLabelsEn = {
+  hero: "Hero",
+  about: "About the business",
+  contact: "Contact details",
+  social: "Social links",
+  services: "Services",
+  gallery: "Gallery",
+  videos: "Videos",
+  testimonials: "Testimonials",
+  faq: "FAQ",
+  seo: "Search visibility",
+} as const;
+
+// Mirrors the field ids defined in packages/core/src/website-content.ts (websiteContentFields) —
+// keep in sync if a field is added/renamed there.
+export const contentFieldLabelsHe = {
+  heroHeading: "כותרת ראשית",
+  heroSubheading: "כותרת משנה",
+  heroBody: "פסקת פתיחה",
+  heroImage: "תמונת פתיחה",
+  ctaLabel: "טקסט כפתור הפעולה",
+  ctaUrl: "קישור כפתור הפעולה",
+  aboutHeading: "כותרת אודות",
+  aboutBody: "תיאור העסק",
+  phone: "מספר טלפון",
+  email: "אימייל ליצירת קשר",
+  address: "כתובת העסק",
+  hours: "שעות פתיחה",
+  socialLinks: "קישורים לרשתות חברתיות",
+  services: "שירותים",
+  galleryImages: "תמונות גלריה",
+  videos: "סרטונים",
+  testimonials: "המלצות לקוחות",
+  faqItems: "שאלות נפוצות",
+  seoTitle: "כותרת SEO",
+  seoDescription: "תיאור SEO",
+} as const;
+
+export const contentFieldLabelsEn = {
+  heroHeading: "Hero heading",
+  heroSubheading: "Hero subheading",
+  heroBody: "Hero paragraph",
+  heroImage: "Hero image",
+  ctaLabel: "Call-to-action text",
+  ctaUrl: "Call-to-action link",
+  aboutHeading: "About heading",
+  aboutBody: "Business description",
+  phone: "Phone number",
+  email: "Contact email",
+  address: "Business address",
+  hours: "Opening hours",
+  socialLinks: "Social links",
+  services: "Services",
+  galleryImages: "Gallery images",
+  videos: "Videos",
+  testimonials: "Testimonials",
+  faqItems: "FAQ",
+  seoTitle: "SEO title",
+  seoDescription: "SEO description",
+} as const;
+
+// Mirrors the helpText strings defined in packages/core/src/website-content.ts for the fields that
+// carry one — keep in sync if helpText is added/changed there.
+const contentFieldHelpHe = {
+  ctaUrl: "לאן יוביל כפתור הפעולה הראשי, למשל מספר טלפון, וואטסאפ או קישור לתיאום פגישה.",
+  services: "מחירים מוצגים רק אם הבעלים מפעיל הצגת מחירים עבור אתר זה.",
+  videos: "העלו קובץ וידאו נתמך או הדביקו קישור לסרטון.",
+  seoTitle: "שדה טכני. בשליטת הבעלים כברירת מחדל.",
+  seoDescription: "שדה טכני. בשליטת הבעלים כברירת מחדל.",
+} as const;
+
+const contentFieldHelpEn = {
+  ctaUrl: "Where the primary button should lead, e.g. a phone, WhatsApp, or booking link.",
+  services: "Prices are shown only if the Owner enables pricing for this site.",
+  videos: "Upload a supported video file or paste a video link.",
+  seoTitle: "Technical field. Owner-controlled by default.",
+  seoDescription: "Technical field. Owner-controlled by default.",
+} as const;
+
 export const websiteContentWorkspace = {
   he: {
     loading: "טוענים את תוכן האתר…",
@@ -34,6 +128,9 @@ export const websiteContentWorkspace = {
     approveAndPublish: "אישור ופרסום",
     rejectionReasonLabel: "סיבת הדחייה",
     reject: "דחייה",
+    fieldLabels: contentFieldLabelsHe,
+    sectionLabels: contentSectionLabelsHe,
+    fieldHelp: contentFieldHelpHe,
   },
   en: {
     loading: "Loading website content…",
@@ -70,55 +167,10 @@ export const websiteContentWorkspace = {
     approveAndPublish: "Approve & publish",
     rejectionReasonLabel: "Rejection reason",
     reject: "Reject",
+    fieldLabels: contentFieldLabelsEn,
+    sectionLabels: contentSectionLabelsEn,
+    fieldHelp: contentFieldHelpEn,
   },
-} as const;
-
-// Mirrors the field ids defined in packages/core/src/website-content.ts (websiteContentFields) —
-// keep in sync if a field is added/renamed there.
-const contentFieldLabelsHe = {
-  heroHeading: "כותרת ראשית",
-  heroSubheading: "כותרת משנה",
-  heroBody: "פסקת פתיחה",
-  heroImage: "תמונת פתיחה",
-  ctaLabel: "טקסט כפתור הפעולה",
-  ctaUrl: "קישור כפתור הפעולה",
-  aboutHeading: "כותרת אודות",
-  aboutBody: "תיאור העסק",
-  phone: "מספר טלפון",
-  email: "אימייל ליצירת קשר",
-  address: "כתובת העסק",
-  hours: "שעות פתיחה",
-  socialLinks: "קישורים לרשתות חברתיות",
-  services: "שירותים",
-  galleryImages: "תמונות גלריה",
-  videos: "סרטונים",
-  testimonials: "המלצות לקוחות",
-  faqItems: "שאלות נפוצות",
-  seoTitle: "כותרת SEO",
-  seoDescription: "תיאור SEO",
-} as const;
-
-const contentFieldLabelsEn = {
-  heroHeading: "Hero heading",
-  heroSubheading: "Hero subheading",
-  heroBody: "Hero paragraph",
-  heroImage: "Hero image",
-  ctaLabel: "Call-to-action text",
-  ctaUrl: "Call-to-action link",
-  aboutHeading: "About heading",
-  aboutBody: "Business description",
-  phone: "Phone number",
-  email: "Contact email",
-  address: "Business address",
-  hours: "Opening hours",
-  socialLinks: "Social links",
-  services: "Services",
-  galleryImages: "Gallery images",
-  videos: "Videos",
-  testimonials: "Testimonials",
-  faqItems: "FAQ",
-  seoTitle: "SEO title",
-  seoDescription: "SEO description",
 } as const;
 
 export const websiteContentPreview = {

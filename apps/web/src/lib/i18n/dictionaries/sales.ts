@@ -1,5 +1,70 @@
+const packageNamesHe: Record<string, string> = { launch: "השקה", growth: "צמיחה", authority: "סמכות" };
+const packageNamesEn: Record<string, string> = { launch: "Launch", growth: "Growth", authority: "Authority" };
+const packageOutcomeLabelsHe: Record<string, string> = {
+  "Up to 5 conversion-focused pages": "עד 5 עמודים ממוקדי המרה",
+  "Mobile optimization": "אופטימיזציה למובייל",
+  "Lead capture and analytics setup": "הגדרת לכידת לידים ואנליטיקס",
+  "Strategy and messaging": "אסטרטגיה ומסרים",
+  "Up to 10 custom pages": "עד 10 עמודים מותאמים אישית",
+  "SEO, analytics, and CRM-ready lead capture": "קידום אורגני (SEO), אנליטיקס ולכידת לידים המוכנה ל-CRM",
+  "Premium content system": "מערכת תוכן פרימיום",
+  "Advanced integrations": "אינטגרציות מתקדמות",
+  "90-day optimization plan": "תוכנית אופטימיזציה ל-90 יום",
+};
+const outreachPurposesHe: Record<string, string> = {
+  first: "פתיחת שיחה רלוונטית",
+  follow_up_1: "הענקת ערך ללא לחץ",
+  follow_up_2: "הצעת תוצאה מוחשית",
+  close_loop: "סגירת הלולאה בכבוד, ללא מענה",
+};
+const outreachPurposesEn: Record<string, string> = {
+  first: "Start a relevant conversation",
+  follow_up_1: "Add value without pressure",
+  follow_up_2: "Offer a concrete outcome",
+  close_loop: "Close the no-response loop respectfully",
+};
+type OutreachContext = { firstName: string; businessName: string; observation: string; bookingUrl: string };
+const cleanText = (value: string) => value.trim().replace(/\s+/g, " ");
+function outreachStepsHe(context: OutreachContext) {
+  const firstName = cleanText(context.firstName), businessName = cleanText(context.businessName), observation = cleanText(context.observation), bookingUrl = cleanText(context.bookingUrl);
+  return [
+    { id: "first" as const, delayDays: 0, purpose: outreachPurposesHe.first, message: `היי ${firstName}, הסתכלתי על ${businessName} ושמתי לב ש${observation}. אנחנו עוזרים לעסקים להפוך הזדמנות כזו לאתר ברור וממוקד המרות. שיחה קצרה של 15 דקות תהיה שימושית?` },
+    { id: "follow_up_1" as const, delayDays: 2, purpose: outreachPurposesHe.follow_up_1, message: `היי ${firstName}, בהמשך למה שכתבתי - מחשבה מעשית אחת: השיפור המהיר ביותר עבור ${businessName} הוא להפוך את הפעולה הבאה של הלקוח לברורה בכל עמוד מרכזי. אשמח להראות איך זה יכול להיראות ב-15 דקות: ${bookingUrl}` },
+    { id: "follow_up_2" as const, delayDays: 5, purpose: outreachPurposesHe.follow_up_2, message: `היי ${firstName}, שריינתי זמן קצר כדי למפות את השיפורים באתר בעלי ההשפעה הגבוהה ביותר עבור ${businessName}. בלי מצגת ארוכה - רק סדרי עדיפויות, לוחות זמנים וחבילה ריאלית. אפשר לבחור זמן כאן: ${bookingUrl}` },
+    { id: "close_loop" as const, delayDays: 9, purpose: outreachPurposesHe.close_loop, message: `היי ${firstName}, אני סוגר/ת את הלולאה כרגע כדי לא להעמיס על ה-WhatsApp שלכם. אם שיפור האתר של ${businessName} יהפוך לעדיפות, כתבו לי "אתר" ואשלח את הצעדים הבאים.` },
+  ];
+}
+function outreachStepsEn(context: OutreachContext) {
+  const firstName = cleanText(context.firstName), businessName = cleanText(context.businessName), observation = cleanText(context.observation), bookingUrl = cleanText(context.bookingUrl);
+  return [
+    { id: "first" as const, delayDays: 0, purpose: outreachPurposesEn.first, message: `Hi ${firstName}, I had a look at ${businessName} and noticed ${observation}. We help businesses turn that kind of opportunity into a clear, conversion-focused website. Would a quick 15-minute chat be useful?` },
+    { id: "follow_up_1" as const, delayDays: 2, purpose: outreachPurposesEn.follow_up_1, message: `Hi ${firstName}, following up with one practical thought: the fastest win for ${businessName} is to make the next customer action unmistakable on every key page. I can show you what that could look like in 15 minutes: ${bookingUrl}` },
+    { id: "follow_up_2" as const, delayDays: 5, purpose: outreachPurposesEn.follow_up_2, message: `Hi ${firstName}, I put aside a short slot to map the highest-impact website improvements for ${businessName}. No long presentation—just priorities, timing, and a realistic package. You can choose a time here: ${bookingUrl}` },
+    { id: "close_loop" as const, delayDays: 9, purpose: outreachPurposesEn.close_loop, message: `Hi ${firstName}, I’ll close the loop for now so I don’t crowd your WhatsApp. If improving ${businessName}’s website becomes a priority, reply “website” and I’ll send the next steps.` },
+  ];
+}
+type ProposalTextInput = { businessName: string; prospectName: string; challenge: string; packageName: string; price: number; timelineWeeks: number; outcomes: readonly string[]; validUntil: string };
+
 export const sales = {
   he: {
+    packageNames: packageNamesHe,
+    packageOutcomeLabels: packageOutcomeLabelsHe,
+    outreachSteps: outreachStepsHe,
+    proposalText: (input: ProposalTextInput) => [
+      `הצעת PageLoom עבור ${input.businessName}`,
+      `הוכנה עבור ${input.prospectName}`,
+      "",
+      `דגש מרכזי: ${input.challenge}`,
+      `חבילה מומלצת: ${input.packageName}`,
+      `השקעה: ₪${input.price.toLocaleString("he-IL")}`,
+      `יעד אספקה: ${input.timelineWeeks} שבועות`,
+      "",
+      "תוצרים כלולים:",
+      ...input.outcomes.map(item => `• ${item}`),
+      "",
+      `בתוקף עד: ${input.validUntil}`,
+      "השלב הבא: בחירת החבילה ואישור שיחת הפתיחה.",
+    ].join("\n"),
     eyebrow: "אפשור מכירות",
     title: "רכישת לקוחות",
     description: "העבירו לידים משיחה רלוונטית לשיחת טלפון מתוזמנת, הצעת מחיר ברורה, בחירת חבילה, ותהליך קליטה בתשלום.",
@@ -32,6 +97,24 @@ export const sales = {
     proposalPlaceholder: "השלימו את פרטי השיחה, החבילה וההצעה כדי להפיק סיכום מוכן ללקוח.",
   },
   en: {
+    packageNames: packageNamesEn,
+    packageOutcomeLabels: {} as Record<string, string>,
+    outreachSteps: outreachStepsEn,
+    proposalText: (input: ProposalTextInput) => [
+      `PageLoom proposal for ${input.businessName}`,
+      `Prepared for ${input.prospectName}`,
+      "",
+      `Priority: ${input.challenge}`,
+      `Recommended package: ${input.packageName}`,
+      `Investment: ₪${input.price.toLocaleString("en-US")}`,
+      `Delivery target: ${input.timelineWeeks} weeks`,
+      "",
+      "Included outcomes:",
+      ...input.outcomes.map(item => `• ${item}`),
+      "",
+      `Valid until: ${input.validUntil}`,
+      "Next step: select the package and confirm the kickoff call.",
+    ].join("\n"),
     eyebrow: "SALES ENABLEMENT",
     title: "Customer acquisition",
     description: "Move prospects from a relevant conversation to a booked call, clear proposal, selected package, and paid onboarding.",

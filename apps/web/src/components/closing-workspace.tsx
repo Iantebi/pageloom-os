@@ -15,6 +15,7 @@ type ClosingState = { proposal: ClosingProposal | null; contract: ContractAccept
 // component's state. See functions/src/closing-api.ts for the authorization boundary.
 export function ClosingWorkspace() {
   const s = t("closingWorkspace");
+  const sp = t("sales");
   const { organizationId } = useOrganization();
   const customers = useLiveCollection<Customer>(organizationId ? `organizations/${organizationId}/customers` : undefined);
   const [customerId, setCustomerId] = useState("");
@@ -96,7 +97,7 @@ export function ClosingWorkspace() {
       {selected && <form onSubmit={generate} className="mt-5 grid gap-3 md:grid-cols-2">
         <Field label={s.customerContactLabel} value={form.customer} set={customer => setForm({ ...form, customer })} />
         <Field label={s.businessLabel} value={form.business} set={business => setForm({ ...form, business })} />
-        <label className="field"><span>{s.packageLabel}</span><select className="input" value={form.packageId} onChange={e => setForm({ ...form, packageId: e.target.value as typeof form.packageId })}>{salesPackages.map(item => <option key={item.id} value={item.id}>{item.name} · {money(item.price)}</option>)}</select></label>
+        <label className="field"><span>{s.packageLabel}</span><select className="input" value={form.packageId} onChange={e => setForm({ ...form, packageId: e.target.value as typeof form.packageId })}>{salesPackages.map(item => <option key={item.id} value={item.id}>{sp.packageNames[item.id] ?? item.name} · {money(item.price)}</option>)}</select></label>
         <label className="field"><span>{s.kickoffDateLabel}</span><input required type="date" className="input" value={form.startAt} onChange={e => setForm({ ...form, startAt: e.target.value })} /></label>
         <label className="field md:col-span-2"><span>{s.customerPriorityLabel}</span><textarea required className="input min-h-20" value={form.challenge} onChange={e => setForm({ ...form, challenge: e.target.value })} /></label>
         <label className="field"><span>{s.validUntilLabel}</span><input required type="date" className="input" value={form.validUntil} onChange={e => setForm({ ...form, validUntil: e.target.value })} /></label>
@@ -107,12 +108,12 @@ export function ClosingWorkspace() {
     {loading && <Loading label={s.loadingLabel} />}
     {proposal && data && <>
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card><div className="flex justify-between"><h2 className="text-sm font-semibold">{s.proposalTitle(proposal.package.name)}</h2><Status value={proposal.status} /></div><p className="mt-3 text-xs">{proposal.challenge}</p><div className="mt-4 grid grid-cols-3 gap-2"><Metric label={s.investmentLabel} value={money(proposal.investment)} /><Metric label={s.depositLabel} value={money(proposal.deposit)} /><Metric label={s.balanceLabel} value={money(proposal.balance)} /></div>{proposal.package.outcomes.map(item => <p key={item} className="mt-2 text-xs">✓ {item}</p>)}</Card>
+        <Card><div className="flex justify-between"><h2 className="text-sm font-semibold">{s.proposalTitle(sp.packageNames[proposal.package.id] ?? proposal.package.name)}</h2><Status value={proposal.status} /></div><p className="mt-3 text-xs">{proposal.challenge}</p><div className="mt-4 grid grid-cols-3 gap-2"><Metric label={s.investmentLabel} value={money(proposal.investment)} /><Metric label={s.depositLabel} value={money(proposal.deposit)} /><Metric label={s.balanceLabel} value={money(proposal.balance)} /></div>{proposal.package.outcomes.map(item => <p key={item} className="mt-2 text-xs">✓ {sp.packageOutcomeLabels[item] ?? item}</p>)}</Card>
         <Card><h2 className="text-sm font-semibold">{s.contractTitle}</h2><p className="mt-2 text-xs text-[var(--muted)]">{s.contractDescription}</p><label className="field mt-4"><span>{s.typeToSignLabel(proposal.customer)}</span><input disabled={signed || busy} className="input" value={signature} onChange={e => setSignature(e.target.value)} /></label><Button className="mt-3" disabled={signed || busy || !signature.trim()} onClick={() => void sign()}>{signed ? s.contractSignedButton : s.acceptAndSignButton}</Button></Card>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card><h2 className="text-sm font-semibold">{s.checklistTitle}</h2>{data.checklist.map(item => <label key={item.id} className="mt-3 flex items-center gap-3 text-xs"><input type="checkbox" checked={item.complete} disabled={busy} onChange={() => void toggleChecklist(item.id, !item.complete)} /><span className="flex-1">{item.label}</span><small>{item.owner}</small></label>)}</Card>
-        <Card><h2 className="text-sm font-semibold">{s.paymentsTitle}</h2>{data.payments.length ? data.payments.map(item => <div key={item.id} className="mt-3 flex items-center justify-between rounded-xl border p-3"><span><b className="block text-xs">{item.label}</b><small>{money(item.amount)}</small></span><Button variant="secondary" disabled={item.status === "paid" || busy} onClick={() => void paid(item.id)}>{item.status === "paid" ? s.paidButton : s.markPaidButton}</Button></div>) : <Empty title={s.noPaymentScheduleTitle} description={s.noPaymentScheduleDescription} />}</Card>
+        <Card><h2 className="text-sm font-semibold">{s.checklistTitle}</h2>{data.checklist.map(item => <label key={item.id} className="mt-3 flex items-center gap-3 text-xs"><input type="checkbox" checked={item.complete} disabled={busy} onChange={() => void toggleChecklist(item.id, !item.complete)} /><span className="flex-1">{s.checklistItemLabels[item.id] ?? item.label}</span><small>{s.checklistOwnerLabels[item.owner] ?? item.owner}</small></label>)}</Card>
+        <Card><h2 className="text-sm font-semibold">{s.paymentsTitle}</h2>{data.payments.length ? data.payments.map(item => <div key={item.id} className="mt-3 flex items-center justify-between rounded-xl border p-3"><span><b className="block text-xs">{s.paymentItemLabels[item.id] ?? item.label}</b><small>{money(item.amount)}</small></span><Button variant="secondary" disabled={item.status === "paid" || busy} onClick={() => void paid(item.id)}>{item.status === "paid" ? s.paidButton : s.markPaidButton}</Button></div>) : <Empty title={s.noPaymentScheduleTitle} description={s.noPaymentScheduleDescription} />}</Card>
       </div>
     </>}
   </section>;

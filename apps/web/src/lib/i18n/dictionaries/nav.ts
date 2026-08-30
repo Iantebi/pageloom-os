@@ -19,6 +19,8 @@ export const nav = {
     roleClient: "לקוח",
     ownerFallbackName: "מנכ״ל",
     clientFallbackName: "לקוח",
+    noAccessTitle: "אין גישה משויכת לחשבון זה",
+    noAccessMessage: "החשבון שלכם עדיין לא משויך לארגון, ללקוח או לפרויקט ב-PageLoom. פנו לצוות PageLoom כדי לקבל גישה, או התנתקו והתחברו עם חשבון אחר.",
   },
   en: {
     overview: "Overview",
@@ -40,5 +42,7 @@ export const nav = {
     roleClient: "Client",
     ownerFallbackName: "CEO",
     clientFallbackName: "Client",
+    noAccessTitle: "No access assigned to this account",
+    noAccessMessage: "Your account is not yet linked to an organization, customer, or project in PageLoom. Contact the PageLoom team for access, or sign out and sign in with a different account.",
   },
 } as const;

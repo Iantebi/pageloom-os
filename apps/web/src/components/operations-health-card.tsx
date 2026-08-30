@@ -25,6 +25,7 @@ export function OperationsHealthCard() {
   );
 
   const s = t("operationsHealthCard");
+  const agentNames = t("agentsPage").agentNames;
   const load = useCallback(() => {
     if (!visible || !organizationId) return;
     api<HealthReport>(`/operations/${organizationId}/health`)
@@ -59,7 +60,7 @@ export function OperationsHealthCard() {
     </Card>
     <Card>
       <CardHeader icon={AlertTriangle} title={s.recoveryQueueTitle} subtitle={s.recoveryQueueSubtitle} action={<span className="text-[9px] font-bold">{s.openCount(open.length)}</span>} />
-      {open.slice(0, 5).map((item) => <div className="mb-2 rounded-xl border border-[var(--border)] p-3" key={item.id}><div className="flex items-start justify-between gap-3"><div><b className="text-[10px]">{item.agentId}</b><p className="mt-1 text-[9px] leading-4 text-[var(--muted)]">{item.reason}</p><small className="mt-2 block text-[8px] text-[var(--muted)]">{dateTime(item.createdAt)}</small></div>{membership?.role === "owner" && <Button variant="secondary" disabled={busy === item.id} onClick={() => void retry(item.id)}><RefreshCw className="h-3.5 w-3.5" />{busy === item.id ? s.retrying : s.retry}</Button>}</div></div>)}
+      {open.slice(0, 5).map((item) => <div className="mb-2 rounded-xl border border-[var(--border)] p-3" key={item.id}><div className="flex items-start justify-between gap-3"><div><b className="text-[10px]">{agentNames[item.agentId] ?? item.agentId}</b><p className="mt-1 text-[9px] leading-4 text-[var(--muted)]">{item.reason}</p><small className="mt-2 block text-[8px] text-[var(--muted)]">{dateTime(item.createdAt)}</small></div>{membership?.role === "owner" && <Button variant="secondary" disabled={busy === item.id} onClick={() => void retry(item.id)}><RefreshCw className="h-3.5 w-3.5" />{busy === item.id ? s.retrying : s.retry}</Button>}</div></div>)}
       {!open.length && <Empty title={s.noDeadLettersTitle} description={s.noDeadLettersDescription} />}
     </Card>
   </section>;

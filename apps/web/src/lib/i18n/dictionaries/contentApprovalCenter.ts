@@ -1,3 +1,5 @@
+import { contentFieldLabelsHe, contentFieldLabelsEn } from "./websiteContent";
+
 export const contentApprovalCenter = {
   he: {
     title: "מרכז אישור תוכן",
@@ -6,7 +8,7 @@ export const contentApprovalCenter = {
     decisionError: "פעולת הבדיקה נכשלה.",
     rejectionReasonPrompt: "סיבת הדחייה",
     changesRequestedPrompt: "מה על הלקוח לשנות?",
-    changedFieldsLabel: (fields: string) => `שדות שהשתנו: ${fields}`,
+    changedFieldsLabel: (fieldIds: string[]) => `שדות שהשתנו: ${fieldIds.map(id => contentFieldLabelsHe[id as keyof typeof contentFieldLabelsHe] ?? id).join(", ")}`,
     customerLabel: (id: string) => `לקוח ${id}`,
     submittedByLabel: (name: string) => `מאת ${name}`,
     pendingStatusLabel: "ממתין לאישור",
@@ -24,7 +26,7 @@ export const contentApprovalCenter = {
     decisionError: "Review action failed.",
     rejectionReasonPrompt: "Reason for rejection",
     changesRequestedPrompt: "What should the customer change?",
-    changedFieldsLabel: (fields: string) => `Changed fields: ${fields}`,
+    changedFieldsLabel: (fieldIds: string[]) => `Changed fields: ${fieldIds.map(id => contentFieldLabelsEn[id as keyof typeof contentFieldLabelsEn] ?? id).join(", ")}`,
     customerLabel: (id: string) => `customer ${id}`,
     submittedByLabel: (name: string) => `by ${name}`,
     pendingStatusLabel: "Pending",
