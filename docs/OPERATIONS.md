@@ -4,7 +4,7 @@
 
 1. Create Firebase web and Google Cloud projects, enable Authentication (Google provider), Firestore, Storage, Functions, Hosting, Secret Manager, Cloud Build, and the required Google APIs.
 2. Copy `.firebaserc.example` to `.firebaserc` and set the Firebase project alias. Copy `.env.example` to `apps/web/.env.local` and enter only browser-safe Firebase configuration.
-3. Set `AI_EXECUTION_MODE=manual` for launch. Existing provider secrets may stay in Secret Manager, but manual mode does not invoke Gemini or OpenAI. Future API inference requires an explicit owner change to `AI_EXECUTION_MODE=api` and provider verification.
+3. Set `AI_EXECUTION_MODE=manual` for launch. Existing provider secrets may stay in Secret Manager, but manual mode does not invoke Gemini or OpenAI. Future API inference requires an explicit owner change to `AI_EXECUTION_MODE=api` **and** `AI_EXECUTION_MODE_APPROVAL=API_MODE_APPROVED_FOR_PRODUCTION` (see `functions/src/ai-execution-mode.ts`) — setting the mode alone does not enable live billing in production; the deploy is otherwise forced back to manual and the attempt is logged.
 4. Create `organizations/{orgId}` and `organizations/{orgId}/members/{uid}` with `uid`, `role: "owner"`, and display metadata using an authenticated administration process.
 5. Add current model rate cards at `system/modelPricing/{provider}_{model}`. Until configured, usage is recorded with `pricingStatus: "unconfigured"` and cost is not guessed.
 6. Run `npm.cmd run check`, test with Firebase Emulator Suite, then deploy using `npm.cmd run deploy`.
