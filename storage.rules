@@ -1,7 +1,9 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    function platformAdmin() { return request.auth != null && request.auth.token.platformRole in ['owner','admin']; }
+    // See the matching comment in firestore.rules: .get(key, default) avoids throwing on tokens
+    // that never carry a platformRole claim at all (i.e. every non-platform-admin user).
+    function platformAdmin() { return request.auth != null && request.auth.token.get('platformRole', null) in ['owner','admin']; }
     function member(orgId) { return request.auth != null && firestore.exists(/databases/(default)/documents/organizations/$(orgId)/members/$(request.auth.uid)) && firestore.get(/databases/(default)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.disabled != true; }
     function membership(orgId) { return firestore.get(/databases/(default)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data; }
     function staff(orgId) { return platformAdmin() || (member(orgId) && membership(orgId).role in ['owner','admin','operator','member']); }

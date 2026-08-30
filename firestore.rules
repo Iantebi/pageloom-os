@@ -2,7 +2,14 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    function platformAdmin() { return signedIn() && request.auth.token.platformRole in ['owner','admin']; }
+    // request.auth.token.get(key, default) is used instead of direct property access because the
+    // vast majority of tokens never carry a platformRole claim at all (only actual platform
+    // owners/admins do), and `in` on a genuinely-absent map key throws "Property platformRole is
+    // undefined on object" rather than evaluating false - confirmed via the behavioral rules
+    // test suite against the real emulator rules engine, where that error was propagating through
+    // every `||` starting with platformAdmin() (staff(), privileged()) and denying reads that
+    // should have fallen through to the rest of the check.
+    function platformAdmin() { return signedIn() && request.auth.token.get('platformRole', null) in ['owner','admin']; }
     function member(orgId) { return signedIn() && exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) && get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.disabled != true; }
     function role(orgId) { return get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role; }
     function staff(orgId) { return platformAdmin() || (member(orgId) && role(orgId) in ['owner','admin','operator','member']); }
