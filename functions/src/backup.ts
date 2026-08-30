@@ -27,6 +27,16 @@ export async function exportFirestoreBackup(): Promise<void> {
   const result = await response.json() as { name?: string; error?: { message?: string } };
   if (!response.ok || !result.name) {
     const reason = result.error?.message ?? `Firestore export returned HTTP ${response.status}`;
+    // Cloud Scheduler retries this job aggressively on any non-2xx response; if an earlier attempt
+    // already completed today's export before a retry lands, Firestore correctly rejects the
+    // duplicate with this exact message. That's not a failure - today's backup already exists -
+    // so it's recorded and logged as such instead of a thrown error, which otherwise showed up as
+    // a noisy, misleading "backup failed" entry for a day that was actually backed up successfully.
+    if (/path already exists/i.test(reason)) {
+      await run.set({ id: runId, status: "already_completed", reason, outputUriPrefix, startedAt, updatedAt: new Date().toISOString() });
+      operationalLog("info", "backup.already_completed", { projectId, outputUriPrefix });
+      return;
+    }
     await run.set({ id: runId, status: "failed", reason, outputUriPrefix, startedAt, updatedAt: new Date().toISOString() });
     throw new Error(reason);
   }
