@@ -29,7 +29,12 @@ service cloud.firestore {
     // safe for a list/query. clientProject(orgId, projectId) is kept as-is for sub-collection matches
     // below (comments/questionnaires/documents), where the parent projectId is fixed by the path and
     // this limitation does not apply.
-    function clientProjectList(orgId) { return client(orgId) && resource.data.customerId == clientCustomerId(orgId) && (!('projectIds' in get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data) || get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.projectIds.size() == 0 || resource.id in get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.projectIds); }
+    // resource.data.get('customerId', null) (not bare .customerId) for the same reason as
+    // platformAdmin() above: the behavioral test suite showed the emulator's list/query safety
+    // analysis evaluates this condition against a resource that doesn't reliably carry the field,
+    // and bare property access throws "Property customerId is undefined on object" there instead
+    // of evaluating false - .get() with a default makes the equality check simply false instead.
+    function clientProjectList(orgId) { return client(orgId) && resource.data.get('customerId', null) == clientCustomerId(orgId) && (!('projectIds' in get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data) || get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.projectIds.size() == 0 || resource.id in get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.projectIds); }
     match /organizations/{orgId} {
       allow read: if staff(orgId); allow write: if false;
       match /members/{uid} { allow read: if staff(orgId); allow write: if false; }

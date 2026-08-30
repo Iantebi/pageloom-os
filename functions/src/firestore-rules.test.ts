@@ -17,14 +17,14 @@ describe("client project list-query safety (clientProjectList)",()=>{
     expect(rules).toContain("match /projects/{projectId} { allow read: if staff(orgId) || clientProjectList(orgId); allow write: if false; }");
   });
   it("a. lets a client list/query only projects bearing its own customerId, using resource.data directly rather than a redundant self-get()",()=>{
-    expect(clientProjectListSrc).toContain("client(orgId) && resource.data.customerId == clientCustomerId(orgId)");
+    expect(clientProjectListSrc).toContain("client(orgId) && resource.data.get('customerId', null) == clientCustomerId(orgId)");
     // This redundant get() on the very document being evaluated is the exact bug being fixed: Firestore
     // cannot prove a list/query rule safe when it depends on an explicit get() of the document under
     // evaluation, and rejects the whole query with PERMISSION_DENIED regardless of the real data.
     expect(clientProjectListSrc).not.toContain("get(/databases/$(database)/documents/organizations/$(orgId)/projects/$(projectId))");
   });
   it("b. cannot match another customer's project, since resource.data.customerId is compared against the caller's own clientCustomerId",()=>{
-    expect(clientProjectListSrc).toContain("resource.data.customerId == clientCustomerId(orgId)");
+    expect(clientProjectListSrc).toContain("resource.data.get('customerId', null) == clientCustomerId(orgId)");
   });
   it("c. cannot match an unassigned project, preserving the optional projectIds allow-list keyed by resource.id",()=>{
     expect(clientProjectListSrc).toContain("'projectIds' in get(");
