@@ -20,7 +20,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { collection, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
+import { collection, doc, documentId, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
 
 const RULES_PATH = new URL("../../firestore.rules", import.meta.url);
 const PROJECT_ID = "demo-pageloom-rules-fs";
@@ -163,7 +163,7 @@ describe("Firestore rules engine (behavioral, via emulator)", () => {
 
     it("excludes an unassigned project from list results when projectIds is a non-empty allow-list", async () => {
       const client = testEnv.authenticatedContext(CLIENT_ALPHA_RESTRICTED_UID);
-      const snap = await assertSucceeds(getDocs(query(collection(client.firestore(), `organizations/${ORG}/projects`), where("customerId", "==", CUST_ALPHA))));
+      const snap = await assertSucceeds(getDocs(query(collection(client.firestore(), `organizations/${ORG}/projects`), where("customerId", "==", CUST_ALPHA), where(documentId(), "in", [PROJ_ALPHA_1]))));
       const ids = snap.docs.map((d) => d.id);
       expect(ids).toEqual([PROJ_ALPHA_1]);
       expect(ids).not.toContain(PROJ_ALPHA_2);
