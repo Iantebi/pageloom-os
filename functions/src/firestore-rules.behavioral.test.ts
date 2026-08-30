@@ -20,7 +20,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
 
 const RULES_PATH = new URL("../../firestore.rules", import.meta.url);
 const PROJECT_ID = "demo-pageloom-rules-fs";
@@ -125,42 +125,45 @@ describe("Firestore rules engine (behavioral, via emulator)", () => {
     if (testEnv) await testEnv.cleanup();
   });
 
-  // KNOWN EMULATOR LIMITATION - all 3 tests in this describe block currently fail against the
-  // local Firestore emulator due to a confirmed, long-standing, still-unresolved firebase-tools
-  // bug: https://github.com/firebase/firebase-tools/issues/6252 - the emulator double-evaluates
-  // list/query rules that reference `resource.data`, and the first evaluation throws/denies
-  // against an incomplete synthetic resource. Multiple independent reports confirm this breaks
-  // @firebase/rules-unit-testing specifically while the identical rule works correctly against
-  // real, deployed Firestore (no errors in the Firebase console) - this is emulator-only, not a
-  // rule defect. The equivalent GET-based tenant-isolation logic (clientProject, not
-  // clientProjectList - see "fixed-path project subcollections" below) exercises the same
-  // customerId/projectIds boundary and passes cleanly through this same emulator.
-  //
-  // Do NOT skip or delete these tests to make CI green - they assert the correct, intended
-  // security behavior and are expected to start passing automatically once the upstream emulator
-  // bug is fixed. CI is expected to report exactly these 3 failures (and no others) in the
-  // behavioral suite; a change in which tests fail here, or new failures elsewhere, means
-  // something real broke and needs investigation.
+  // These tests query with an explicit where('customerId','==', ownCustomerId) filter, matching
+  // exactly what the real app does (apps/web/src/app/(product)/portal/page.tsx, via
+  // useLiveCollection) for every client account - never a bare, unfiltered collection() listing.
+  // That distinction matters: Firestore's list/query rule-safety analysis cannot prove a rule
+  // depending on resource.data.customerId safe without a query filter that matches it, and
+  // correctly denies a bare listing outright regardless of what the real data would return -
+  // in the emulator AND in real, deployed production Firestore alike (verified directly against
+  // pageloom-os-production with the real test client account: a bare listing was denied with
+  // "Missing or insufficient permissions", while the same query with this where() filter
+  // succeeded and returned exactly the expected, correctly-scoped project). An earlier version of
+  // this file used a bare listing and mistakenly attributed the resulting denial to an emulator
+  // bug (firebase/firebase-tools#6252) - that diagnosis was wrong. This filtered form is the
+  // correct, provably-safe way to exercise clientProjectList, and is what production actually
+  // verified to work correctly.
   describe("client project list-query safety (the exact bug class that shipped before)", () => {
     it("lets a client list/query organizations/{org}/projects and returns only their own customer's projects", async () => {
       const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
-      const snap = await assertSucceeds(getDocs(collection(client.firestore(), `organizations/${ORG}/projects`)));
+      const snap = await assertSucceeds(getDocs(query(collection(client.firestore(), `organizations/${ORG}/projects`), where("customerId", "==", CUST_ALPHA))));
       const ids = snap.docs.map((d) => d.id).sort();
       expect(ids).toEqual([PROJ_ALPHA_1, PROJ_ALPHA_2].sort());
     });
 
     it("filters an unrelated customer's project out of the list results (cross-tenant isolation in queries)", async () => {
       const client = testEnv.authenticatedContext(CLIENT_BETA_UID);
-      const snap = await assertSucceeds(getDocs(collection(client.firestore(), `organizations/${ORG}/projects`)));
+      const snap = await assertSucceeds(getDocs(query(collection(client.firestore(), `organizations/${ORG}/projects`), where("customerId", "==", CUST_BETA))));
       const ids = snap.docs.map((d) => d.id);
       expect(ids).toEqual([PROJ_BETA_1]);
       expect(ids).not.toContain(PROJ_ALPHA_1);
       expect(ids).not.toContain(PROJ_ALPHA_2);
     });
 
+    it("denies a client attempting to list with a customerId filter that does not match their own membership", async () => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      await assertFails(getDocs(query(collection(client.firestore(), `organizations/${ORG}/projects`), where("customerId", "==", CUST_BETA))));
+    });
+
     it("excludes an unassigned project from list results when projectIds is a non-empty allow-list", async () => {
       const client = testEnv.authenticatedContext(CLIENT_ALPHA_RESTRICTED_UID);
-      const snap = await assertSucceeds(getDocs(collection(client.firestore(), `organizations/${ORG}/projects`)));
+      const snap = await assertSucceeds(getDocs(query(collection(client.firestore(), `organizations/${ORG}/projects`), where("customerId", "==", CUST_ALPHA))));
       const ids = snap.docs.map((d) => d.id);
       expect(ids).toEqual([PROJ_ALPHA_1]);
       expect(ids).not.toContain(PROJ_ALPHA_2);
