@@ -13,7 +13,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --exclude vendor/** --exclude \"**/*.behavioral.test.ts\"",
     "test:behavioral": "vitest run --no-file-parallelism src/firestore-rules.behavioral.test.ts src/storage-rules.behavioral.test.ts",
-    "provision:owner": "node scripts/provision-platform-owner.mjs"
+    "provision:owner": "node scripts/provision-platform-owner.mjs",
+    "verify:client-project-list": "node scripts/verify-client-project-list.mjs"
   },
   "dependencies": {
     "@fontsource/noto-sans-hebrew": "^5.3.0",

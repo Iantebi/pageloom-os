@@ -62,8 +62,20 @@ jobs:
         # if the emulators never become healthy, so this step fails closed rather than silently
         # skipping the suite. No production credentials are used or required: this only ever
         # talks to demo-* project IDs on the local emulator, never real Firestore/Storage.
+        #
+        # KNOWN, EXPECTED RESULT: 41/44 pass. The remaining 3 (all in
+        # firestore-rules.behavioral.test.ts's "client project list-query safety" describe block)
+        # fail because of a confirmed, unresolved firebase-tools emulator bug, not a rules defect
+        # - see the detailed comment at that describe block for the full explanation and the
+        # upstream issue link. This step, and this job, are intentionally left red because of
+        # those 3 rather than marked passing/skipped - deliberately not silently suppressed, so a
+        # red CI badge here is expected until Google fixes the emulator. If the failure count or
+        # the specific failing tests change, that's a real regression and needs investigation.
         run: npx firebase emulators:exec --project demo-pageloom-rules-fs --only firestore,storage "npm run test:behavioral --workspace=@pageloom/functions"
         timeout-minutes: 10
 
+      # Runs even when the known-failing behavioral step above fails, so a build regression is
+      # never masked by (or blamed on) the documented emulator limitation.
       - name: Build
+        if: ${{ !cancelled() }}
         run: npm run build
