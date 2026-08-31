@@ -65,6 +65,44 @@ jobs:
         run: npx firebase emulators:exec --project demo-pageloom-rules-fs --only firestore,storage "npm run test:behavioral --workspace=@pageloom/functions"
         timeout-minutes: 10
 
+      # End-to-end customer lifecycle test: unlike the rules-only behavioral suite above, this
+      # also runs the Functions emulator (the real Express API in functions/src/api.ts), which
+      # imports functions/src/config.ts's defineSecret() params. The Functions emulator needs a
+      # value for each at boot even for a demo project, so this writes a LOCAL, CI-only dummy
+      # file consumed only by the emulator process (never checked in - functions/.secret.local
+      # is gitignored, and every value here is a placeholder string, not a real credential).
+      - name: Write dummy secrets for the emulator (E2E test only, not a real credential)
+        run: |
+          cat > functions/.secret.local << 'EOF'
+          OPENAI_API_KEY=dummy
+          GEMINI_API_KEY=dummy
+          GOOGLE_WORKSPACE_SERVICE_ACCOUNT_JSON=dummy
+          GOOGLE_WORKSPACE_SUBJECT=dummy
+          GOOGLE_MAPS_API_KEY=dummy
+          STRIPE_SECRET_KEY=dummy
+          STRIPE_WEBHOOK_SECRET=dummy
+          PAYPAL_CLIENT_ID=dummy
+          PAYPAL_CLIENT_SECRET=dummy
+          WHATSAPP_ACCESS_TOKEN=dummy
+          WHATSAPP_PHONE_NUMBER_ID=dummy
+          CRM_API_TOKEN=dummy
+          ZAPIER_WEBHOOK_SECRET=dummy
+          MAKE_WEBHOOK_SECRET=dummy
+          N8N_API_KEY=dummy
+          GITHUB_TOKEN=dummy
+          RESEND_API_KEY=dummy
+          TWILIO_ACCOUNT_SID=dummy
+          TWILIO_AUTH_TOKEN=dummy
+          EOF
+
+      - name: End-to-end customer lifecycle test (real emulator)
+        # Same non-negotiable safety property as the behavioral step: only ever talks to a
+        # demo-* project ID on the local emulator, never real Firestore/Storage/Auth, and makes
+        # no real Stripe call anywhere (see customer-lifecycle.e2e.test.ts's own safety assertion
+        # that the project ID starts with "demo-").
+        run: npx firebase emulators:exec --project demo-pageloom-e2e --only firestore,storage,auth,functions "npm run test:e2e --workspace=@pageloom/functions"
+        timeout-minutes: 10
+
       # Runs even when the known-failing behavioral step above fails, so a build regression is
       # never masked by (or blamed on) the documented emulator limitation.
       #
