@@ -3,6 +3,7 @@ import { acceptDigitalContract, createClosingProposal, markPaymentPaid, onboardi
 import { z } from "zod";
 import { requireRole, type AuthenticatedRequest } from "./auth.js";
 import { db } from "./firebase.js";
+import { operationalLog, safeErrorName } from "./observability.js";
 
 export const closingRouter = Router();
 
@@ -25,7 +26,8 @@ function docRef(organizationId: string, customerId: string) {
 
 function fail(error: unknown, res: import("express").Response) {
   if (error instanceof z.ZodError) return res.status(422).json({ error: { code: "VALIDATION_ERROR", message: error.issues.map(issue => issue.message).join(", ") } });
-  return res.status(409).json({ error: { code: "CLOSING_OPERATION_FAILED", message: error instanceof Error ? error.message : "Closing operation failed" } });
+  operationalLog("error", "closing.operation.failed", { errorType: safeErrorName(error) });
+  return res.status(409).json({ error: { code: "CLOSING_OPERATION_FAILED", message: "Closing operation failed" } });
 }
 
 closingRouter.get("/customers/:customerId/closing", async (req: AuthenticatedRequest, res) => {
