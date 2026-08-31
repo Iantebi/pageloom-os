@@ -79,7 +79,14 @@ jobs:
       # value for each at boot even for a demo project, so this writes a LOCAL, CI-only dummy
       # file consumed only by the emulator process (never checked in - functions/.secret.local
       # is gitignored, and every value here is a placeholder string, not a real credential).
-      - name: Write dummy secrets for the emulator (E2E test only, not a real credential)
+      - name: Write dummy secrets and params for the emulator (E2E test only, not real credentials)
+        # Two separate files are needed: .secret.local for defineSecret() params, and
+        # .env.demo-pageloom-e2e for defineString() params. Without the latter, the Functions
+        # emulator's own introspection manifest (functions.yaml) leaves params as literal
+        # unsubstituted "{{ params.NAME }}" strings - which then hangs the emulator's scheduler-
+        # trigger setup on functions like dailyFirestoreBackup/monitorBusinessRisks that bind
+        # timeZone/serviceAccount/region to those params (an invalid IANA timezone or a
+        # non-existent service account never resolves during trigger emulation).
         run: |
           cat > functions/.secret.local << 'EOF'
           OPENAI_API_KEY=dummy
@@ -101,6 +108,22 @@ jobs:
           RESEND_API_KEY=dummy
           TWILIO_ACCOUNT_SID=dummy
           TWILIO_AUTH_TOKEN=dummy
+          EOF
+          cat > functions/.env.demo-pageloom-e2e << 'EOF'
+          PAGELOOM_FUNCTION_REGION=europe-west1
+          AI_EXECUTION_MODE=manual
+          AI_EXECUTION_MODE_APPROVAL=
+          AI_API_PROVIDER=openai
+          OPENAI_FALLBACK_ENABLED=false
+          CRM_BASE_URL=
+          N8N_BASE_URL=
+          GCP_DEPLOY_PROJECT_ID=demo-pageloom-e2e
+          PAGELOOM_BACKUP_BUCKET=demo-pageloom-e2e-backups
+          PAGELOOM_BACKUP_SERVICE_ACCOUNT=dummy@demo-pageloom-e2e.iam.gserviceaccount.com
+          TWILIO_FROM_NUMBER=
+          RESEND_FROM_EMAIL=
+          AGENCY_TIMEZONE=UTC
+          PAGELOOM_MEDIA_TRANSFER_JOB=transferJobs/dummy
           EOF
 
       - name: End-to-end customer lifecycle test (real emulator)
