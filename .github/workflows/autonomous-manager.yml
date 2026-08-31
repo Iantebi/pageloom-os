@@ -1,0 +1,93 @@
+name: Autonomous Development Manager
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+  issues:
+    types: [closed]
+  pull_request:
+    types: [closed]
+
+concurrency:
+  group: autonomous-manager
+  cancel-in-progress: false
+
+jobs:
+  ensure-labels:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure required labels exist (idempotent)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          gh label create "autonomous:approved" --color 0E8A16 --description "Isaac has approved this issue for the autonomous manager" --force
+          gh label create "autonomous:safe" --color 0E8A16 --description "Classified SAFE by automation/policy.json" --force
+          gh label create "autonomous:protected" --color B60205 --description "Requires Isaac's explicit approval before any action" --force
+          gh label create "autonomous:in-progress" --color FBCA04 --description "Autonomous manager is currently working this task" --force
+          gh label create "autonomous:blocked" --color B60205 --description "Approved but classified PROTECTED; needs Isaac" --force
+          gh label create "autonomous:done" --color 6E5494 --description "Autonomous manager completed this task" --force
+          gh label create "autonomous:status-board" --color 1D76DB --description "Pinned status-reporting issue for the autonomous manager" --force
+
+  dispatch-next-task:
+    needs: [ensure-labels]
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Select and start the next SAFE approved task
+        id: select
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node automation/select-next-task.mjs --repo "${{ github.repository }}"
+      - name: Update status board
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TASK_JSON: ${{ steps.select.outputs.task }}
+        run: |
+          set -e
+          node automation/build-status-state.mjs > /tmp/status-state.json
+          node automation/report-status.mjs --repo "${{ github.repository }}" --state-file /tmp/status-state.json
+
+  release-lock-on-completion:
+    if: |
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true) ||
+      (github.event_name == 'issues' && github.event.action == 'closed')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Mark linked issue done and release the in-progress lock
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -e
+          if [ "$EVENT_NAME" = "issues" ]; then
+            NUM="$ISSUE_NUMBER"
+          else
+            NUM=$(echo "$PR_BODY" | grep -oE '#[0-9]+' | head -1 | tr -d '#')
+          fi
+          if [ -n "$NUM" ]; then
+            gh issue edit "$NUM" --repo "${{ github.repository }}" --remove-label "autonomous:in-progress" --add-label "autonomous:done" || true
+          fi
+
+  # Deliberately no auto-merge job. Autonomous work may create and validate PRs,
+  # but merging remains a human-approved action by Isaac.
