@@ -33,5 +33,9 @@ function State({icon,title,description,action}:{icon:ReactNode;title:string;desc
 function EmptyPanel({text}:{text:string}){return <div className="master-empty"><ArchiveRestore className="h-5 w-5"/><span>{text}</span></div>}
 function render(value:unknown,key:string){if(key==="storageUsage")return bytes(Number(value));if(typeof value==="number")return number(value);const labels=t("statusLabels")as Record<string,string>;return labels[String(value)]??String(value).replaceAll("_"," ")}
 function formatIntelligence(key:string,value:unknown){const s=t("masterControlCenter");if(["conversion","retention"].includes(key))return`${(Number(value)*100).toFixed(1)}%`;if(["websiteDeliveryTime","averageBuildTime"].includes(key))return s.hours(Number(value));if(["revenueGrowth","averageProfit"].includes(key))return money(Number(value));return number(Number(value))}
-function bytes(value:number){if(!value)return"0 B";const units=["B","KB","MB","GB","TB"],index=Math.min(Math.floor(Math.log(value)/Math.log(1024)),units.length-1);return`${(value/1024**index).toFixed(index?1:0)} ${units[index]}`}
+// Wrapped in Unicode LRI/PDI isolate marks (⁦/⁩): a plain "0 B"-style string with a
+// Latin unit suffix gets visually reordered to "B 0" by the bidi algorithm when embedded in the
+// app's RTL (Hebrew) text flow - isolating it forces the number+unit to always render in their
+// actual left-to-right order, matching how money()/number() already behave via Intl formatting.
+function bytes(value:number){if(!value)return"⁦0 B⁩";const units=["B","KB","MB","GB","TB"],index=Math.min(Math.floor(Math.log(value)/Math.log(1024)),units.length-1);return`⁦${(value/1024**index).toFixed(index?1:0)} ${units[index]}⁩`}
 function without<T extends Record<string,unknown>>(value:T,key:keyof T){return Object.fromEntries(Object.entries(value).filter(([name])=>name!==key))}
