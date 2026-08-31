@@ -19,7 +19,7 @@ design and policy rationale; this file is the map of what's here and how to run 
 ```
 npm run test:automation
 # or directly:
-node --test automation
+node --test automation/*.test.mjs automation/lib/*.test.mjs
 ```
 
 Every script that touches GitHub (`gh.mjs`) is kept as a thin wrapper so the actual

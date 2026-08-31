@@ -12,7 +12,7 @@
     "typecheck": "npm run build --workspace=@pageloom/core && npm run prepare:vendor --workspace=@pageloom/functions && npm run typecheck --workspace=@pageloom/functions && npm run typecheck --workspace=@pageloom/web",
     "test": "npm run build --workspace=@pageloom/core && npm run prepare:vendor --workspace=@pageloom/functions && npm run test --workspace=@pageloom/core && npm run test --workspace=@pageloom/functions && npm run test:automation",
     "lint": "npm run lint --workspaces --if-present",
-    "test:automation": "node --test automation",
+    "test:automation": "node --test automation/*.test.mjs automation/lib/*.test.mjs",
     "check": "npm run typecheck && npm test && npm run build",
     "deploy": "npm run build && firebase deploy --only hosting,functions,firestore,storage",
     "deploy:hosting": "npm run build --workspace=@pageloom/web && firebase deploy --only hosting"
