@@ -35,3 +35,10 @@ The dashboard is served at `http://localhost:3000`. Use `npm.cmd run check` befo
 Create `.firebaserc` from `.firebaserc.example`, configure Firebase Functions secrets as described in [operations](docs/OPERATIONS.md), and run `npm.cmd run deploy`. Hosting serves the static Next.js control plane; `/api/**` is routed to the authenticated Cloud Function.
 
 See [architecture](docs/ARCHITECTURE.md), [agent communication](docs/AGENT-COMMUNICATION.md), [security](docs/SECURITY.md), and [operations](docs/OPERATIONS.md).
+
+## Autonomous development
+
+Approved backlog issues (labeled `autonomous:approved`) can be picked up and implemented
+automatically, within a strict SAFE/PROTECTED policy that keeps money, production/Firebase,
+secrets, infrastructure, and customer-data actions gated behind Isaac's explicit approval.
+See [docs/AUTONOMOUS-MANAGER.md](docs/AUTONOMOUS-MANAGER.md).
