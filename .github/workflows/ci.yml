@@ -18,7 +18,7 @@ jobs:
   verify:
     name: Install, typecheck, lint, test, build
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,6 +64,75 @@ jobs:
         # talks to demo-* project IDs on the local emulator, never real Firestore/Storage.
         run: npx firebase emulators:exec --project demo-pageloom-rules-fs --only firestore,storage "npm run test:behavioral --workspace=@pageloom/functions"
         timeout-minutes: 10
+
+      # The Functions emulator (unlike the rules-only behavioral step above) actually loads and
+      # runs the DEPLOYED function code from functions/lib/index.js, not the TypeScript source -
+      # that only gets produced by this build. Without it the emulator fails closed with
+      # "functions/lib/index.js does not exist, can't deploy Cloud Functions" before the test
+      # ever gets a chance to run.
+      - name: Build functions (required for the Functions emulator below)
+        run: npm run build --workspace=@pageloom/core && npm run prepare:vendor --workspace=@pageloom/functions && npm run build --workspace=@pageloom/functions
+
+      # End-to-end customer lifecycle test: unlike the rules-only behavioral suite above, this
+      # also runs the Functions emulator (the real Express API in functions/src/api.ts), which
+      # imports functions/src/config.ts's defineSecret() params. The Functions emulator needs a
+      # value for each at boot even for a demo project, so this writes a LOCAL, CI-only dummy
+      # file consumed only by the emulator process (never checked in - functions/.secret.local
+      # is gitignored, and every value here is a placeholder string, not a real credential).
+      - name: Write dummy secrets and params for the emulator (E2E test only, not real credentials)
+        # Two separate files are needed: .secret.local for defineSecret() params, and
+        # .env.demo-pageloom-e2e for defineString() params. Without the latter, the Functions
+        # emulator's own introspection manifest (functions.yaml) leaves params as literal
+        # unsubstituted "{{ params.NAME }}" strings - which then hangs the emulator's scheduler-
+        # trigger setup on functions like dailyFirestoreBackup/monitorBusinessRisks that bind
+        # timeZone/serviceAccount/region to those params (an invalid IANA timezone or a
+        # non-existent service account never resolves during trigger emulation).
+        run: |
+          cat > functions/.secret.local << 'EOF'
+          OPENAI_API_KEY=dummy
+          GEMINI_API_KEY=dummy
+          GOOGLE_WORKSPACE_SERVICE_ACCOUNT_JSON=dummy
+          GOOGLE_WORKSPACE_SUBJECT=dummy
+          GOOGLE_MAPS_API_KEY=dummy
+          STRIPE_SECRET_KEY=dummy
+          STRIPE_WEBHOOK_SECRET=dummy
+          PAYPAL_CLIENT_ID=dummy
+          PAYPAL_CLIENT_SECRET=dummy
+          WHATSAPP_ACCESS_TOKEN=dummy
+          WHATSAPP_PHONE_NUMBER_ID=dummy
+          CRM_API_TOKEN=dummy
+          ZAPIER_WEBHOOK_SECRET=dummy
+          MAKE_WEBHOOK_SECRET=dummy
+          N8N_API_KEY=dummy
+          GITHUB_TOKEN=dummy
+          RESEND_API_KEY=dummy
+          TWILIO_ACCOUNT_SID=dummy
+          TWILIO_AUTH_TOKEN=dummy
+          EOF
+          cat > functions/.env.demo-pageloom-e2e << 'EOF'
+          PAGELOOM_FUNCTION_REGION=europe-west1
+          AI_EXECUTION_MODE=manual
+          AI_EXECUTION_MODE_APPROVAL=
+          AI_API_PROVIDER=openai
+          OPENAI_FALLBACK_ENABLED=false
+          CRM_BASE_URL=
+          N8N_BASE_URL=
+          GCP_DEPLOY_PROJECT_ID=demo-pageloom-e2e
+          PAGELOOM_BACKUP_BUCKET=demo-pageloom-e2e-backups
+          PAGELOOM_BACKUP_SERVICE_ACCOUNT=dummy@demo-pageloom-e2e.iam.gserviceaccount.com
+          TWILIO_FROM_NUMBER=
+          RESEND_FROM_EMAIL=
+          AGENCY_TIMEZONE=UTC
+          PAGELOOM_MEDIA_TRANSFER_JOB=transferJobs/dummy
+          EOF
+
+      - name: End-to-end customer lifecycle test (real emulator)
+        # Same non-negotiable safety property as the behavioral step: only ever talks to a
+        # demo-* project ID on the local emulator, never real Firestore/Storage/Auth, and makes
+        # no real Stripe call anywhere (see customer-lifecycle.e2e.test.ts's own safety assertion
+        # that the project ID starts with "demo-").
+        run: npx firebase emulators:exec --project demo-pageloom-e2e --only firestore,storage,auth,functions --debug "npm run test:e2e --workspace=@pageloom/functions"
+        timeout-minutes: 18
 
       # Runs even when the known-failing behavioral step above fails, so a build regression is
       # never masked by (or blamed on) the documented emulator limitation.
