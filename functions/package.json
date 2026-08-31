@@ -11,8 +11,9 @@
     "build": "tsc -p tsconfig.json",
     "prepare:vendor": "node scripts/prepare-core-vendor.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --exclude vendor/** --exclude \"**/*.behavioral.test.ts\"",
+    "test": "vitest run --exclude vendor/** --exclude \"**/*.behavioral.test.ts\" --exclude \"**/*.e2e.test.ts\"",
     "test:behavioral": "vitest run --no-file-parallelism src/firestore-rules.behavioral.test.ts src/storage-rules.behavioral.test.ts",
+    "test:e2e": "vitest run --no-file-parallelism src/customer-lifecycle.e2e.test.ts",
     "provision:owner": "node scripts/provision-platform-owner.mjs",
     "verify:client-project-list": "node scripts/verify-client-project-list.mjs"
   },
