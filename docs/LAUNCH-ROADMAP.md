@@ -1,5 +1,16 @@
 # PageLoom September 1 Launch Roadmap
 
+## Infrastructure readiness update — August 31, 2026
+
+Monitoring, backups, restore verification, security behavioral tests, and a full
+synthetic customer-lifecycle E2E harness are now complete and verified (see
+`LAUNCH-BOARD.md` and `disaster-recovery-runbook.md` for evidence). This closes
+the "Complete an internal production rehearsal with evidence and rollback
+verification" P0 item and the "Automated Firestore and Storage security-rules
+tests" and "Per-user/API rate limits and abuse alerts" P1 items below, whose
+statuses are updated accordingly. Remaining gaps are legal/business, not
+technical.
+
 ## Sprint Alpha Enterprise update — August 16, 2026
 
 The business KPI, pricing, legal-versioning, and dedicated-project planning foundations are complete. Real customer project creation remains blocked behind owner and Billing Account approval. Customer #1 should use the dedicated-project pilot only after a sandbox rehearsal proves provisioning, isolation, backup, monitoring, deployment, and rollback.
@@ -25,7 +36,7 @@ Status values: `DONE`, `IN PROGRESS`, `NOT STARTED`, and `OWNER BLOCKED`.
 | P0 | Prepare customer agreement, privacy notice, data-processing terms, accessibility statement, and approval record | 1–3 days | Israeli legal/accessibility review and owner approval | OWNER BLOCKED |
 | P0 | Define manual quote, invoice, payment confirmation, refund, and receipt procedure for customer #1 | 0.5 day | Owner commercial decisions | NOT STARTED |
 | P0 | Define support channel, response target, escalation path, and incident/customer communication templates | 0.5 day | Owner business hours | NOT STARTED |
-| P0 | Complete an internal production rehearsal with evidence and rollback verification | 1 day | All P0 technical items, production deployment approval | NOT STARTED |
+| P0 | Complete an internal production rehearsal with evidence and rollback verification | 1 day | All P0 technical items, production deployment approval | DONE — emulator-only E2E harness (18/18 tests, CI-verified) exercises the full lifecycle including rollback restoring the exact prior version's content; a real Firestore restore drill separately verified 487/487 documents recoverable into an isolated database |
 
 ## SHOULD HAVE
 
@@ -33,8 +44,8 @@ Status values: `DONE`, `IN PROGRESS`, `NOT STARTED`, and `OWNER BLOCKED`.
 |---|---|---:|---|---|
 | P1 | Firebase App Check for browser-originated requests | 0.5–1 day | Production domain | NOT STARTED |
 | P1 | Owner MFA and documented account-recovery procedure | 0.5 day | Firebase Authentication | NOT STARTED |
-| P1 | Per-user/API rate limits and abuse alerts | 1 day | Functions/Firestore | NOT STARTED |
-| P1 | Automated Firestore and Storage security-rules tests for staff and client roles | 1 day | Firebase test environment | PARTIAL |
+| P1 | Per-user/API rate limits and abuse alerts | 1 day | Functions/Firestore | DONE — Firestore-transaction-backed limiter on AI-triggering endpoints, fails closed on infra errors, 18 passing unit tests |
+| P1 | Automated Firestore and Storage security-rules tests for staff and client roles | 1 day | Firebase test environment | DONE — behavioral suite runs the real rules engine in CI, 45/45 passing |
 | P1 | Customer-facing progress, approvals, file upload, comments, and final handoff checklist | 1 day | Client portal access | PARTIAL |
 | P1 | First-customer runbook with named owner, acceptance criteria, daily checks, and recovery steps | 0.5 day | Golden-path rehearsal | DONE |
 | P1 | Manual lead follow-up and discovery-call checklist | 0.25 day | None | NOT STARTED |
