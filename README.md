@@ -16,6 +16,7 @@ No CMS or page-builder runtime is used. Websites are delivered as native React/N
 - `apps/web` — bilingual control plane and real-time dashboard
 - `functions` — authenticated API, event-driven orchestrator, tools, schedules, and webhooks
 - `packages/core` — shared contracts, agent definitions, prompts, and model routing
+- `automation` — the approved-backlog-driven Autonomous Development Manager (SAFE/PROTECTED policy, task selection, draft scheduled workflow); see [automation/README.md](automation/README.md)
 - `docs` — architecture, communication, security, and operations runbooks
 - `prompts` and `templates` — prompt governance and reusable delivery assets
 

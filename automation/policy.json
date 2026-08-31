@@ -1,0 +1,81 @@
+{
+  "$comment": "Machine-readable SAFE/PROTECTED policy for the PageLoom Autonomous Development Manager. See automation/README.md for how this is used. Unknown/ambiguous tasks MUST default to PROTECTED (see defaultClassification).",
+  "version": 1,
+  "defaultClassification": "PROTECTED",
+
+  "backlog": {
+    "requiredLabel": "backlog:approved",
+    "priorityLabels": ["priority:p0", "priority:p1", "priority:p2"],
+    "excludeLabels": ["autopilot:in-progress", "autopilot:done", "needs-human-approval", "protected"],
+    "lockLabel": "autopilot:in-progress"
+  },
+
+  "safe": {
+    "description": "Task categories the manager may execute without asking Isaac first, per the issue's AUTONOMOUSLY ALLOWED list.",
+    "categories": [
+      "read-repository",
+      "read-approved-backlog",
+      "prioritize-safe-tasks",
+      "create-branch",
+      "write-application-code",
+      "fix-bug",
+      "refactor-low-risk",
+      "add-or-improve-tests",
+      "improve-error-handling",
+      "improve-documentation",
+      "safe-code-level-security-hardening",
+      "run-install-typecheck-lint-test-build",
+      "diagnose-fix-ordinary-ci-failure",
+      "commit-changes",
+      "push-agent-branch",
+      "create-pull-request",
+      "respond-to-code-review-feedback"
+    ]
+  },
+
+  "protected": {
+    "description": "Categories that always require a fresh, explicit, current-turn approval from Isaac, per CLAUDE.md and the issue's HARD SAFETY BOUNDARY. Matching ANY keyword/path/label below classifies the whole task PROTECTED, even if other parts look safe.",
+    "categories": [
+      {
+        "id": "money",
+        "keywords": ["payment", "charge", "refund", "invoice", "subscription", "purchase", "billing", "credit card", "credits", "paid api", "spending limit", "quota increase", "stripe", "paypal"]
+      },
+      {
+        "id": "firebase-cloud-production",
+        "keywords": ["firebase deploy", "firebase production", "iam", "service account", "app check enforcement", "production firestore", "production storage", "security-rule deployment", "deploy firestore rules", "deploy storage rules", "functions deployment", "hosting deployment", "gcloud", "google cloud production", "cloud infrastructure"]
+      },
+      {
+        "id": "secrets-credentials",
+        "keywords": ["api key", "apikey", "password", "secret", "access token", "private key", "certificate", "credential rotation", "rotate credential", "gh secret set", "gh variable set"]
+      },
+      {
+        "id": "production-infrastructure",
+        "keywords": ["dns", "domain registration", "ssl configuration", "production hosting", "destructive infrastructure", "infrastructure teardown"]
+      },
+      {
+        "id": "customers-customer-data",
+        "keywords": ["customer data", "customer record", "delete customer", "customer account permission", "send email to customer", "send whatsapp", "send sms", "contract", "legal acceptance", "irreversible customer"]
+      },
+      {
+        "id": "destructive-high-risk",
+        "keywords": ["drop table", "delete collection", "destructive migration", "delete production", "irreversible operation", "force push", "force-push", "rm -rf", "wipe database", "truncate"]
+      }
+    ],
+    "paths": [
+      ".github/workflows/",
+      ".firebaserc",
+      ".env",
+      "**/*.secret*",
+      "**/serviceAccount*.json"
+    ],
+    "labels": ["protected", "needs-human-approval"]
+  },
+
+  "enforcementNotes": [
+    "This policy is a pre-filter that decides whether the manager is allowed to hand a task to Claude Code at all. It is not the only safety layer.",
+    "CLAUDE.md's production deployment safety gate is loaded automatically in every Claude Code session in this repository and independently blocks any production-changing command (firebase deploy, gcloud/IAM writes, gh secret/variable set, direct prod Admin SDK writes) unless the CURRENT turn contains fresh, explicit, scope-specific approval. A SAFE classification here never substitutes for that gate.",
+    "The manager itself never runs deploy/IAM/secret commands directly — it only posts @claude comments on approved issues/PRs (reusing the existing .github/workflows/claude.yml trigger) and reads GitHub state. It has no Firebase/GCP credentials and no repository-secret write access.",
+    "If a task matches both safe and protected signals, PROTECTED wins.",
+    "If classification cannot be determined with confidence, treat the task as PROTECTED (fail closed)."
+  ]
+}

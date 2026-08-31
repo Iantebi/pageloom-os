@@ -1,0 +1,138 @@
+# PageLoom Autonomous Development Manager — draft scheduled workflow.
+#
+# This file is intentionally NOT in .github/workflows/. The Claude Code GitHub
+# App's token cannot write there, so this repo's first Autonomous Manager PR
+# ships this as a reviewable sample instead of a live workflow. To activate
+# the manager, Isaac reviews this file and copies it to
+# .github/workflows/autonomous-manager.yml (a one-time manual step — see
+# automation/README.md, "One-time setup Isaac must do").
+#
+# What this workflow does, once enabled:
+#   1. Runs on a schedule (and via manual workflow_dispatch).
+#   2. Looks for an in-flight autopilot PR/issue first, and nudges Claude to
+#      fix ordinary CI failures on it (bounded retries) rather than starting
+#      new work while something is already in progress.
+#   3. Otherwise, reads issues labeled "backlog:approved", classifies them
+#      with automation/manager.mjs against automation/policy.json, and posts
+#      an @claude comment on the highest-priority SAFE one — reusing the
+#      existing .github/workflows/claude.yml trigger rather than duplicating
+#      a second Claude invocation path.
+#   4. PROTECTED issues are never handed to Claude: the workflow comments
+#      explaining why and labels them "needs-human-approval", then moves on
+#      to the next SAFE candidate.
+#   5. Updates a single pinned "Autonomous Manager Status" issue so Isaac can
+#      see current/last/next task, PR, CI, and review state at a glance.
+#
+# This workflow never runs `firebase deploy`, `gcloud`, IAM/secret commands,
+# or `gh pr merge`. It only reads repo/issue/PR state and posts comments and
+# labels. The actual code changes are still produced by the existing
+# claude.yml Claude Code Action run, which remains bound by this repository's
+# CLAUDE.md production-deployment safety gate.
+
+name: Autonomous Development Manager
+
+on:
+  schedule:
+    # Every 30 minutes. Tune to taste; GitHub Actions schedules are best-effort.
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+
+# Serializes manager runs so two scheduled ticks can never act concurrently.
+concurrency:
+  group: autonomous-manager
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  manage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Check for in-flight autopilot work
+        id: in_flight
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # A single open PR/issue labeled autopilot:in-progress means the
+          # previous cycle's task hasn't finished yet — never start a second
+          # one at the same time.
+          count=$(gh issue list --label "autopilot:in-progress" --state open --json number --jq 'length')
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+
+      - name: Nudge fixes on in-flight PR CI/review failures
+        if: steps.in_flight.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Ordinary-failure auto-fix loop: bounded by the autopilot:attempt-N
+          # label so a persistently broken PR eventually stops and asks for
+          # help instead of looping forever. Left intentionally simple here —
+          # see automation/README.md for the full state machine Isaac should
+          # review before enabling this in production.
+          echo "See automation/README.md for the fix-loop this step performs."
+
+      - name: Select next SAFE backlog task
+        id: select
+        if: steps.in_flight.outputs.count == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          issues_json=$(gh issue list --label "backlog:approved" --state open \
+            --json number,title,body,labels,createdAt \
+            --jq '[.[] | {number, title, body, labels: [.labels[].name], created_at: .createdAt}]')
+          echo "$issues_json" | node automation/manager.mjs select > /tmp/selection.json
+          cat /tmp/selection.json
+
+      - name: Trigger Claude on the selected SAFE issue
+        if: steps.in_flight.outputs.count == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          next_number=$(node -pe 'JSON.parse(require("fs").readFileSync("/tmp/selection.json","utf8")).next?.issue?.number ?? ""')
+          if [ -z "$next_number" ]; then
+            echo "No SAFE approved task available this cycle."
+            exit 0
+          fi
+          gh issue comment "$next_number" --body "@claude Please implement this issue. It was auto-selected by the Autonomous Development Manager and classified SAFE per automation/policy.json. Follow CLAUDE.md and automation/README.md exactly: run all available validation, commit, push, and open a PR. Do not deploy or perform any PROTECTED action."
+          gh issue edit "$next_number" --add-label "autopilot:in-progress"
+
+      - name: Flag PROTECTED candidates for Isaac
+        if: steps.in_flight.outputs.count == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          node -e '
+            const s = JSON.parse(require("fs").readFileSync("/tmp/selection.json","utf8"));
+            for (const p of s.skippedProtected) console.log(p.issue.number, "|", p.reasons.join("; "));
+          ' | while IFS='|' read -r number reasons; do
+            [ -z "$number" ] && continue
+            gh issue edit "$number" --add-label "needs-human-approval" || true
+            gh issue comment "$number" --body "🤖 The Autonomous Development Manager classified this task PROTECTED and will not act on it without Isaac's explicit approval. Reason(s):$reasons" || true
+          done
+
+      - name: Update status issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "See automation/README.md, 'Status reporting', for the status-issue update this step performs."

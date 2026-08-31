@@ -5,6 +5,10 @@ operating as "PageLoom Lead Engineer") a single high-level mission and how that 
 broken down, executed, and reported back — without inventing new infrastructure beyond
 what already exists in this repository and in Claude Code itself.
 
+For the approved-backlog-driven loop that lets development continue without Isaac
+manually starting each mission — while keeping the same escalation rules below as a hard
+boundary — see [`automation/README.md`](../automation/README.md).
+
 This is a coordination model, not a new system to build. Two agent layers already exist
 and are reused here rather than duplicated:
 
