@@ -4,7 +4,7 @@ import {
   STORAGE_FRESHNESS_HOURS,
   isFirestoreBackupStale,
   isStorageBackupStale,
-  latestBackupFolderDate,
+  latestTimestamp,
   isRelevantActiveServiceHealthEvent,
 } from "./watchdog-policy.js";
 
@@ -42,13 +42,26 @@ describe("Storage transfer backup freshness", () => {
   });
 });
 
-describe("latestBackupFolderDate", () => {
-  it("picks the most recent ISO date folder", () => {
-    expect(latestBackupFolderDate(["firestore/2026-08-28/", "firestore/2026-08-30/", "firestore/2026-08-29/"])).toEqual(new Date("2026-08-30T00:00:00Z"));
+describe("latestTimestamp", () => {
+  it("picks the most recent real timestamp, not a parsed date label", () => {
+    // The regression this guards: the export runs at 02:30 Asia/Jerusalem, which during
+    // Israeli Daylight Time is 23:30 UTC the PREVIOUS day - so a real completion timestamp can
+    // legitimately be "later in the day" than what a naive folder-date-at-midnight would suggest.
+    expect(latestTimestamp(["2026-08-28T23:30:00Z", "2026-08-30T23:30:00Z", "2026-08-29T23:30:00Z"])).toEqual(new Date("2026-08-30T23:30:00Z"));
   });
-  it("returns null when no folders match", () => {
-    expect(latestBackupFolderDate([])).toBeNull();
-    expect(latestBackupFolderDate(["firestore/not-a-date/"])).toBeNull();
+  it("returns null when there are no timestamps", () => {
+    expect(latestTimestamp([])).toBeNull();
+    expect(latestTimestamp([undefined, undefined])).toBeNull();
+  });
+});
+
+describe("Firestore freshness regression: DST-shifted backup time must not read as stale", () => {
+  it("a backup that completed at 23:30 UTC last night is fresh ~9.5h later, not stale", () => {
+    // Reproduces the real 2026-08-31T07:07Z false CRITICAL alert: the export completed
+    // 2026-08-30T23:30:00Z, and the watchdog ran ~9.5h later - genuinely fresh, well under 27h.
+    const latest = latestTimestamp(["2026-08-30T23:30:00Z"]);
+    const now = new Date("2026-08-31T09:00:00Z");
+    expect(isFirestoreBackupStale(now, latest!)).toBe(false);
   });
 });
 

@@ -13,17 +13,15 @@ export function isStorageBackupStale(now: Date, lastSuccessTime: Date): boolean 
   return hoursSince(now, lastSuccessTime) > STORAGE_FRESHNESS_HOURS;
 }
 
-const FOLDER_DATE_PATTERN = /(\d{4}-\d{2}-\d{2})\/?$/;
-
-// Firestore backup folder names sort correctly as plain strings since they're ISO dates
-// (e.g. "firestore/2026-08-30/"), so the latest one is just the max after extraction.
-export function latestBackupFolderDate(folderNames: string[]): Date | null {
-  const dates = folderNames
-    .map((name) => FOLDER_DATE_PATTERN.exec(name)?.[1])
-    .filter((date): date is string => Boolean(date))
-    .sort();
-  const latest = dates.at(-1);
-  return latest ? new Date(`${latest}T00:00:00Z`) : null;
+// Picks the most recent real timestamp out of a list of ISO datetime strings (e.g. GCS objects'
+// timeCreated, or Storage Transfer operations' endTime). Deliberately NOT derived from parsing a
+// "YYYY-MM-DD" folder/label name into midnight UTC - that anchor point can differ from the actual
+// backup completion time by up to a day depending on timezone/DST, which previously caused a
+// systematic ~23.5h overestimate of elapsed time and false "stale" alerts.
+export function latestTimestamp(isoTimestamps: Array<string | undefined>): Date | null {
+  const valid = isoTimestamps.filter((t): t is string => Boolean(t)).sort();
+  const latest = valid.at(-1);
+  return latest ? new Date(latest) : null;
 }
 
 const RELEVANT_SERVICE_HEALTH_RELEVANCE = new Set(["RELATED", "IMPACTED"]);
