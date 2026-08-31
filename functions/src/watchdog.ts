@@ -1,6 +1,6 @@
 import { params } from "./config.js";
 import { operationalLog, safeErrorName } from "./observability.js";
-import { isFirestoreBackupStale, isStorageBackupStale, isRelevantActiveServiceHealthEvent, latestBackupFolderDate } from "./watchdog-policy.js";
+import { isFirestoreBackupStale, isStorageBackupStale, isRelevantActiveServiceHealthEvent, latestTimestamp } from "./watchdog-policy.js";
 
 async function accessToken(): Promise<string> {
   const { google } = await import("googleapis");
@@ -14,13 +14,18 @@ async function checkFirestoreFreshness(now: Date): Promise<void> {
   try {
     const bucket = params.backupBucket.value();
     const token = await accessToken();
-    const response = await fetch(`https://storage.googleapis.com/storage/v1/b/${bucket}/o?delimiter=/&prefix=firestore/`, {
+    // Use each object's real timeCreated rather than parsing the "firestore/YYYY-MM-DD/" folder
+    // name into a date: the export runs at 02:30 Asia/Jerusalem, which is 23:30 UTC the PREVIOUS
+    // day during Israeli Daylight Time - so the folder's date and the run's actual wall-clock
+    // completion time can differ by up to a day. Anchoring to the folder name's midnight UTC
+    // previously overestimated elapsed time by ~23.5h and produced false "stale" alerts.
+    const response = await fetch(`https://storage.googleapis.com/storage/v1/b/${bucket}/o?prefix=firestore/&fields=items(timeCreated)`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    const result = (await response.json()) as { prefixes?: string[] };
-    const latest = latestBackupFolderDate(result.prefixes ?? []);
+    const result = (await response.json()) as { items?: Array<{ timeCreated?: string }> };
+    const latest = latestTimestamp((result.items ?? []).map((item) => item.timeCreated));
     if (!latest) {
-      operationalLog("warning", "watchdog.check_failed", { check: "firestore", reason: "no_backup_folders_found" });
+      operationalLog("warning", "watchdog.check_failed", { check: "firestore", reason: "no_backup_objects_found" });
       return;
     }
     if (isFirestoreBackupStale(now, latest)) {
