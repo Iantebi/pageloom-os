@@ -5,6 +5,8 @@ out/
 lib/
 !apps/web/src/lib/
 !apps/web/src/lib/**
+!automation/lib/
+!automation/lib/**
 dist/
 coverage/
 .firebase/

@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": 1,
+  "description": "Machine-readable SAFE/PROTECTED policy for the PageLoom Autonomous Development Manager. Unknown or ambiguous work MUST default to PROTECTED. See docs/AUTONOMOUS-MANAGER.md for the human-readable explanation and CLAUDE.md for the production deployment safety gate this policy must never bypass.",
+  "default": "PROTECTED",
+  "labels": {
+    "approved": "autonomous:approved",
+    "safe": "autonomous:safe",
+    "protected": "autonomous:protected",
+    "inProgress": "autonomous:in-progress",
+    "blocked": "autonomous:blocked",
+    "done": "autonomous:done",
+    "statusBoard": "autonomous:status-board"
+  },
+  "priorityLabels": ["priority:p0", "priority:p1", "priority:p2", "priority:p3"],
+
+  "protectedCategories": [
+    {
+      "id": "money",
+      "description": "Anything involving payments, billing, or spend",
+      "keywords": [
+        "payment", "charge", "refund", "invoice", "subscription", "purchase",
+        "billing", "credit card", "stripe", "paypal", "spending limit",
+        "quota increase", "pricing change", "price change", "paid api",
+        "paid plan", "checkout flow"
+      ]
+    },
+    {
+      "id": "firebase-cloud-production",
+      "description": "Firebase/GCP production configuration or deployment",
+      "keywords": [
+        "firebase deploy", "firebase production", "firebase.json", "iam",
+        "service account", "app check", "production firestore",
+        "production storage", "security rule deploy", "firestore.rules deploy",
+        "storage.rules deploy", "functions deploy", "hosting deploy",
+        "gcloud ", "google cloud production", "cloud run deploy",
+        "production infrastructure", "deploy to production",
+        "npm run deploy", "firebase deploy --only"
+      ]
+    },
+    {
+      "id": "secrets",
+      "description": "Secrets, credentials, or access management",
+      "keywords": [
+        "api key", "apikey", "secret key", "secret manager", "password",
+        "access token", "private key", "certificate", "credential rotation",
+        "oauth token", "service account key", "gh secret set",
+        "gh variable set", "rotate credential", "env secret"
+      ]
+    },
+    {
+      "id": "production-infrastructure",
+      "description": "Domains, DNS, hosting, or cloud infrastructure changes",
+      "keywords": [
+        "domain", "dns", "ssl certificate", "tls certificate",
+        "production hosting", "cloud infrastructure", "load balancer",
+        "cdn config", "custom domain"
+      ]
+    },
+    {
+      "id": "customers-and-customer-data",
+      "description": "Real customer data, accounts, or customer-facing communication",
+      "keywords": [
+        "customer data", "customer record", "delete customer",
+        "customer account permission", "send email to customer",
+        "send sms to customer", "notify customers", "contract",
+        "legal acceptance", "customer communication", "real customer"
+      ]
+    },
+    {
+      "id": "destructive-or-high-risk",
+      "description": "Irreversible, destructive, or high-risk operations",
+      "keywords": [
+        "drop table", "drop collection", "delete collection", "truncate",
+        "destroy resource", "force push", "reset --hard", "irreversible",
+        "data migration", "delete production", "wipe data", "purge data",
+        "delete all", "mass delete"
+      ]
+    }
+  ],
+
+  "safeCategories": [
+    {
+      "id": "bug-fix",
+      "description": "Fixing an ordinary application bug",
+      "keywords": ["bug fix", "fix bug", "bugfix", "fix crash", "fix regression"]
+    },
+    {
+      "id": "refactor-low-risk",
+      "description": "Low-risk refactor of application/internal code, not infra or schemas",
+      "keywords": ["refactor", "clean up", "cleanup", "simplify", "rename variable", "dedupe"]
+    },
+    {
+      "id": "tests",
+      "description": "Adding or improving automated tests",
+      "keywords": ["add test", "improve test", "test coverage", "unit test", "integration test", "write tests"]
+    },
+    {
+      "id": "error-handling",
+      "description": "Improving error handling or resilience in application code",
+      "keywords": ["error handling", "error message", "retry logic", "validation error", "handle failure"]
+    },
+    {
+      "id": "documentation",
+      "description": "Documentation-only changes",
+      "keywords": ["documentation", "docs", "readme", "typo", "comment clarity", "runbook update"]
+    },
+    {
+      "id": "code-level-security-hardening",
+      "description": "Safe, code-level security hardening that does not touch production config, secrets, or infra",
+      "keywords": ["input sanitization", "sanitize input", "xss", "sql injection", "code-level hardening", "dependency bump", "lint rule"]
+    },
+    {
+      "id": "ci-fix",
+      "description": "Diagnosing and fixing an ordinary CI failure",
+      "keywords": ["ci failure", "flaky test", "fix ci", "failing check", "typecheck error", "lint error"]
+    }
+  ]
+}

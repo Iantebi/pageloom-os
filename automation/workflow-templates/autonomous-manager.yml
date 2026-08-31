@@ -1,0 +1,138 @@
+# ---------------------------------------------------------------------------------------
+# TEMPLATE — not active until Isaac copies this file to .github/workflows/autonomous-manager.yml
+#
+# Why this lives here instead of already being in .github/workflows/: the Claude Code
+# GitHub App's permissions intentionally do not allow it to create or modify files under
+# .github/workflows (a standard GitHub App restriction, so an agent can never grant itself
+# more CI/CD power). Copying this one file in is a deliberate one-time human action.
+#
+# What this does NOT duplicate: it never invokes claude-code-action itself. It reuses the
+# existing .github/workflows/claude.yml (triggered by an "@claude" issue comment) to do the
+# actual implementation work, and the existing .github/workflows/claude-code-review.yml to
+# review the resulting PR. This file only decides *which* approved backlog issue to hand to
+# that pipeline next, and later whether the PR it produced is safe to auto-merge.
+#
+# See docs/AUTONOMOUS-MANAGER.md for the full design and automation/policy.json for the
+# SAFE/PROTECTED rules this workflow enforces.
+# ---------------------------------------------------------------------------------------
+name: Autonomous Development Manager
+
+on:
+  schedule:
+    # Every 30 minutes. Adjust freely — this only decides *when to check* the backlog,
+    # it does not itself run untrusted code beyond `automation/*.mjs` and `gh`.
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+  issues:
+    types: [closed]
+  pull_request:
+    types: [closed]
+
+concurrency:
+  # Hard mutual-exclusion: only one manager "pick the next task" run at a time, repo-wide.
+  # `cancel-in-progress: false` so a running claim is never interrupted mid-way.
+  group: autonomous-manager
+  cancel-in-progress: false
+
+jobs:
+  ensure-labels:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure required labels exist (idempotent)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          gh label create "autonomous:approved" --color 0E8A16 --description "Isaac has approved this issue for the autonomous manager" --force
+          gh label create "autonomous:safe" --color 0E8A16 --description "Classified SAFE by automation/policy.json" --force
+          gh label create "autonomous:protected" --color B60205 --description "Requires Isaac's explicit approval before any action" --force
+          gh label create "autonomous:in-progress" --color FBCA04 --description "Autonomous manager is currently working this task" --force
+          gh label create "autonomous:blocked" --color B60205 --description "Approved but classified PROTECTED; needs Isaac" --force
+          gh label create "autonomous:done" --color 6E5494 --description "Autonomous manager completed this task" --force
+          gh label create "autonomous:status-board" --color 1D76DB --description "Pinned status-reporting issue for the autonomous manager" --force
+
+  dispatch-next-task:
+    needs: [ensure-labels]
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Select and start the next SAFE approved task
+        id: select
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node automation/select-next-task.mjs --repo "${{ github.repository }}"
+      - name: Update status board
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TASK_JSON: ${{ steps.select.outputs.task }}
+        run: |
+          set -e
+          node automation/build-status-state.mjs > /tmp/status-state.json
+          node automation/report-status.mjs --repo "${{ github.repository }}" --state-file /tmp/status-state.json
+
+  release-lock-on-completion:
+    # Runs when a PR or its linked issue closes, so a merged/abandoned task doesn't stay
+    # stuck labeled autonomous:in-progress forever and block that issue from ever being
+    # reconsidered.
+    if: |
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true) ||
+      (github.event_name == 'issues' && github.event.action == 'closed')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Mark linked issue done and release the in-progress lock
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -e
+          if [ "$EVENT_NAME" = "issues" ]; then
+            NUM="$ISSUE_NUMBER"
+          else
+            NUM=$(echo "$PR_BODY" | grep -oE '#[0-9]+' | head -1 | tr -d '#')
+          fi
+          if [ -n "$NUM" ]; then
+            gh issue edit "$NUM" --repo "${{ github.repository }}" --remove-label "autonomous:in-progress" --add-label "autonomous:done" || true
+          fi
+
+  auto-merge-check:
+    # Re-checks every open, SAFE-labeled, manager-created PR on the same schedule. Kept as
+    # a periodic sweep (rather than reacting to every check/review event) so this stays a
+    # single simple job instead of wiring up check_suite/workflow_run/review-event fan-in.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Evaluate and enable auto-merge for eligible SAFE PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          PRS=$(gh pr list --repo "${{ github.repository }}" --label "autonomous:safe" --state open --json number --jq '.[].number')
+          for PR in $PRS; do
+            node automation/check-merge-eligibility.mjs --repo "${{ github.repository }}" --pr "$PR"
+          done
