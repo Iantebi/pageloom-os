@@ -4,6 +4,7 @@ import { z } from "zod";
 import { customerPermission, requirePlatformOrRole, requireProjectAccess, requireRole, type AuthenticatedRequest } from "./auth.js";
 import { db } from "./firebase.js";
 import { rateLimit, uidKey } from "./rate-limit.js";
+import { operationalLog, safeErrorName } from "./observability.js";
 
 export const operationalRecordsRouter = Router();
 const allowed = ["owner", "admin", "operator"];
@@ -13,6 +14,14 @@ const allowed = ["owner", "admin", "operator"];
 // privileged-only `allowed` list used for financial/ticket-management routes below.
 const staffBroad = ["owner", "admin", "operator", "member"];
 const audit = (organizationId: string, type: string, actorId: string, payload: Record<string, unknown>) => db.collection(`organizations/${organizationId}/activity`).add({ type, actorId, payload, createdAt: new Date().toISOString() });
+// Every route below shares this: a ZodError's own issues are safe, useful validation feedback,
+// but any other error (Firestore internals, etc.) is logged server-side and replaced with a fixed
+// message so implementation detail is never echoed back to the caller.
+function fail(res: import("express").Response, error: unknown, code: string, event: string, fallback: string) {
+  if (error instanceof z.ZodError) return res.status(400).json({ error: { code, message: error.issues.map(issue => issue.message).join(", ") } });
+  operationalLog("error", event, { errorType: safeErrorName(error) });
+  return res.status(400).json({ error: { code, message: fallback } });
+}
 
 operationalRecordsRouter.post("/finance/:kind", async (req: AuthenticatedRequest, res) => {
   try {
@@ -22,7 +31,7 @@ operationalRecordsRouter.post("/finance/:kind", async (req: AuthenticatedRequest
     await ref.create({ id: ref.id, ...record, source: "manual_ledger", createdBy: req.user!.uid, createdAt: now });
     await audit(organizationId, `finance.${kind === "revenue" ? "revenue" : "expense"}.recorded`, req.user!.uid, { recordId: ref.id, amount: record.amount, currency: record.currency, category: record.category });
     return res.status(201).json({ data: { id: ref.id } });
-  } catch (error) { return res.status(400).json({ error: { code: "INVALID_FINANCIAL_RECORD", message: error instanceof Error ? error.message : "Invalid financial record" } }); }
+  } catch (error) { return fail(res, error, "INVALID_FINANCIAL_RECORD", "operational_records.finance.failed", "Invalid financial record"); }
 });
 
 // Staff-created support tickets: keyed by the creating staff uid. 30 per 15 minutes covers a busy
@@ -37,7 +46,7 @@ operationalRecordsRouter.post("/support-tickets", rateLimit("support-ticket-staf
     await ref.create({ id: ref.id, ...input, status: "open", responseDueAt: supportDueAt(input.priority, now), createdBy: req.user!.uid, createdAt: now, updatedAt: now });
     await audit(input.organizationId, "support.ticket.created", req.user!.uid, { ticketId: ref.id, customerId: input.customerId, projectId: input.projectId ?? null, priority: input.priority });
     return res.status(201).json({ data: { id: ref.id } });
-  } catch (error) { return res.status(400).json({ error: { code: "INVALID_SUPPORT_TICKET", message: error instanceof Error ? error.message : "Invalid support ticket" } }); }
+  } catch (error) { return fail(res, error, "INVALID_SUPPORT_TICKET", "operational_records.support_ticket.staff_failed", "Invalid support ticket"); }
 });
 
 // Customer-portal ticket creation: the audit's flagged abuse vector — a portal user could script
@@ -57,7 +66,7 @@ operationalRecordsRouter.post("/projects/:projectId/support-tickets", rateLimit(
     await db.collection(`organizations/${input.organizationId}/notifications`).add({ audience: "owner", customerId: project.data()!.customerId, projectId, ticketId: ref.id, title: "New customer support request", body: input.subject, params: { subject: input.subject, priority: input.priority }, severity: input.priority === "critical" ? "critical" : "warning", type: "support_ticket_created", read: false, createdAt: now });
     await audit(input.organizationId, "support.ticket.customer_created", req.user!.uid, { ticketId: ref.id, customerId: project.data()!.customerId, projectId, priority: input.priority });
     return res.status(201).json({ data: { id: ref.id, responseDueAt: supportDueAt(input.priority, now) } });
-  } catch (error) { return res.status(400).json({ error: { code: "INVALID_SUPPORT_TICKET", message: error instanceof Error ? error.message : "Invalid support ticket" } }); }
+  } catch (error) { return fail(res, error, "INVALID_SUPPORT_TICKET", "operational_records.support_ticket.portal_failed", "Invalid support ticket"); }
 });
 
 operationalRecordsRouter.patch("/support-tickets/:ticketId", async (req: AuthenticatedRequest, res) => {
@@ -73,7 +82,7 @@ operationalRecordsRouter.patch("/support-tickets/:ticketId", async (req: Authent
     await batch.commit();
     await audit(input.organizationId, "support.ticket.status_changed", req.user!.uid, { ticketId: ref.id, from: ticket.data()?.status, to: input.status, resolution: input.resolution ?? null });
     return res.json({ data: { id: ref.id, status: input.status } });
-  } catch (error) { return res.status(400).json({ error: { code: "INVALID_SUPPORT_UPDATE", message: error instanceof Error ? error.message : "Invalid support update" } }); }
+  } catch (error) { return fail(res, error, "INVALID_SUPPORT_UPDATE", "operational_records.support_ticket.update_failed", "Invalid support update"); }
 });
 
 operationalRecordsRouter.patch("/notifications/:notificationId/read", async (req: AuthenticatedRequest, res) => {

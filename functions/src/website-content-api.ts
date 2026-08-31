@@ -3,6 +3,7 @@ import { canEditContentField, contentField, defaultWebsiteContentValues, updateC
 import { z } from "zod";
 import { customerPermission, requirePlatformAdmin, requirePlatformOrRole, requirePlatformProjectAccess, type AuthenticatedRequest } from "./auth.js";
 import { db, storage } from "./firebase.js";
+import { operationalLog, safeErrorName } from "./observability.js";
 
 export const websiteContentRouter = Router();
 const base = z.object({ organizationId: z.string().min(1) });
@@ -104,4 +105,4 @@ async function mediaUrls(values: Record<string, unknown>, org: string, customer:
 async function record(organizationId: string, type: string, actorId: string, payload: Record<string, unknown>) { await db.collection(`organizations/${organizationId}/activity`).add({ type, actorId, customerId: payload.customerId ?? null, projectId: payload.projectId ?? null, websiteId: payload.websiteId ?? null, payload, createdAt: new Date().toISOString() }); }
 function empty(projectId: string) { return { configured: false, projectId, status: "not_configured", fields: [], sections: [], draft: {}, published: {} }; }
 function notConfigured(res: Response) { return res.status(409).json({ error: { code: "CONTENT_NOT_CONFIGURED", message: "Website content must be configured by an administrator first" } }); }
-function fail(res: Response, error: unknown) { if (error instanceof z.ZodError) return res.status(422).json({ error: { code: "VALIDATION_ERROR", message: "Website content validation failed", issues: error.issues } }); return res.status(400).json({ error: { code: "WEBSITE_CONTENT_ERROR", message: error instanceof Error ? error.message : "Website content operation failed" } }); }
+function fail(res: Response, error: unknown) { if (error instanceof z.ZodError) return res.status(422).json({ error: { code: "VALIDATION_ERROR", message: "Website content validation failed", issues: error.issues } }); if (error instanceof Error && error.message === "Media must belong to the same customer, project, and website") return res.status(400).json({ error: { code: "WEBSITE_CONTENT_ERROR", message: error.message } }); operationalLog("error", "website_content.operation.failed", { errorType: safeErrorName(error) }); return res.status(400).json({ error: { code: "WEBSITE_CONTENT_ERROR", message: "Website content operation failed" } }); }

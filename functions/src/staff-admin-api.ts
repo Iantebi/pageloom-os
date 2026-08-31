@@ -4,6 +4,7 @@ import { requireRole, type AuthenticatedRequest } from "./auth.js";
 import { db } from "./firebase.js";
 import { invitationExpiresAt, normalizeInvitationEmail } from "./customer-invitations.js";
 import { createHash } from "node:crypto";
+import { operationalLog, safeErrorName } from "./observability.js";
 
 // Staff (owner/admin/operator/member) invitations and role management. Mirrors
 // customer-invitations.ts but for internal team access rather than portal access.
@@ -73,5 +74,6 @@ export async function claimStaffInvitations(identity: { uid: string; email?: str
 
 function fail(error: unknown, res: Response) {
   if (error instanceof z.ZodError) return res.status(422).json({ error: { code: "VALIDATION_ERROR", message: error.issues.map(issue => issue.message).join(", ") } });
-  return res.status(400).json({ error: { code: "STAFF_ADMIN_ERROR", message: error instanceof Error ? error.message : "Staff admin operation failed" } });
+  operationalLog("error", "staff_admin.operation.failed", { errorType: safeErrorName(error) });
+  return res.status(400).json({ error: { code: "STAFF_ADMIN_ERROR", message: "Staff admin operation failed" } });
 }

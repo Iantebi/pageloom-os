@@ -42,6 +42,7 @@
 
 ### Security
 
+- API error responses no longer echo raw internal error messages to callers; failures are logged server-side and callers receive a fixed generic message instead.
 - Cloud provisioning cannot execute from the planning API.
 - Project-factory plans are idempotent and require CEO approval.
 - Legal acceptances bind to exact published document hashes.
