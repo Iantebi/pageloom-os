@@ -27,8 +27,9 @@ Requirements: Node.js 22, a Firebase project, and the Firebase CLI.
 2. Keep `AI_EXECUTION_MODE=manual`. No AI credential is required for the official launch workflow.
 3. Existing OpenAI and Gemini secrets may remain in Secret Manager for future API mode, but are not invoked in manual mode.
 4. Run `npm.cmd install`, then `npm.cmd run dev`.
+5. To exercise Firestore/Storage rules, Functions, or orchestration locally without touching the real Firebase project, run `npm.cmd run dev:firebase` to start the Firebase Emulator Suite instead.
 
-The dashboard is served at `http://localhost:3000`. Use `npm.cmd run check` before merging.
+The dashboard is served at `http://localhost:3000`. Use `npm.cmd run check` before merging (runs `typecheck`, `test`, then `build`; each is also available on its own).
 
 ## Production
 
