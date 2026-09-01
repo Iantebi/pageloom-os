@@ -375,6 +375,9 @@ describe("Customer lifecycle (end-to-end, real Functions/Firestore/Auth/Storage 
   // Requires the project to already be in "questionnaire" stage (set by 7a above) - this is the
   // existing, unchanged /questionnaires/:id/complete endpoint, exercised here with the new brief.
   it("10b. Customer completes the Website Brief, which advances the workflow into materials collection", async () => {
+    // Longer than vitest's default 5000ms test timeout: this test polls (via waitFor, up to
+    // 10000ms) for the async processWorkflowEvent Firestore trigger to apply the transition -
+    // the emulator's cold-start latency for a fresh trigger can exceed 5s under CI load.
     const briefDoc = await adminDb.doc(`organizations/${ORG_ALPHA}/projects/${state.projectId}/questionnaires/${state.websiteBriefId}`).get();
     const fields = briefDoc.data()!.fields as { id: string; required: boolean }[];
     const responses = Object.fromEntries(fields.filter(field => field.required).map(field => [field.id, `Synthetic e2e-test answer for ${field.id}`]));
@@ -390,7 +393,7 @@ describe("Customer lifecycle (end-to-end, real Functions/Firestore/Auth/Storage 
       snap => snap.data()?.workflowStage === "assets",
     );
     expect(projectDoc.data()?.workflowStage).toBe("assets");
-  });
+  }, 15_000);
 
   // ===== 11: media upload =====
   it("11. uploads customer website media under the customer/project/website storage boundary", async () => {
