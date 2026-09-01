@@ -10,9 +10,18 @@
     "inProgress": "autonomous:in-progress",
     "blocked": "autonomous:blocked",
     "done": "autonomous:done",
-    "statusBoard": "autonomous:status-board"
+    "statusBoard": "autonomous:status-board",
+    "roleDeveloper": "autonomous:role-developer",
+    "roleQaSafety": "autonomous:role-qa-safety",
+    "roleBusinessOps": "autonomous:role-business-ops",
+    "qaRequested": "autonomous:qa-requested",
+    "qaPassed": "autonomous:qa-passed",
+    "qaChangesRequested": "autonomous:qa-changes-requested",
+    "readyForMerge": "autonomous:ready-for-merge"
   },
   "priorityLabels": ["priority:p0", "priority:p1", "priority:p2", "priority:p3"],
+
+  "maxConcurrentWorkers": 2,
 
   "protectedCategories": [
     {
@@ -114,6 +123,29 @@
       "id": "ci-fix",
       "description": "Diagnosing and fixing an ordinary CI failure",
       "keywords": ["ci failure", "flaky test", "fix ci", "failing check", "typecheck error", "lint error"]
+    }
+  ],
+
+  "businessOpsCategories": [
+    {
+      "id": "business-process-doc",
+      "description": "Repository-based business-process documentation or SOPs, not external communication",
+      "keywords": ["business process", "standard operating procedure", "sop document", "process document", "process doc", "internal handbook", "playbook"]
+    },
+    {
+      "id": "onboarding-asset",
+      "description": "Onboarding or training assets prepared inside the repository",
+      "keywords": ["onboarding checklist", "onboarding guide", "onboarding template", "new hire guide", "training material"]
+    },
+    {
+      "id": "proposal-template",
+      "description": "Proposal or quote template scaffolding kept in the repo, not sending anything to anyone. Note: contract-related text is caught by the existing customers-and-customer-data PROTECTED category first, by design.",
+      "keywords": ["proposal template", "quote template", "document template", "email template draft"]
+    },
+    {
+      "id": "operational-prep",
+      "description": "Operational task preparation, runbooks, and process checklists",
+      "keywords": ["operational checklist", "operations runbook", "ops runbook", "operational prep", "vendor checklist", "process checklist"]
     }
   ]
 }

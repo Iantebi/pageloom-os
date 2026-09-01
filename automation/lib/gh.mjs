@@ -26,16 +26,30 @@ export function listApprovedIssues(repo, approvedLabel) {
   return JSON.parse(out);
 }
 
-export function findIssuesByLabel(repo, label, { state = "open", limit = 5 } = {}) {
+export function findIssuesByLabel(repo, label, { state = "open", limit = 5, fields = "number,title,url" } = {}) {
   const out = run([
     "issue", "list",
     "--repo", repo,
     "--label", label,
     "--state", state,
-    "--json", "number,title,url",
+    "--json", fields,
     "--limit", String(limit),
   ]);
   return JSON.parse(out);
+}
+
+export function findLastCompletedIssue(repo, doneLabel) {
+  const out = run([
+    "issue", "list",
+    "--repo", repo,
+    "--label", doneLabel,
+    "--state", "all",
+    "--json", "number,title,url,closedAt",
+    "--limit", "20",
+  ]);
+  const issues = JSON.parse(out).filter((i) => i.closedAt);
+  if (issues.length === 0) return null;
+  return issues.reduce((latest, i) => (new Date(i.closedAt) > new Date(latest.closedAt) ? i : latest));
 }
 
 export function addLabel(repo, issueNumber, label) {
@@ -48,6 +62,19 @@ export function removeLabel(repo, issueNumber, label) {
 
 export function commentOnIssue(repo, issueNumber, body) {
   run(["issue", "comment", String(issueNumber), "--repo", repo, "--body", body]);
+}
+
+export function commentOnPr(repo, prNumber, body) {
+  run(["pr", "comment", String(prNumber), "--repo", repo, "--body", body]);
+}
+
+export function listPrComments(repo, prNumber) {
+  const out = run([
+    "pr", "view", String(prNumber),
+    "--repo", repo,
+    "--json", "comments",
+  ]);
+  return JSON.parse(out).comments ?? [];
 }
 
 export function listIssueComments(repo, issueNumber) {
@@ -89,11 +116,19 @@ export function viewPr(repo, prNumber) {
   const out = run([
     "pr", "view", String(prNumber),
     "--repo", repo,
-    "--json", "number,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,labels,isDraft,title,url",
+    "--json", "number,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,labels,isDraft,title,url,body",
   ]);
   return JSON.parse(out);
 }
 
-export function enableAutoMerge(repo, prNumber) {
-  run(["pr", "merge", String(prNumber), "--repo", repo, "--auto", "--squash", "--delete-branch"]);
+export function listOpenPrsByLabel(repo, label) {
+  const out = run([
+    "pr", "list",
+    "--repo", repo,
+    "--label", label,
+    "--state", "open",
+    "--json", "number,title,url,body,labels,isDraft",
+    "--limit", "50",
+  ]);
+  return JSON.parse(out);
 }

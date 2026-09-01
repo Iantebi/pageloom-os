@@ -6,32 +6,28 @@
  * Reads the task JSON from the TASK_JSON env var (not argv) so it never has to be
  * shell-escaped/interpolated by the calling workflow step.
  *
- * Usage: TASK_JSON='{"found":true,...}' node automation/build-status-state.mjs > state.json
+ * Usage: TASK_JSON='{"dispatched":[...],...}' node automation/build-status-state.mjs > state.json
  */
 export function buildState(taskJson, now = new Date().toISOString()) {
-  if (taskJson.found) {
-    return {
-      generatedAt: now,
-      currentTask: {
-        number: taskJson.issueNumber,
-        title: taskJson.title,
-        url: taskJson.url,
-        classification: taskJson.classification,
-        reason: taskJson.reason,
-        status: "in-progress: handed off to @claude via issue comment",
-      },
-      nextCandidates: [],
-    };
-  }
+  const protectedCandidates = (taskJson.protectedCandidates ?? []).map((c) => ({
+    number: c.number,
+    title: c.title,
+    classification: "PROTECTED",
+    reason: c.reason,
+  }));
+  const safeQueue = (taskJson.safeQueueRemaining ?? []).map((c) => ({
+    number: c.number,
+    title: c.title,
+    classification: "SAFE",
+    role: c.role,
+  }));
+
   return {
     generatedAt: now,
-    idle: true,
-    nextCandidates: (taskJson.protectedCandidates ?? []).map((c) => ({
-      number: c.number,
-      title: c.title,
-      classification: "PROTECTED",
-      reason: c.reason,
-    })),
+    concurrency: { active: taskJson.activeWorkers ?? 0, max: taskJson.capacityMax ?? 2 },
+    haltedForBlocker: taskJson.anyBlockedWorker === true,
+    idle: (taskJson.activeWorkers ?? 0) === 0,
+    nextCandidates: [...protectedCandidates, ...safeQueue],
   };
 }
 
