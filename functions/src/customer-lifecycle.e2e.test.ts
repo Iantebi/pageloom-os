@@ -160,6 +160,20 @@ function withQuery(path: string, params: Record<string, string>) {
   return `${path}?${new URLSearchParams(params).toString()}`;
 }
 
+/** Endpoints that only call WorkflowEngine.emit() (not .process()) rely on the async
+ * processWorkflowEvent Firestore trigger to actually apply the stage transition - unlike
+ * onboarding-journey-api.ts's payment-confirmed endpoint, which drives the engine synchronously.
+ * Polls a read until it matches, rather than asserting immediately after such a call. */
+async function waitFor<T>(read: () => Promise<T>, matches: (value: T) => boolean, timeoutMs = 10_000): Promise<T> {
+  const start = Date.now();
+  for (;;) {
+    const value = await read();
+    if (matches(value)) return value;
+    if (Date.now() - start > timeoutMs) throw new Error("waitFor: condition was not met within the timeout");
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Shared state threaded through the sequential lifecycle stages below.
 // ---------------------------------------------------------------------------------------------
@@ -368,7 +382,13 @@ describe("Customer lifecycle (end-to-end, real Functions/Firestore/Auth/Storage 
       organizationId: ORG_ALPHA, responses, filePaths: [],
     });
     expect(completed.status).toBe(202);
-    const projectDoc = await adminDb.doc(`organizations/${ORG_ALPHA}/projects/${state.projectId}`).get();
+    // QuestionnaireCompleted is only emitted here, not processed synchronously (unlike the
+    // payment-confirmed endpoint) - the transition lands asynchronously via the
+    // processWorkflowEvent Firestore trigger, so poll rather than asserting immediately.
+    const projectDoc = await waitFor(
+      () => adminDb.doc(`organizations/${ORG_ALPHA}/projects/${state.projectId}`).get(),
+      snap => snap.data()?.workflowStage === "assets",
+    );
     expect(projectDoc.data()?.workflowStage).toBe("assets");
   });
 
