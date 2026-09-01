@@ -12,28 +12,47 @@ etc.
 | Customer submits the Website Brief | `website_brief_received` | owner | `api.ts` (`POST /projects/:id/questionnaires/:id/complete`, only when the questionnaire's `kind === "website_brief"`) |
 | Materials fail validation | `materials_missing` | owner | `api.ts` (`POST /projects/:id/assets/validate`, missing-files branch) |
 | Materials pass validation (build starts) | `build_started` | customer | `api.ts` (`POST /projects/:id/assets/validate`, success branch) |
-| Preview ready for review | `preview_ready` | — | **Template only.** The stage that produces a customer-reviewable preview (`ProductionDeploymentCompleted`) is emitted deep in orchestrator/deployment internals not touched by this feature; wiring the producer call is a follow-up, not blocked on anything here. |
+| Preview ready for review | `preview_ready` | customer | `workflow-engine.ts` (on the `ProductionDeploymentCompleted` event, the same central `process()` transaction as `final_approval_recorded`) |
 | Customer submits a revision request | `revision_received` | owner | `onboarding-journey-api.ts` (`POST /projects/:id/revision-requests`) |
 | Owner resolves a revision request | `revision_resolved` | customer | `onboarding-journey-api.ts` (`PATCH /projects/:id/revision-requests/:id/resolve`) |
 | Customer gives final approval | `final_approval_recorded` | owner | `workflow-engine.ts` (on the `CustomerApproved` event) |
 | Owner records handover / site goes live | `website_live` | customer | `onboarding-journey-api.ts` (`POST /projects/:id/handover`) |
-| Post-launch follow-up | `post_launch_follow_up` | — | **Template only.** Deliberately not scheduled — the mission's production-safety section explicitly excludes Scheduler changes from this work. |
+| Post-launch follow-up | `post_launch_follow_up` | — | **Template only — see below.** |
 
-## Why two items are "template only"
+## Why `post_launch_follow_up` is still template-only
 
-The mission's instruction is to "build the notification/event architecture and
-templates first" and explicitly forbids sending real messages or touching the
-Scheduler in this pass. `preview_ready` and `post_launch_follow_up` have their full
-type definition and Hebrew/English copy already in `notifications.ts` (so a future
-producer just writes `{type, params}` and it renders correctly), but wiring their
-actual trigger points was intentionally left out because:
+Every other notification in this table fires as the *immediate* consequence of some
+event (a request arriving, a stage transitioning). `post_launch_follow_up` is
+different in kind: it means "check in with the customer some days/weeks after
+launch," which has no triggering event to hang off of — correct behavior requires
+something to wake up on a schedule and ask "has enough time passed since handover?"
+That is a Scheduler by definition, whether it's a brand-new `onSchedule` function or
+added logic inside an existing one (`monitorWorkflowTimeouts`,
+`monitorBusinessRisks`, etc.) — either way it changes what runs on a schedule in
+production, which this pass's explicit constraint is to avoid. `notifications.ts`
+already has the full `post_launch_follow_up` type and Hebrew/English copy ready, so
+the only remaining work is the scheduled producer itself.
 
-- `preview_ready`'s natural trigger (`ProductionDeploymentCompleted`) lives inside
-  deployment/orchestrator internals this feature doesn't otherwise touch, and forcing
-  a producer call there without understanding that pipeline risked exactly the kind
-  of unrelated architecture change the mission asks to avoid.
-- `post_launch_follow_up` is inherently time-delayed (some days/weeks after launch),
-  which means a Scheduler — explicitly out of scope for this production-safety pass.
+### Exact future implementation
+
+When a Scheduler change is separately approved:
+
+1. Add a `followUpSentAt?: string` field to the `Handover` record
+   (`packages/core/src/handover.ts`) and to the Firestore document written by
+   `POST /projects/:id/handover`.
+2. Add a new `onSchedule` function (e.g. `sendPostLaunchFollowUps`, modeled on the
+   existing `monitorBusinessRisks` — `every 1 hours` cadence is more than sufficient
+   for a days-later check) that:
+   - Queries `collectionGroup("handover")` where `followUpSentAt` is unset and
+     `createdAt` is older than the desired follow-up window (e.g. 7 days).
+   - For each match, writes a `post_launch_follow_up` notification
+     (`audience: "customer"`, `params: { projectName }`) exactly like every other
+     producer in this table, then sets `followUpSentAt` on the handover doc so it is
+     never sent twice.
+3. No new external service, no IAM change, no billing change — this reuses the exact
+   `onSchedule`/Firestore/notification pattern already deployed for
+   `monitorWorkflowTimeouts` and `monitorBusinessRisks`, just with a new function
+   name and query.
 
 ## Workflow-level notifications (unchanged, pre-existing)
 
