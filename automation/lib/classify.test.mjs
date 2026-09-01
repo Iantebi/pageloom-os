@@ -95,6 +95,19 @@ test("secrets rotation is always protected", () => {
   assert.equal(result.matchedCategory, "secrets");
 });
 
+test("business-ops category (e.g. onboarding checklist) is SAFE once approved", () => {
+  const result = classify(
+    {
+      title: "Draft onboarding checklist",
+      body: "Write an onboarding checklist for new clients.",
+      labels: ["autonomous:approved"],
+    },
+    policy,
+  );
+  assert.equal(result.classification, "SAFE");
+  assert.equal(result.matchedCategory, "onboarding-asset");
+});
+
 test("documentation-only change is SAFE once approved", () => {
   const result = classify(
     { title: "Update README", body: "Fix a typo in the documentation.", labels: ["autonomous:approved"] },
