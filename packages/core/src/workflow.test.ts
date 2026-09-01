@@ -50,4 +50,13 @@ describe("website production workflow",()=>{
     expect(nextWorkflowAttempt({},"production_deployment")).toBe(1);
     expect(nextWorkflowAttempt({production_deployment:1},"production_deployment")).toBe(2);
   });
+  it("requires an explicit, manual Owner action to confirm payment - never automatic",()=>{
+    expect(workflowDefinitions.payment_confirmed.startMode).toBe("manual");
+    expect(workflowDefinitions.payment_confirmed.requiredAgents).toEqual([]);
+    expect(resolveWorkflowTransition("closed_won","PaymentConfirmed")).toEqual({from:"closed_won",to:"payment_confirmed"});
+  });
+  it("lets onboarding start from either closed_won directly or after payment_confirmed",()=>{
+    expect(resolveWorkflowTransition("closed_won","OnboardingStarted")?.to).toBe("onboarding");
+    expect(resolveWorkflowTransition("payment_confirmed","OnboardingStarted")?.to).toBe("onboarding");
+  });
 });

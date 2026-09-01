@@ -2,6 +2,7 @@ export const projectsView = {
   he: {
     tabs: {
       overview: "סקירה כללית",
+      onboarding: "קליטת לקוח",
       questionnaire: "שאלון",
       website: "אתר",
       tasks: "משימות",
@@ -82,6 +83,7 @@ export const projectsView = {
   en: {
     tabs: {
       overview: "Overview",
+      onboarding: "Onboarding",
       questionnaire: "Questionnaire",
       website: "Website",
       tasks: "Tasks",

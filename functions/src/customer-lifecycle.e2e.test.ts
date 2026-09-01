@@ -160,6 +160,20 @@ function withQuery(path: string, params: Record<string, string>) {
   return `${path}?${new URLSearchParams(params).toString()}`;
 }
 
+/** Endpoints that only call WorkflowEngine.emit() (not .process()) rely on the async
+ * processWorkflowEvent Firestore trigger to actually apply the stage transition - unlike
+ * onboarding-journey-api.ts's payment-confirmed endpoint, which drives the engine synchronously.
+ * Polls a read until it matches, rather than asserting immediately after such a call. */
+async function waitFor<T>(read: () => Promise<T>, matches: (value: T) => boolean, timeoutMs = 10_000): Promise<T> {
+  const start = Date.now();
+  for (;;) {
+    const value = await read();
+    if (matches(value)) return value;
+    if (Date.now() - start > timeoutMs) throw new Error("waitFor: condition was not met within the timeout");
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Shared state threaded through the sequential lifecycle stages below.
 // ---------------------------------------------------------------------------------------------
@@ -167,7 +181,7 @@ const state: {
   ownerAlphaToken?: string; staffMemberAlphaToken?: string; clientAlphaToken?: string;
   ownerBetaToken?: string; clientBetaToken?: string;
   leadId?: string; projectId?: string; customerId?: string;
-  websiteId?: string;
+  websiteId?: string; websiteBriefId?: string;
   uploadedMediaPath?: string;
   version1RevisionId?: string; version1HeroHeading?: string;
 } = {};
@@ -290,6 +304,39 @@ describe("Customer lifecycle (end-to-end, real Functions/Firestore/Auth/Storage 
     expect(kickoff.data.data).toEqual({ id: "kickoff", complete: true });
   });
 
+  // ===== 7a: PAYMENT CONFIRMED — the new, dedicated, Owner-only endpoint (mission section 1). =====
+  // Advances the workflow through the new payment_confirmed stage into "questionnaire" and
+  // auto-creates the Website Brief, all in one manual Owner action - no Stripe call, no scheduler.
+  it("7a. Owner confirms payment via the dedicated payment-confirmed endpoint, which records payment state and auto-creates the Website Brief", async () => {
+    const confirmed = await apiCall(state.ownerAlphaToken, "POST", `/api/projects/${state.projectId}/payment-confirmed`, {
+      organizationId: ORG_ALPHA, paymentReference: "e2e-test-payment-ref-001",
+      evidence: "Synthetic e2e-test evidence: payment confirmed by the owner, no real Stripe call.",
+    });
+    expect(confirmed.status).toBe(202);
+    state.websiteBriefId = confirmed.data.data!.websiteBriefId;
+
+    const [customerDoc, projectDoc] = await Promise.all([
+      adminDb.doc(`organizations/${ORG_ALPHA}/customers/${state.customerId}`).get(),
+      adminDb.doc(`organizations/${ORG_ALPHA}/projects/${state.projectId}`).get(),
+    ]);
+    // Security property: a payment reference is recorded, but never card details.
+    expect(customerDoc.data()?.paymentStatus).toBe("paid");
+    expect(customerDoc.data()?.paymentReference).toBe("e2e-test-payment-ref-001");
+    expect(Object.keys(customerDoc.data() ?? {}).some(key => /card/i.test(key))).toBe(false);
+    expect(projectDoc.data()?.workflowStage).toBe("questionnaire");
+
+    const briefDoc = await adminDb.doc(`organizations/${ORG_ALPHA}/projects/${state.projectId}/questionnaires/${state.websiteBriefId}`).get();
+    expect(briefDoc.data()?.kind).toBe("website_brief");
+    expect((briefDoc.data()?.fields as unknown[]).length).toBeGreaterThan(10);
+
+    // Idempotent: confirming payment again for the same project is a no-op, not a duplicate advance.
+    const again = await apiCall(state.ownerAlphaToken, "POST", `/api/projects/${state.projectId}/payment-confirmed`, {
+      organizationId: ORG_ALPHA, paymentReference: "e2e-test-payment-ref-001", evidence: "Second call, should be a no-op.",
+    });
+    expect(again.status).toBe(200);
+    expect(again.data.data!.alreadyConfirmed).toBe(true);
+  });
+
   // ===== 8: website creation + 9: draft creation =====
   it("8-9. configures website content permissions, which creates the website and its default draft", async () => {
     const config = await apiCall(state.ownerAlphaToken, "PUT", `/api/projects/${state.projectId}/website-content/config`, {
@@ -323,6 +370,30 @@ describe("Customer lifecycle (end-to-end, real Functions/Firestore/Auth/Storage 
     expect(portal.status).toBe(200);
     expect(portal.data.data!.configured).toBe(true);
   });
+
+  // ===== 10b: WEBSITE BRIEF — the customer completes the brief auto-created at payment time. =====
+  // Requires the project to already be in "questionnaire" stage (set by 7a above) - this is the
+  // existing, unchanged /questionnaires/:id/complete endpoint, exercised here with the new brief.
+  it("10b. Customer completes the Website Brief, which advances the workflow into materials collection", async () => {
+    // Longer than vitest's default 5000ms test timeout: this test polls (via waitFor, up to
+    // 10000ms) for the async processWorkflowEvent Firestore trigger to apply the transition -
+    // the emulator's cold-start latency for a fresh trigger can exceed 5s under CI load.
+    const briefDoc = await adminDb.doc(`organizations/${ORG_ALPHA}/projects/${state.projectId}/questionnaires/${state.websiteBriefId}`).get();
+    const fields = briefDoc.data()!.fields as { id: string; required: boolean }[];
+    const responses = Object.fromEntries(fields.filter(field => field.required).map(field => [field.id, `Synthetic e2e-test answer for ${field.id}`]));
+    const completed = await apiCall(state.clientAlphaToken, "POST", `/api/projects/${state.projectId}/questionnaires/${state.websiteBriefId}/complete`, {
+      organizationId: ORG_ALPHA, responses, filePaths: [],
+    });
+    expect(completed.status).toBe(202);
+    // QuestionnaireCompleted is only emitted here, not processed synchronously (unlike the
+    // payment-confirmed endpoint) - the transition lands asynchronously via the
+    // processWorkflowEvent Firestore trigger, so poll rather than asserting immediately.
+    const projectDoc = await waitFor(
+      () => adminDb.doc(`organizations/${ORG_ALPHA}/projects/${state.projectId}`).get(),
+      snap => snap.data()?.workflowStage === "assets",
+    );
+    expect(projectDoc.data()?.workflowStage).toBe("assets");
+  }, 15_000);
 
   // ===== 11: media upload =====
   it("11. uploads customer website media under the customer/project/website storage boundary", async () => {
@@ -421,6 +492,67 @@ describe("Customer lifecycle (end-to-end, real Functions/Firestore/Auth/Storage 
     });
     expect(ticket.status).toBe(201);
     (state as { ticketId?: string }).ticketId = ticket.data.data!.id;
+  });
+
+  // ===== 6. REVISION REQUESTS — structured, recorded, resolvable (mission section 6). =====
+  it("19. lets the customer submit a structured revision request, and the Owner resolve it", async () => {
+    const created = await apiCall(state.clientAlphaToken, "POST", `/api/projects/${state.projectId}/revision-requests`, {
+      organizationId: ORG_ALPHA, description: "Synthetic e2e test: please enlarge the hero call-to-action button.", area: "Homepage",
+    });
+    expect(created.status).toBe(201);
+    expect(created.data.data!.status).toBe("open");
+    const requestId = created.data.data!.id as string;
+
+    // Security property: a different tenant's owner cannot resolve this org's revision request.
+    const crossTenant = await apiCall(state.ownerBetaToken, "PATCH", `/api/projects/${state.projectId}/revision-requests/${requestId}/resolve`, { organizationId: ORG_ALPHA, resolutionNote: "hijacked" });
+    expect(crossTenant.status).toBe(403);
+
+    const resolved = await apiCall(state.ownerAlphaToken, "PATCH", `/api/projects/${state.projectId}/revision-requests/${requestId}/resolve`, {
+      organizationId: ORG_ALPHA, resolutionNote: "Enlarged the button as requested.",
+    });
+    expect(resolved.status).toBe(200);
+    expect(resolved.data.data!.status).toBe("resolved");
+  });
+
+  // ===== 7. PUBLISH — launch readiness checklist (mission section 7). =====
+  it("20. lets staff load and complete the pre-launch checklist", async () => {
+    const loaded = await apiCall(state.ownerAlphaToken, "GET", withQuery(`/api/projects/${state.projectId}/launch-checklist`, { organizationId: ORG_ALPHA }));
+    expect(loaded.status).toBe(200);
+    const items = loaded.data.data!.items as { id: string; required: boolean }[];
+    expect(items.length).toBeGreaterThan(5);
+
+    // Security property: the customer identity cannot read the launch checklist at all.
+    const asClient = await apiCall(state.clientAlphaToken, "GET", withQuery(`/api/projects/${state.projectId}/launch-checklist`, { organizationId: ORG_ALPHA }));
+    expect(asClient.status).toBe(403);
+
+    for (const item of items) {
+      const toggled = await apiCall(state.ownerAlphaToken, "PATCH", `/api/projects/${state.projectId}/launch-checklist/${item.id}`, { organizationId: ORG_ALPHA, complete: true });
+      expect(toggled.status).toBe(200);
+    }
+  });
+
+  // ===== 8. HANDOVER — recorded once at launch (mission section 8). =====
+  it("21. records handover, which the customer can then read and which feeds the portal's live-site link", async () => {
+    const recorded = await apiCall(state.ownerAlphaToken, "POST", `/api/projects/${state.projectId}/handover`, {
+      organizationId: ORG_ALPHA,
+      liveUrl: "https://e2e-test-customer-co.example.com",
+      supportInstructions: "Open a support ticket from your portal for anything you need.",
+      maintenanceInfo: "PageLoom monitors uptime and applies security updates automatically.",
+      pageloomResponsibilities: "Hosting, uptime, and security updates.",
+      customerResponsibilities: "Keeping your business information up to date.",
+    });
+    expect(recorded.status).toBe(201);
+
+    const asClient = await apiCall(state.clientAlphaToken, "GET", withQuery(`/api/projects/${state.projectId}/handover`, { organizationId: ORG_ALPHA }));
+    expect(asClient.status).toBe(200);
+    expect(asClient.data.data!.liveUrl).toBe("https://e2e-test-customer-co.example.com");
+
+    const projectDoc = await adminDb.doc(`organizations/${ORG_ALPHA}/projects/${state.projectId}`).get();
+    expect(projectDoc.data()?.websiteUrl).toBe("https://e2e-test-customer-co.example.com");
+
+    // Security property: a different tenant's client cannot read this project's handover.
+    const crossTenant = await apiCall(state.clientBetaToken, "GET", withQuery(`/api/projects/${state.projectId}/handover`, { organizationId: ORG_ALPHA }));
+    expect(crossTenant.status).toBe(403);
   });
 
   // =================================================================================================

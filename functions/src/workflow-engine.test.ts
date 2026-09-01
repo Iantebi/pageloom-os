@@ -11,4 +11,13 @@ describe("workflow engine notifications", () => {
     expect(source).toContain("title:`Project ${isRetry?\"retrying\":\"moved to\"} ${transition.to.replaceAll(\"_\",\" \")}`");
     expect(source).toContain("body:`Responsible: ${policy.requiredAgents.join(\", \")||policy.approval}. Estimated completion ${due}.`");
   });
+  it("notifies the customer with a preview_ready type when ProductionDeploymentCompleted is processed", () => {
+    expect(source).toContain('event.type==="ProductionDeploymentCompleted"');
+    expect(source).toContain('audience:"customer"');
+    expect(source).toContain('type:"preview_ready"');
+  });
+  it("sets customerApprovedAt and notifies the owner with a final_approval_recorded type when CustomerApproved is processed", () => {
+    expect(source).toContain('event.type==="CustomerApproved"?{customerApprovedAt:nowIso}');
+    expect(source).toContain('type:"final_approval_recorded"');
+  });
 });

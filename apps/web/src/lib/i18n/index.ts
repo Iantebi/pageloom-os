@@ -42,6 +42,8 @@ import { enterpriseOverview } from "./dictionaries/enterpriseOverview";
 import { fleetOverview } from "./dictionaries/fleetOverview";
 import { workflowTimeline } from "./dictionaries/workflowTimeline";
 import { appearanceSettings } from "./dictionaries/appearanceSettings";
+import { customerJourney } from "./dictionaries/customerJourney";
+import { onboardingJourneyPanel } from "./dictionaries/onboardingJourneyPanel";
 
 const dictionaries = {
   common,
@@ -89,6 +91,8 @@ const dictionaries = {
   fleetOverview,
   workflowTimeline,
   appearanceSettings,
+  customerJourney,
+  onboardingJourneyPanel,
 } as const;
 
 type Dictionaries = typeof dictionaries;

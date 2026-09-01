@@ -17,6 +17,7 @@ export const portalQuestionnaire = {
     uploadingFile: "מעלים את הקובץ…",
     fileSaved: "הקובץ נשמר בהצלחה.",
     selectPlaceholder: "בחירת תשובה",
+    missingFieldsTitle: (count: number) => `חסרים ${count} שדות נדרשים`,
   },
   en: {
     loading: "Loading the intake questionnaire…",
@@ -36,5 +37,6 @@ export const portalQuestionnaire = {
     uploadingFile: "Uploading the file…",
     fileSaved: "The file was saved successfully.",
     selectPlaceholder: "Select an answer",
+    missingFieldsTitle: (count: number) => `${count} required field(s) missing`,
   },
 } as const;

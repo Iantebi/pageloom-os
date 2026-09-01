@@ -94,6 +94,13 @@ async function seed() {
       set(`organizations/${ORG}/supportTickets/ticket-alpha`, { customerId: CUST_ALPHA, subject: "help" }),
       set(`organizations/${ORG}/supportTickets/ticket-beta`, { customerId: CUST_BETA, subject: "help" }),
 
+      set(`organizations/${ORG}/projects/${PROJ_ALPHA_1}/revisionRequests/rev-1`, { description: "Make the hero bigger", status: "open" }),
+      set(`organizations/${ORG}/projects/${PROJ_BETA_1}/revisionRequests/rev-1`, { description: "Fix the footer", status: "open" }),
+      set(`organizations/${ORG}/projects/${PROJ_ALPHA_1}/launchChecklist/current`, { items: [{ id: "domain", complete: false }] }),
+      set(`organizations/${ORG}/projects/${PROJ_BETA_1}/launchChecklist/current`, { items: [{ id: "domain", complete: false }] }),
+      set(`organizations/${ORG}/projects/${PROJ_ALPHA_1}/handover/current`, { liveUrl: "https://alpha.example.com" }),
+      set(`organizations/${ORG}/projects/${PROJ_BETA_1}/handover/current`, { liveUrl: "https://beta.example.com" }),
+
       set(`organizations/${ORG}/leads/lead-1`, { name: "Prospective Co" }),
       set(`organizations/${ORG}/customers/${CUST_ALPHA}`, { name: "Alpha Inc" }),
 
@@ -269,6 +276,39 @@ describe("Firestore rules engine (behavioral, via emulator)", () => {
     it("denies a client from reading another customer's support ticket", async () => {
       const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
       await assertFails(getDoc(doc(client.firestore(), `organizations/${ORG}/supportTickets/ticket-beta`)));
+    });
+  });
+
+  describe("onboarding journey: revision requests, launch checklist, handover", () => {
+    it("lets a client read revision requests and handover on their own assigned project", async () => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      await assertSucceeds(getDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/revisionRequests/rev-1`)));
+      await assertSucceeds(getDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/handover/current`)));
+    });
+
+    it("denies a client from reading another customer's revision requests or handover", async () => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      await assertFails(getDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_BETA_1}/revisionRequests/rev-1`)));
+      await assertFails(getDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_BETA_1}/handover/current`)));
+    });
+
+    it("denies a client from reading the launch checklist at all (staff-only readiness detail)", async () => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      await assertFails(getDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/launchChecklist/current`)));
+    });
+
+    it("lets staff read revision requests, launch checklist, and handover across projects", async () => {
+      const staffMember = testEnv.authenticatedContext(STAFF_MEMBER_UID);
+      await assertSucceeds(getDoc(doc(staffMember.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/revisionRequests/rev-1`)));
+      await assertSucceeds(getDoc(doc(staffMember.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/launchChecklist/current`)));
+      await assertSucceeds(getDoc(doc(staffMember.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/handover/current`)));
+    });
+
+    it("denies writes to all three from the client SDK (server/admin-authorized only)", async () => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      await assertFails(setDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/revisionRequests/rev-1`), { status: "resolved" }));
+      await assertFails(setDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/launchChecklist/current`), { items: [] }));
+      await assertFails(setDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/handover/current`), { liveUrl: "https://hacked.example.com" }));
     });
   });
 
