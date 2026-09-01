@@ -3,7 +3,7 @@ import type {WorkflowEventType,WorkflowStage} from "@pageloom/core";
 export type WorkflowEventAuthority="owner"|"member"|"system_only";
 
 const ownerEvents=new Set<WorkflowEventType>([
-  "PhoneCallScheduled","PhoneCallCompleted","LeadWon","AssetsValidated","CEOApproved",
+  "PhoneCallScheduled","PhoneCallCompleted","LeadWon","PaymentConfirmed","AssetsValidated","CEOApproved",
   "CEORejected","FinalDeploymentApproved","ManualRetryRequested"
 ]);
 const memberEvents=new Set<WorkflowEventType>([

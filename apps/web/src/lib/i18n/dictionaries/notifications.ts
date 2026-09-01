@@ -25,6 +25,16 @@ type ContentChangesRequestedParams = { reason: string };
 type ContentRejectedParams = { reason: string };
 type ContentPublishedParams = { version: number };
 type WorkflowStageChangedParams = { fromStage: string; toStage: string; isRetry: boolean; agentIds: string[]; approval: string; dueAt: string };
+type PaymentConfirmedParams = { projectId: string };
+type WebsiteBriefReceivedParams = { projectName: string };
+type MaterialsMissingParams = { missingCount: number };
+type BuildStartedParams = { projectName: string };
+type PreviewReadyParams = { projectName: string };
+type RevisionReceivedParams = { area: string };
+type RevisionResolvedParams = Record<string, never>;
+type FinalApprovalRecordedParams = { projectName: string };
+type WebsiteLiveParams = { liveUrl: string };
+type PostLaunchFollowUpParams = { projectName: string };
 
 // Mirrors the `type` string written at each notification producer — keep in sync if a producer adds,
 // renames, or removes a notification type.
@@ -42,9 +52,19 @@ export type NotificationParamsByType = {
   website_content_rejected: ContentRejectedParams;
   website_content_published: ContentPublishedParams;
   workflow_stage_changed: WorkflowStageChangedParams;
+  payment_confirmed: PaymentConfirmedParams;
+  website_brief_received: WebsiteBriefReceivedParams;
+  materials_missing: MaterialsMissingParams;
+  build_started: BuildStartedParams;
+  preview_ready: PreviewReadyParams;
+  revision_received: RevisionReceivedParams;
+  revision_resolved: RevisionResolvedParams;
+  final_approval_recorded: FinalApprovalRecordedParams;
+  website_live: WebsiteLiveParams;
+  post_launch_follow_up: PostLaunchFollowUpParams;
 };
 export type NotificationType = keyof NotificationParamsByType;
-const notificationTypes = new Set<string>(["domain_expiry", "ssl_expiry", "backup_failure", "customer_inactivity", "project_stalled", "negative_profitability", "support_ticket_created", "support_ticket_resolved", "website_content_submitted", "website_content_changes_requested", "website_content_rejected", "website_content_published", "workflow_stage_changed"]);
+const notificationTypes = new Set<string>(["domain_expiry", "ssl_expiry", "backup_failure", "customer_inactivity", "project_stalled", "negative_profitability", "support_ticket_created", "support_ticket_resolved", "website_content_submitted", "website_content_changes_requested", "website_content_rejected", "website_content_published", "workflow_stage_changed", "payment_confirmed", "website_brief_received", "materials_missing", "build_started", "preview_ready", "revision_received", "revision_resolved", "final_approval_recorded", "website_live", "post_launch_follow_up"]);
 function isKnownType(value: string): value is NotificationType { return notificationTypes.has(value); }
 
 const approvalLabelsHe: Record<string, string> = { none: "ללא", ceo: "מנכ\"ל", customer: "לקוח" };
@@ -79,6 +99,16 @@ const formattersHe: Formatters = {
   website_content_rejected: params => `תוכן האתר נדחה: ${str(params.reason)}`,
   website_content_published: params => `גרסה ${num(params.version)} של תוכן האתר פורסמה`,
   workflow_stage_changed: params => { const stage = stageLabel(str(params.toStage), statusLabels.he), responsible = responsibleParty(list(params.agentIds), str(params.approval), agentNamesHe, approvalLabelsHe); return `${bool(params.isRetry) ? `ניסיון חוזר בשלב "${stage}"` : `הפרויקט עבר לשלב "${stage}"`}. אחראים: ${responsible}. מועד סיום משוער: ${dateTime(str(params.dueAt))}.`; },
+  payment_confirmed: () => `התשלום התקבל והפרויקט נפתח. ברוכים הבאים ל-PageLoom — יש למלא את שאלון האתר כדי להתחיל`,
+  website_brief_received: params => `שאלון האתר עבור ${str(params.projectName)} התקבל`,
+  materials_missing: params => `חסרים ${num(params.missingCount)} פרטים/קבצים להשלמת שאלון האתר`,
+  build_started: params => `התחלנו לבנות את האתר עבור ${str(params.projectName)}`,
+  preview_ready: params => `תצוגה מקדימה של האתר ${str(params.projectName)} מוכנה לבדיקה`,
+  revision_received: params => `התקבלה בקשת שינוי חדשה${str(params.area) ? ` (${str(params.area)})` : ""}`,
+  revision_resolved: () => `בקשת השינוי שלכם טופלה`,
+  final_approval_recorded: params => `האישור הסופי לאתר ${str(params.projectName)} נרשם`,
+  website_live: params => `האתר שלכם עלה לאוויר: ${str(params.liveUrl)}`,
+  post_launch_follow_up: params => `בדיקת מעקב לאחר ההשקה עבור ${str(params.projectName)}`,
 };
 
 const formattersEn: Formatters = {
@@ -95,6 +125,16 @@ const formattersEn: Formatters = {
   website_content_rejected: params => `Website content was rejected: ${str(params.reason)}`,
   website_content_published: params => `Website content version ${num(params.version)} is now published`,
   workflow_stage_changed: params => { const stage = stageLabel(str(params.toStage), statusLabels.en), responsible = responsibleParty(list(params.agentIds), str(params.approval), agentNamesEn, approvalLabelsEn); return `${bool(params.isRetry) ? `Retrying stage "${stage}"` : `Project moved to stage "${stage}"`}. Responsible: ${responsible}. Estimated completion ${dateTime(str(params.dueAt))}.`; },
+  payment_confirmed: () => `Payment received and your project is open. Welcome to PageLoom — please complete your Website Brief to get started`,
+  website_brief_received: params => `Website Brief received for ${str(params.projectName)}`,
+  materials_missing: params => `${num(params.missingCount)} item(s) are still missing to complete the Website Brief`,
+  build_started: params => `We've started building the website for ${str(params.projectName)}`,
+  preview_ready: params => `A preview of ${str(params.projectName)} is ready for review`,
+  revision_received: params => `A new revision request was received${str(params.area) ? ` (${str(params.area)})` : ""}`,
+  revision_resolved: () => `Your revision request was resolved`,
+  final_approval_recorded: params => `Final approval for ${str(params.projectName)} was recorded`,
+  website_live: params => `Your website is live: ${str(params.liveUrl)}`,
+  post_launch_follow_up: params => `Post-launch follow-up for ${str(params.projectName)}`,
 };
 
 export const notifications = {

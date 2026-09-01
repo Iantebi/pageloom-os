@@ -107,6 +107,9 @@ service cloud.firestore {
       match /projects/{projectId}/documents/{documentId}/signatures/{signatureId} { allow read: if staff(orgId); allow write: if false; }
       match /supportTickets/{ticketId} { allow read: if staff(orgId) || (client(orgId) && resource.data.customerId == clientCustomerId(orgId)); allow write: if false; }
       match /supportTickets/{ticketId}/internalNotes/{noteId} { allow read: if staff(orgId); allow write: if false; }
+      match /projects/{projectId}/revisionRequests/{requestId} { allow read: if staff(orgId) || clientProject(orgId, projectId); allow write: if false; }
+      match /projects/{projectId}/launchChecklist/{docId} { allow read: if staff(orgId); allow write: if false; }
+      match /projects/{projectId}/handover/{docId} { allow read: if staff(orgId) || clientProject(orgId, projectId); allow write: if false; }
     }
     match /{document=**} { allow read, write: if false; }
   }

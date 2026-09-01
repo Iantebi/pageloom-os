@@ -2,7 +2,7 @@ import {z} from "zod";
 import type {AgentId} from "./types.js";
 
 export const workflowStageSchema=z.enum([
-  "lead","phone_call","closed_won","onboarding","questionnaire","assets","research",
+  "lead","phone_call","closed_won","payment_confirmed","onboarding","questionnaire","assets","research",
   "brand_strategy","design_system","sitemap","ux_planning","ui_generation","copywriting",
   "seo_optimization","development","deployment_preparation","qa","ceo_approval",
   "production_deployment","customer_review","revision","final_deployment","completed"
@@ -10,7 +10,7 @@ export const workflowStageSchema=z.enum([
 export type WorkflowStage=z.infer<typeof workflowStageSchema>;
 
 export const workflowEventTypeSchema=z.enum([
-  "LeadCreated","PhoneCallScheduled","PhoneCallCompleted","LeadWon","OnboardingStarted","OnboardingCompleted",
+  "LeadCreated","PhoneCallScheduled","PhoneCallCompleted","LeadWon","PaymentConfirmed","OnboardingStarted","OnboardingCompleted",
   "QuestionnaireCompleted","AssetsUploaded","AssetsValidated","ResearchCompleted",
   "BrandStrategyCompleted","DesignSystemCompleted","SitemapCompleted","UXPlanCompleted",
   "UIGenerationCompleted","CopywritingCompleted","SEOOptimizationCompleted",
@@ -62,7 +62,17 @@ const stage=(
 export const workflowDefinitions:Record<WorkflowStage,WorkflowStageDefinition>={
   lead:stage("lead",[],["PhoneCallScheduled"],["sales"],"none","manual",60,1440,3,30,["ceo"]),
   phone_call:stage("phone_call",["leadExists"],["PhoneCallCompleted","LeadWon"],["sales"],"none","manual",60,2880,2,120,["ceo"]),
-  closed_won:stage("closed_won",["callCompleted","dealWon"],["OnboardingStarted"],["project-manager"],"none","automatic",30,1440,3,60,["ceo","project_manager"]),
+  closed_won:stage("closed_won",["callCompleted","dealWon"],["PaymentConfirmed"],["project-manager"],"none","automatic",30,1440,3,60,["ceo","project_manager"]),
+  // Payment confirmation is an explicit, MANUAL Owner action (see functions/src/onboarding-journey-api.ts) —
+  // never automatic — per product decision (mirrors the closing-api.ts payment/deposit confirmation, which is
+  // also manual-only). This stage exists only to make that confirmation a first-class, auditable point in the
+  // workflow between "deal closed" and "onboarding starts"; it has no agent work of its own.
+  // No entry condition: unlike every other stage, this one must not depend on a "dealWon" fact
+  // that requires having already gone through the engine's own lead→phone_call→closed_won path,
+  // because POST /api/projects (the actual deal-closing endpoint) writes journeyStage directly
+  // and never emits engine events — see the PaymentConfirmed transition comment below. The real
+  // authorization is onboarding-journey-api.ts's own explicit `dealClosedAt` Firestore check.
+  payment_confirmed:stage("payment_confirmed",[],["OnboardingStarted"],[],"none","manual",5,1440,3,60,["ceo","customer"]),
   onboarding:stage("onboarding",["dealWon"],["OnboardingCompleted"],["client-journey","project-manager"],"none","automatic",120,2880),
   questionnaire:stage("questionnaire",["onboardingComplete"],["QuestionnaireCompleted"],["client-journey"],"none","customer_action",240,4320,3,240,["project_manager","customer"]),
   assets:{...stage("assets",["questionnaireComplete"],["AssetsUploaded","AssetsValidated"],["media","project-manager"],"none","customer_action",480,4320,3,240,["project_manager","customer"]),rollbackStage:"assets"},
@@ -89,7 +99,14 @@ export const eventTransitions:Partial<Record<WorkflowEventType,{from:WorkflowSta
   PhoneCallScheduled:{from:["lead"],to:"phone_call"},
   PhoneCallCompleted:{from:["phone_call"],to:"phone_call"},
   LeadWon:{from:["phone_call"],to:"closed_won"},
-  OnboardingStarted:{from:["closed_won"],to:"onboarding"},
+  // "lead"/"phone_call" are included alongside "closed_won" because POST /api/projects (the
+  // existing deal-closing endpoint in api.ts) never calls WorkflowEngine — it writes journeyStage
+  // directly — so a freshly closed project's workflowStage is often still unset (defaults to
+  // "lead") by the time Owner confirms payment. The real authorization gate for this event is
+  // functions/src/onboarding-journey-api.ts's own explicit `dealClosedAt` check, not this stage
+  // list; the list only needs to cover every realistic pre-payment value of workflowStage.
+  PaymentConfirmed:{from:["lead","phone_call","closed_won"],to:"payment_confirmed"},
+  OnboardingStarted:{from:["closed_won","payment_confirmed"],to:"onboarding"},
   OnboardingCompleted:{from:["onboarding"],to:"questionnaire"},
   QuestionnaireCompleted:{from:["questionnaire"],to:"assets"},
   AssetsUploaded:{from:["assets"],to:"assets"},
