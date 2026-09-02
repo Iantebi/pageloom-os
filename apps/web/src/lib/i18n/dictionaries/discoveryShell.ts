@@ -10,7 +10,7 @@ const he = {
   taskCardContinueCta: "המשיכו את אפיון העסק",
   taskCardProgress: (completed: number) => `הושלמו ${completed} מתוך 9 שלבים`,
   taskCardSubmitted: "אפיון העסק נשלח — אנחנו בודקים את הפרטים",
-  taskCardReopened: "דרוש מידע נוסף כדי להמשיך",
+  taskCardReopened: "יש לעדכן כמה פרטים לפני שנמשיך",
   taskCardReopenedCta: "השלימו את הפרטים החסרים",
 
   // Shell chrome
@@ -78,7 +78,7 @@ const en = {
   taskCardContinueCta: "Continue Business Discovery",
   taskCardProgress: (completed: number) => `${completed} of 9 stages completed`,
   taskCardSubmitted: "Business Discovery submitted — we're reviewing the details",
-  taskCardReopened: "More information is needed to continue",
+  taskCardReopened: "A few details need updating before we continue",
   taskCardReopenedCta: "Complete the missing details",
 
   brandName: "PageLoom",

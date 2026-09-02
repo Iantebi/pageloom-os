@@ -459,6 +459,37 @@ describe("Firestore rules engine (behavioral, via emulator)", () => {
       await assertFails(getDoc(doc(disabled.firestore(), `organizations/${ORG}/leads/lead-1`)));
       await assertFails(getDoc(doc(disabled.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}`)));
     });
+
+    // Data-recovery/no-cascading-delete proof (docs/customer-discovery-onboarding/SECURITY.md §8):
+    // disabling a member is purely a boolean flip on their OWN membership doc — it never touches
+    // the Discovery data itself. Staff retain full access throughout, and the disabled client
+    // regains access to the exact same data the moment they're re-enabled. Nothing is deleted or
+    // migrated at any point in this sequence.
+    it("disabling then re-enabling a client preserves Discovery data untouched — disabling only gates access, it never deletes anything", async () => {
+      const staff = testEnv.authenticatedContext(STAFF_MEMBER_UID);
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+
+      // Baseline: staff and the (currently enabled) client can both read it.
+      await assertSucceeds(getDoc(doc(staff.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/discovery/business`)));
+      await assertSucceeds(getDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/discovery/business`)));
+
+      // Disable the client (server-authorized bypass, exactly like the real disable endpoint would).
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), `organizations/${ORG}/members/${CLIENT_ALPHA_UID}`), { role: "client", disabled: true, customerId: CUST_ALPHA, projectIds: [] });
+      });
+
+      // The client is now denied — but staff still reads the SAME, unmodified document.
+      await assertFails(getDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/discovery/business`)));
+      const whileDisabled = await getDoc(doc(staff.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/discovery/business`));
+      expect(whileDisabled.data()?.responses?.["business.publicName"]).toBe("Alpha Co");
+
+      // Re-enable: the client immediately regains access to the exact same data — nothing was lost.
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), `organizations/${ORG}/members/${CLIENT_ALPHA_UID}`), { role: "client", disabled: false, customerId: CUST_ALPHA, projectIds: [] });
+      });
+      const restored = await getDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/discovery/business`));
+      expect(restored.data()?.responses?.["business.publicName"]).toBe("Alpha Co");
+    });
   });
 
   describe("broad staff/owner/admin positive paths (guard against accidental over-restriction)", () => {

@@ -640,6 +640,43 @@ describe("Customer lifecycle (end-to-end, real Functions/Firestore/Auth/Storage 
     expect(crossTenant.status).toBe(403);
   });
 
+  // ===== 22: WEBSITE BRIEF REGRESSION — the legacy generic questionnaire mechanism is untouched =====
+  // and still fully usable by staff, even though it is no longer auto-created at payment time (see
+  // 7a above, and onboarding-journey-api.ts's own comment on this product decision). Deliberately
+  // run here, at the very end of the sequential lifecycle (the project is long past "questionnaire"
+  // stage by now) so that this generic questionnaire's own QuestionnaireCompleted event — which the
+  // real endpoint always emits — cannot interfere with the Discovery-driven stage transition that
+  // steps 7a/10b already exercised and asserted on. A no-op event this late is exactly the correct,
+  // safe outcome (see workflow-engine.md: an event that doesn't match the current stage is recorded
+  // "ignored", never a duplicate advance), not a gap in this test's coverage.
+  it("22. staff can still create and complete a generic (Website-Brief-shaped) questionnaire by hand — the legacy mechanism is preserved, just no longer auto-created for new projects", async () => {
+    const created = await apiCall(state.ownerAlphaToken, "POST", `/api/projects/${state.projectId}/questionnaires`, {
+      organizationId: ORG_ALPHA, title: "Ad-hoc staff questionnaire",
+      fields: [{ id: "note", label: "Internal note", type: "short_text", required: true }],
+    });
+    expect(created.status).toBe(201);
+    const questionnaireId = created.data.data!.id as string;
+    expect(created.data.data!.version).toBe(1);
+
+    // Security property: a client cannot create a generic questionnaire (staff-only), matching
+    // api.ts's requireRole default (owner/admin/operator, no client).
+    const deniedCreate = await apiCall(state.clientAlphaToken, "POST", `/api/projects/${state.projectId}/questionnaires`, {
+      organizationId: ORG_ALPHA, title: "Attempted client-created questionnaire", fields: [{ id: "x", label: "x", type: "short_text", required: false }],
+    });
+    expect(deniedCreate.status).toBe(403);
+
+    // But the client CAN complete it (requireProjectAccess includes client) — same as the Website
+    // Brief always could.
+    const completed = await apiCall(state.clientAlphaToken, "POST", `/api/projects/${state.projectId}/questionnaires/${questionnaireId}/complete`, {
+      organizationId: ORG_ALPHA, responses: { note: "Synthetic e2e-test answer" }, filePaths: [],
+    });
+    expect(completed.status).toBe(202);
+
+    const doc = await adminDb.doc(`organizations/${ORG_ALPHA}/projects/${state.projectId}/questionnaires/${questionnaireId}`).get();
+    expect(doc.data()?.status).toBe("completed");
+    expect(doc.data()?.kind).toBeUndefined(); // no "website_brief" kind tag — this is a genuinely generic, ad-hoc questionnaire, not the auto-created brief
+  });
+
   // =================================================================================================
   // Security properties
   // =================================================================================================

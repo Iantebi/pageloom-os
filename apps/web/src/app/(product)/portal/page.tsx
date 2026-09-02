@@ -78,10 +78,23 @@ export default function Portal() {
       <div className="grid gap-4 lg:grid-cols-2">
         <WelcomePanel project={project} />
         <div className="lg:col-span-2"><CustomerJourneyTimeline project={project} /></div>
-        <DiscoveryTaskCard organizationId={organizationId} projectId={project.id} />
+        {/* Single stable scroll anchor for WelcomePanel's CTA, shared by whichever intake
+            mechanism this project actually uses — the two are mutually exclusive in practice
+            (DiscoveryTaskCard renders only if a discoveryProgress doc exists; CustomerQuestionnaire
+            renders only if a legacy questionnaire doc exists), so wrapping both here means the CTA
+            always scrolls to the one that's actually showing, never to an empty/dead card. See the
+            "Website Brief only renders..." note below for why workflowStage alone isn't a safe gate. */}
+        <div id="website-brief" className="contents">
+          <DiscoveryTaskCard organizationId={organizationId} projectId={project.id} />
+          {/* Website Brief only renders when a legacy questionnaire document actually exists — a
+              Business-Discovery-based project also sits in workflowStage "questionnaire" (same
+              workflow stage, different intake mechanism) but never gets a questionnaire document,
+              so gating on workflowStage alone used to show a permanent, never-resolving "waiting"
+              card here for every new project. */}
+          {questionnaires.data.length > 0 && <CustomerQuestionnaire organizationId={organizationId} projectId={project.id} questionnaires={questionnaires} />}
+        </div>
         <Card aria-label={s.progressTitle}><div className="flex items-start justify-between gap-3"><div><h2 className="text-sm font-semibold">{s.progressTitle}</h2><p className="mt-1 text-xs text-[var(--muted)]">{s.currentStageLabel(project.workflowStage ?? project.journeyStage)}</p></div><Status value={project.workflowStatus ?? project.status} /></div><b className="mt-5 block text-3xl" aria-label={s.progressPercentAria(project.progress)}>{project.progress}%</b><div className="progress mt-4" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={project.progress}><i style={{ width: `${project.progress}%` }} /></div>{project.blockedReason && <p className="mt-4 rounded-lg bg-[var(--warn-bg)] p-3 text-xs text-[var(--warn-text)]">{s.blockedNotice}</p>}</Card>
         <Card><h2 className="text-sm font-semibold">{s.materialsTitle}</h2><p className="mt-2 text-xs leading-5 text-[var(--muted)]">{s.materialsDescription}</p><label className="button button-secondary mt-5 cursor-pointer justify-center"><UploadCloud className="h-4 w-4" />{busy ? s.uploading : s.chooseFile}<input className="sr-only" type="file" disabled={busy} onChange={upload} /></label></Card>
-        <div id="website-brief" className="contents">{(project.workflowStage === "questionnaire" || questionnaires.data.length > 0) && <CustomerQuestionnaire organizationId={organizationId} projectId={project.id} questionnaires={questionnaires} />}</div>
         {websiteUrl && <Card className="lg:col-span-2"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-sm font-semibold">{s.previewTitle}</h2><p className="mt-1 text-xs text-[var(--muted)]">{s.previewDescription}</p></div><a className="button button-secondary" href={websiteUrl} target="_blank" rel="noopener noreferrer"><Eye className="h-4 w-4" />{s.openSite}</a></div></Card>}
         <HandoverPanel organizationId={organizationId} project={project} />
         <WebsiteContentWorkspace organizationId={organizationId} projectId={project.id} customerMode={client} />

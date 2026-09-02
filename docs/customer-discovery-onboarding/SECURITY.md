@@ -164,15 +164,48 @@ explicit "do not store full questionnaire content in logs/analytics/audit metada
 
 ## 8. Soft delete / archive — Discovery-specific application of the platform-wide policy
 
-No permanent deletion endpoint exists for any Discovery document in this release —
-consistent with `CLAUDE.md`'s platform-wide "no casual one-click irreversible deletion"
-rule. If a project is archived (existing project-level archive mechanism, unchanged by
-this feature), its Discovery documents are neither deleted nor specially migrated — they
-remain exactly where they are, inaccessible to a disabled/removed member the same way
-every other project subcollection already is (member's `disabled: true` or missing
-`members` doc fails `staff()`/`client()` immediately, per the existing rule helpers).
-"Reopen" (§`DATA-MODEL.md` §2.1) is the only state-reversal operation Discovery defines,
-and it is additive (preserves prior `responses`), not destructive.
+**Correction (post-audit)**: an earlier version of this section said a project could be
+"archived" via an "existing project-level archive mechanism." A dedicated audit of the
+whole codebase found **no such mechanism exists anywhere in PageLoom today** — no
+`isArchived`/`archivedAt` field, no archive/restore endpoint, and no `"archived"` value
+in any status enum, for customers, projects, or any other entity. The paragraph below is
+corrected to describe what is actually true.
+
+**No permanent deletion endpoint exists for any Discovery document, full stop** —
+verified by an exhaustive grep of every `functions/src/*.ts` route for `.delete()`/
+`deleteDoc`/`batch.delete`/`recursiveDelete`: the only hard-delete route in the entire
+API is `website-content-api.ts`'s scoped, guarded deletion of an *unused* media Storage
+object (never referenced by draft/published content) — nothing ever calls `.delete()`
+on a Firestore document anywhere in this codebase. This is consistent with `CLAUDE.md`'s
+platform-wide "no casual one-click irreversible deletion" rule and is *stronger* than
+"Owner-controlled deletion": there is no deletion path for Discovery data at all today,
+by any role, through any route.
+
+The one real precedent for "disabling" something in this codebase — a portal user's
+`disabled: true` flag (`customer-admin-api.ts`) — is purely additive and non-cascading:
+it flips one boolean on the member document and touches nothing else. Every other
+document that member could previously read (including every Discovery collection)
+remains fully intact in Firestore; it merely becomes inaccessible to *that specific
+member* via the existing `staff()`/`client()` rule checks, and immediately becomes
+accessible again if `disabled` is flipped back to `false`. Staff (a different role)
+retain full read access throughout. This is proven directly by a behavioral emulator
+test (`firestore-rules.behavioral.test.ts`, "disabling and re-enabling a client
+preserves Discovery data, it only gates access") — see `TEST-PLAN.md` for the exact
+assertion.
+
+"Reopen" (`DATA-MODEL.md` §2.1) is the only state-reversal operation Discovery itself
+defines, and it is additive (preserves prior `responses`), not destructive.
+
+**Open item, explicitly not built here**: a real project/customer-level archive feature
+(the kind the earlier draft of this section assumed already existed) would be a
+legitimate future need, but it is a **platform-wide** concern — it would touch
+customers, projects, websites, and every other project subcollection, not just
+Discovery — and is exactly the kind of change `CLAUDE.md`'s safety rules say should not
+be invented unilaterally inside a single feature's scope. If PageLoom wants one, it
+needs its own scoped product decision (what "archived" means for a project, who can
+restore it, what stays queryable) rather than being backed into here. Until then,
+Discovery's actual protection is what's described above (no delete path) plus the
+platform's existing backup/restore safety net (§9 below).
 
 ## 9. Backups & recovery
 

@@ -14,6 +14,11 @@ const he = {
   notApplicable: "לא רלוונטי", noAnswer: "ללא תשובה",
   loading: "טוען…", loadError: "לא הצלחנו לטעון את אפיון העסק",
   cancel: "ביטול",
+  statPercent: "אחוז השלמה", statCurrentSection: "שלב נוכחי", statLastActivity: "פעילות אחרונה", statSubmittedAt: "תאריך הגשה",
+  missingCount: (count: number) => `${count} שדות חסרים`,
+  nextActionLabel: "הפעולה הבאה", nextActionNone: "אין פעולה נדרשת כרגע",
+  nextActionReadyForReview: "מוכן לבדיקת הצוות",
+  nextActionWaitingOnCustomer: (sectionTitle: string) => `ממתינים ללקוח בשלב "${sectionTitle}"`,
 } as const;
 
 const en = {
@@ -29,6 +34,11 @@ const en = {
   notApplicable: "Not applicable", noAnswer: "No answer",
   loading: "Loading…", loadError: "We couldn't load Business Discovery",
   cancel: "Cancel",
+  statPercent: "Percent complete", statCurrentSection: "Current section", statLastActivity: "Last activity", statSubmittedAt: "Submitted date",
+  missingCount: (count: number) => `${count} field(s) missing`,
+  nextActionLabel: "Next action", nextActionNone: "No action needed right now",
+  nextActionReadyForReview: "Ready for staff review",
+  nextActionWaitingOnCustomer: (sectionTitle: string) => `Waiting on customer at "${sectionTitle}"`,
 } as const;
 
 export const discoveryPanel = { he, en } as const;
