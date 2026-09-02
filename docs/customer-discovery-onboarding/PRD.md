@@ -499,13 +499,18 @@ the fresh, current-turn, scope-specific approval defined in the repository's own
 
 ## 36. Open Questions
 
-Decisions that need a PageLoom product call before or during implementation — see §37 for
-the full list with recommendations. The one that most changes scope: **should the
-Website Brief questionnaire be deprecated/removed once Discovery ships**, or kept
-indefinitely as a staff tool for ad-hoc custom questionnaires (its generic
-`createQuestionnaireSchema` mechanism is still useful for one-off staff-created forms
-unrelated to Discovery)? This PRD assumes "keep it as a generic staff tool, stop
-auto-creating it at payment confirmation" — see §37.
+**Update — Website Brief's future is now decided (approved).** Business Discovery is
+the official primary discovery/onboarding process for new PageLoom customer projects.
+The Website Brief questionnaire is **not** deprecated or removed — it remains available
+indefinitely as a generic, staff-created questionnaire tool (`POST
+/projects/:id/questionnaires`, unchanged) for ad-hoc forms unrelated to Discovery. It is
+simply no longer auto-created at payment confirmation for new projects — implemented in
+`onboarding-journey-api.ts`'s payment-confirmed handler (see `PRD.md` §33,
+`ARCHITECTURE.md` §3) and proven by `customer-lifecycle.e2e.test.ts` test 7a (a new
+project's `questionnaires` subcollection stays empty) and test 22 (staff can still
+create and complete a generic questionnaire by hand). No existing Website Brief
+implementation code or historical Website Brief data was touched or removed by this
+decision. See §37 for the remaining open decisions (2-5 below; decision 1 is resolved).
 
 ## 37. Definition of Done
 
@@ -522,12 +527,15 @@ fresh explicit approval `CLAUDE.md` requires.
 
 ## Open Decisions Requiring a Product Call
 
-These are flagged, not resolved, per the mission's explicit instruction to stop and ask
-rather than invent business/legal answers.
+Decision 1 below is **resolved and approved**. Decisions 2-5 remain flagged, not
+resolved, per the mission's explicit instruction to stop and ask rather than invent
+business/legal answers.
 
-1. **Website Brief's future**: deprecate entirely, keep as a staff-only generic
-   questionnaire tool (this PRD's assumption), or run both simultaneously per-project
-   type indefinitely? Affects `onboarding-journey-api.ts`'s trigger logic scope in Phase 1.
+1. ~~**Website Brief's future**~~ — **RESOLVED (approved)**: Business Discovery is the
+   official primary discovery/onboarding process for new customer projects. The Website
+   Brief stays fully intact as a generic, staff-only questionnaire tool and is not
+   auto-created for new projects. Implemented in `onboarding-journey-api.ts`; proven by
+   `customer-lifecycle.e2e.test.ts` tests 7a and 22.
 2. **Template editability**: code-defined + versioned (this PRD's recommendation, matches
    `website-content.ts`/`website-brief.ts` precedent) vs. a Firestore-backed template
    builder PageLoom staff can edit without a deploy. The latter is a materially larger

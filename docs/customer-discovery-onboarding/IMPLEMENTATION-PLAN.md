@@ -77,12 +77,12 @@ against real access behavior, though route tests themselves typically run agains
 Functions emulator with rules active per the existing `customer-lifecycle.e2e.test.ts`
 pattern).
 
-**Work**: implement each route from `SECURITY.md` §4; the `onboarding-journey-api.ts`
-payment-confirmation handler change described in `ARCHITECTURE.md` §3 (initialize
-`discoveryProgress` instead of/alongside auto-creating the Website Brief — **exact
-behavior here is Open Decision 1 in `PRD.md` §37 and should be confirmed before this
-sub-step**, not assumed); notification write sites for `discovery_submitted`/
-`discovery_information_requested`; activity/audit writes per `SECURITY.md` §7.
+**Work — done, approved**: implement each route from `SECURITY.md` §4; the
+`onboarding-journey-api.ts` payment-confirmation handler change described in
+`ARCHITECTURE.md` §3 (initializes `discoveryProgress` **instead of** auto-creating the
+Website Brief — `PRD.md` §37 decision 1 is resolved and approved); notification write
+sites for `discovery_submitted`/`discovery_information_requested`; activity/audit writes
+per `SECURITY.md` §7.
 
 **Tests**: route-level tests matching `closing-api.test.ts`'s/`onboarding-journey-api`'s
 existing style — happy path per route, role-rejection per route, cross-project rejection,

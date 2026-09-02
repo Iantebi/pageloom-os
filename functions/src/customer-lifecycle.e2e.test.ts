@@ -57,7 +57,7 @@ import {
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
 import { doc, getDoc } from "firebase/firestore";
-import { ref, uploadBytes } from "firebase/storage";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { discoverySectionOrder } from "@pageloom/core";
 
 const PROJECT_ID = "demo-pageloom-e2e";
@@ -113,6 +113,7 @@ const PROTECTED_FIELD_IDS = ["seoTitle", "seoDescription"];
 const contentPermissionFields = Object.fromEntries([...CONTENT_FIELD_IDS.map(id => [id, true]), ...PROTECTED_FIELD_IDS.map(id => [id, false])]);
 
 const PNG_BYTES = new TextEncoder().encode("not-a-real-png-but-the-content-type-is-what-matters-for-rules");
+const PDF_BYTES = new TextEncoder().encode("%PDF-1.4 not-a-real-pdf-but-the-content-type-is-what-matters-for-rules");
 
 // ---------------------------------------------------------------------------------------------
 // Helpers
@@ -380,36 +381,116 @@ describe("Customer lifecycle (end-to-end, real Functions/Firestore/Auth/Storage 
 
   // ===== 10b: BUSINESS DISCOVERY — the customer works through all 9 stages, section by section, =====
   // ===== then submits, which advances the workflow into materials collection. =====
-  // Requires the project to already be in "questionnaire" stage (set by 7a above) - exercises
-  // discovery-api.ts's autosave (PATCH), per-section complete, and final submit endpoints end to end,
-  // including the conditional-visibility-aware required-field validation and the boolean answers
-  // chosen deliberately to keep every conditionally-required upload optional (hasTestimonials:false,
-  // hasLogo:false, hasWebsite:false, hasDomain:false — so this test never needs a real file upload).
-  it("10b. Customer completes Business Discovery section by section, then submits, which advances the workflow into materials collection", async () => {
+  // Requires the project to already be in "questionnaire" stage (set by 7a above). This is the
+  // interactive-equivalent QA pass requested for pre-merge review: real Hebrew answers (long and
+  // short), both boolean states across the run (branding.hasLogo=true here, presence.hasWebsite=
+  // false here, trust.hasTestimonials flips false→true in test 10d below), real Storage-emulator
+  // uploads (image + PDF, single and multi-file), a simulated "refresh mid-stage" (re-fetch before
+  // completing a section, proving autosave persisted), and a simulated "leave and return" (re-fetch
+  // partway through, proving the resume point is exactly right).
+  it("10b. Customer completes Business Discovery section by section with realistic Hebrew answers and real file uploads, then submits, which advances the workflow into materials collection", async () => {
     // A hardcoded, explicit map (not derived from the template) so that a future required-question
     // added to discovery-template.ts without updating this test fails loudly here (a 422 from
     // /complete or /submit) rather than silently passing with a stale answer set.
     expect([...discoverySectionOrder]).toEqual(["business", "customers", "services", "differentiation", "trust", "branding", "materials", "presence", "goals"]);
 
+    const clientStorage = testEnv.authenticatedContext(CLIENT_ALPHA_UID).storage();
+    async function uploadDiscoveryFile(sectionId: string, fieldId: string, fileName: string, bytes: Uint8Array, contentType: string, itemIndex = 0) {
+      const path = `organizations/${ORG_ALPHA}/discovery/${state.projectId}/${sectionId}/${fieldId}/${CLIENT_ALPHA_UID}/${itemIndex}-${fileName}`;
+      await assertSucceeds(uploadBytes(ref(clientStorage, path), bytes, { contentType }));
+      // A real, retrievable download URL — not just a successful write — is what the customer's
+      // browser needs to render an image preview (see useFileUpload.ts).
+      const url = await getDownloadURL(ref(clientStorage, path));
+      expect(url).toContain("http");
+      return { path, fileName, uploadedAt: new Date().toISOString(), sizeBytes: bytes.byteLength, source: "customer" as const };
+    }
+
     const responsesBySection: Record<string, Record<string, unknown>> = {
-      business: { "business.publicName": "E2E Test Customer Co", "business.whatItDoes": "Synthetic e2e-test business description", "business.customerFeeling": "Synthetic e2e-test customer feeling" },
-      customers: { "customers.idealCustomer": "Synthetic ideal customer", "customers.beforeContact": "Synthetic trigger", "customers.realProblem": "Synthetic problem", "customers.desiredOutcome": "Synthetic outcome" },
-      services: { "services.list": [{ name: "Synthetic Service", promote: false }] },
-      differentiation: { "differentiation.whyCustomersChoseYou": "Synthetic differentiator", "differentiation.processAdvantages": ["availability"] },
-      trust: { "trust.hasTestimonials": false },
-      branding: { "branding.hasLogo": false, "branding.colors": ["#112233"], "branding.style": ["modern"] },
-      materials: {},
-      presence: { "presence.phone": "0500000000", "presence.email": "synthetic@e2e-test-customer-alpha.example.com", "presence.hasWebsite": false, "presence.hasDomain": false },
-      goals: { "goals.biggestProblem": "Synthetic biggest problem", "goals.sixMonthSuccess": "Synthetic six-month success", "goals.priorityOutcomes": ["more_inquiries"], "goals.capacityCheck": "Synthetic capacity answer" },
+      business: {
+        "business.publicName": "מספרת שלום", // short Hebrew
+        "business.whatItDoes": "מספרה בוטיק לגברים ונשים במרכז תל אביב, עם דגש על שירות אישי, זמינות גבוהה ותשומת לב לפרטים הקטנים שהופכים תספורת טובה לתספורת מעולה.", // long Hebrew
+        "business.customerFeeling": "שירגישו בבית ושיצאו עם תספורת שהם גאים בה.",
+      },
+      customers: {
+        "customers.idealCustomer": "אנשים עסוקים שמחפשים תוצאה מקצועית בלי להתפשר על זמן, בדרך כלל בגילאי 25-45.",
+        "customers.beforeContact": "מחפשים המלצה מחבר או רואים ביקורות טובות ברשת.",
+        "customers.realProblem": "קשה למצוא ספר טוב שגם זמין וגם אמין לאורך זמן.",
+        "customers.desiredOutcome": "תספורת שמחזיקה מעמד ומרגישה שהם השקיעו בעצמם.",
+      },
+      services: { "services.list": [
+        { name: "תספורת גברים", forWhom: "גברים", problem: "תספורת לא מדויקת", outcome: "מראה מסודר ומטופח", priceLabel: "₪80-120", promote: true },
+        { name: "עיצוב זקן", promote: false },
+      ] }, // multiple services
+      differentiation: {
+        "differentiation.whyCustomersChoseYou": "אנחנו תמיד עומדים בזמנים ומקשיבים בדיוק למה שהלקוח רוצה, לא משנה כמה עמוסים אנחנו.",
+        "differentiation.processAdvantages": ["availability", "personal_service"],
+      },
+      trust: { "trust.hasTestimonials": false }, // boolean "No" — flipped to "Yes" with a real testimonial in test 10d
+      branding: {
+        "branding.hasLogo": true, // boolean "Yes" (presence section below covers "No" for its own booleans)
+        "branding.colors": ["#111111", "#b8860b"],
+        "branding.style": ["premium", "warm_friendly"],
+        "branding.avoid": "בלי צבעים זוהרים מדי, רוצים להישאר קלאסיים.",
+      },
+      materials: {}, // filled with real uploads below (multiple images + a PDF)
+      presence: {
+        "presence.phone": "0501234567",
+        "presence.whatsapp": "0501234567",
+        "presence.email": "hello@shalom-barber.example",
+        "presence.address": { line1: "רחוב דיזנגוף 100", city: "תל אביב", serviceAreas: ["תל אביב", "רמת גן"] },
+        "presence.hours": "א'-ה' 9:00-20:00, ו' 9:00-14:00",
+        "presence.hasWebsite": false, // boolean "No" — existing-website URL correctly stays optional/hidden
+        "presence.hasDomain": false,
+      },
+      goals: {
+        "goals.biggestProblem": "אנשים לא מוצאים אותנו בגוגל ומפספסים אותנו לטובת מתחרים עם נוכחות דיגיטלית חזקה יותר.",
+        "goals.sixMonthSuccess": "יומן מלא כל שבוע מלקוחות חדשים שמצאו אותנו בחיפוש.",
+        "goals.priorityOutcomes": ["more_inquiries", "better_google_visibility"],
+        "goals.capacityCheck": "כן, יש לנו שני ספרים נוספים שיכולים לקלוט עומס נוסף.",
+      },
     };
 
-    for (const sectionId of discoverySectionOrder) {
+    for (const [index, sectionId] of discoverySectionOrder.entries()) {
+      if (sectionId === "branding") {
+        responsesBySection.branding!["branding.logo"] = [await uploadDiscoveryFile("branding", "branding.logo", "logo.png", PNG_BYTES, "image/png")];
+      }
+      if (sectionId === "materials") {
+        // Multiple relevant assets in one repeater, plus a second field type (PDF), in one section.
+        responsesBySection.materials!["materials.ownerPhotos"] = [
+          await uploadDiscoveryFile("materials", "materials.ownerPhotos", "owner-1.png", PNG_BYTES, "image/png", 0),
+          await uploadDiscoveryFile("materials", "materials.ownerPhotos", "owner-2.png", PNG_BYTES, "image/png", 1),
+        ];
+        responsesBySection.materials!["materials.priceListOrBrochure"] = [await uploadDiscoveryFile("materials", "materials.priceListOrBrochure", "pricelist.pdf", PDF_BYTES, "application/pdf")];
+      }
+
       const saved = await apiCall(state.clientAlphaToken, "PATCH", `/api/projects/${state.projectId}/discovery/sections/${sectionId}`, {
         organizationId: ORG_ALPHA, responses: responsesBySection[sectionId],
       });
       expect(saved.status, `save ${sectionId}`).toBe(200);
+
+      // "Refresh mid-stage": before marking this section complete, re-fetch Discovery state from
+      // scratch — exactly what a browser reload would do — and confirm the just-autosaved (not yet
+      // completed) answers are exactly what's already persisted server-side, proving autosave
+      // survives a refresh rather than only living in component state.
+      const midStageReload = await apiCall(state.clientAlphaToken, "GET", withQuery(`/api/projects/${state.projectId}/discovery`, { organizationId: ORG_ALPHA }));
+      expect(midStageReload.status).toBe(200);
+      expect(midStageReload.data.data!.sections[sectionId]?.status).toBe("draft");
+      for (const [key, value] of Object.entries(responsesBySection[sectionId]!)) {
+        expect(midStageReload.data.data!.sections[sectionId]?.responses?.[key], `${sectionId}.${key} after refresh`).toEqual(value);
+      }
+
       const completedSection = await apiCall(state.clientAlphaToken, "POST", `/api/projects/${state.projectId}/discovery/sections/${sectionId}/complete`, { organizationId: ORG_ALPHA });
       expect(completedSection.status, `complete ${sectionId}: ${JSON.stringify(completedSection.data)}`).toBe(200);
+
+      // "Leave and return": after the 3rd section, re-fetch and confirm the resume point (current
+      // section, completed list, percent) is exactly what the dashboard task card and /discovery
+      // page would compute for a customer who closed the tab and came back later.
+      if (index === 2) {
+        const resumeCheck = await apiCall(state.clientAlphaToken, "GET", withQuery(`/api/projects/${state.projectId}/discovery`, { organizationId: ORG_ALPHA }));
+        expect(resumeCheck.data.data!.progress.completedSectionIds).toEqual(["business", "customers", "services"]);
+        expect(resumeCheck.data.data!.progress.currentSectionId).toBe("services");
+        expect(resumeCheck.data.data!.progress.percentComplete).toBe(Math.round((3 / 9) * 100));
+      }
     }
 
     const progressDoc = await adminDb.doc(`organizations/${ORG_ALPHA}/projects/${state.projectId}/discoveryProgress/current`).get();
@@ -430,14 +511,14 @@ describe("Customer lifecycle (end-to-end, real Functions/Firestore/Auth/Storage 
     const again = await apiCall(state.clientAlphaToken, "POST", `/api/projects/${state.projectId}/discovery/submit`, { organizationId: ORG_ALPHA });
     expect(again.status).toBe(200);
     expect(again.data.data!.alreadySubmitted).toBe(true);
-  }, 15_000);
+  }, 20_000);
 
   // ===== 10c: internal Discovery notes are staff-only — never visible to the customer, at either =====
   // the API or the Firestore-rules layer, matching the platform-wide "customer must never see
   // internal notes" guarantee (SECURITY.md §3.3).
   it("10c. Owner adds an internal Discovery note; the customer can neither read it via the API nor via a direct Firestore rules read", async () => {
     const note = await apiCall(state.ownerAlphaToken, "POST", `/api/projects/${state.projectId}/discovery/notes`, {
-      organizationId: ORG_ALPHA, sectionId: "branding", body: "Internal-only: ask the customer for a higher-resolution logo before build starts.",
+      organizationId: ORG_ALPHA, sectionId: "trust", body: "Internal-only: the customer's first testimonial reads a little generic — worth asking for a second, more specific one before launch.",
     });
     expect(note.status).toBe(201);
     const noteId = note.data.data!.id as string;
@@ -455,29 +536,74 @@ describe("Customer lifecycle (end-to-end, real Functions/Firestore/Auth/Storage 
     expect(asStaff.data.data!.some((n: { id: string }) => n.id === noteId)).toBe(true);
   });
 
-  // ===== 10d: staff reopens a section — the customer sees a "more information needed" notification =====
-  // and can re-edit the previously-completed section without losing their earlier answers.
-  it("10d. Owner reopens a completed Discovery section with a reason; the customer's prior answers are preserved and they can resubmit", async () => {
-    const reopened = await apiCall(state.ownerAlphaToken, "POST", `/api/projects/${state.projectId}/discovery/sections/branding/reopen`, {
-      organizationId: ORG_ALPHA, reason: "Please share your two brand colors again — the hex codes did not come through clearly.",
+  // ===== 10d: staff reopens a section — the customer sees exactly what's requested, updates it =====
+  // ===== (flipping a boolean "No" to "Yes" with real new content), and resubmits. =====
+  it("10d. Owner reopens the Trust section with a reason; the customer's prior answer is preserved on reopen, then updates it (flips hasTestimonials false→true with a real testimonial) and resubmits — unrelated project data is untouched throughout", async () => {
+    const reopened = await apiCall(state.ownerAlphaToken, "POST", `/api/projects/${state.projectId}/discovery/sections/trust/reopen`, {
+      organizationId: ORG_ALPHA, reason: "לפני שממשיכים, נשמח אם תוכלו לשתף לפחות המלצה אחת מלקוח מרוצה — זה יעזור מאוד לבניית אמון באתר.",
     });
     expect(reopened.status).toBe(200);
 
-    const sectionDoc = await adminDb.doc(`organizations/${ORG_ALPHA}/projects/${state.projectId}/discovery/branding`).get();
+    const sectionDoc = await adminDb.doc(`organizations/${ORG_ALPHA}/projects/${state.projectId}/discovery/trust`).get();
     expect(sectionDoc.data()?.status).toBe("draft");
-    expect(sectionDoc.data()?.responses["branding.colors"]).toEqual(["#112233"]); // preserved, not cleared
+    expect(sectionDoc.data()?.responses["trust.hasTestimonials"]).toBe(false); // preserved on reopen, not cleared
 
-    // A client cannot reopen a section themselves (staff-only action).
-    const deniedClientReopen = await apiCall(state.clientAlphaToken, "POST", `/api/projects/${state.projectId}/discovery/sections/branding/reopen`, {
+    // A client cannot reopen a section themselves (staff-only action) — and the customer sees
+    // exactly what's requested via the reopened section's own reopenReason field.
+    const deniedClientReopen = await apiCall(state.clientAlphaToken, "POST", `/api/projects/${state.projectId}/discovery/sections/trust/reopen`, {
       organizationId: ORG_ALPHA, reason: "Attempting to self-approve.",
     });
     expect(deniedClientReopen.status).toBe(403);
+    const beforeUpdate = await apiCall(state.clientAlphaToken, "GET", withQuery(`/api/projects/${state.projectId}/discovery`, { organizationId: ORG_ALPHA }));
+    expect(beforeUpdate.data.data!.sections.trust.reopenReason).toContain("המלצה אחת מלקוח מרוצה");
 
-    // The customer re-completes the reopened section and the project can be resubmitted.
-    const recompleted = await apiCall(state.clientAlphaToken, "POST", `/api/projects/${state.projectId}/discovery/sections/branding/complete`, { organizationId: ORG_ALPHA });
-    expect(recompleted.status).toBe(200);
+    // The customer updates the flagged answer — autosaves, then completes.
+    const updated = await apiCall(state.clientAlphaToken, "PATCH", `/api/projects/${state.projectId}/discovery/sections/trust`, {
+      organizationId: ORG_ALPHA, responses: { "trust.hasTestimonials": true, "trust.testimonials": [{ text: "השירות הכי טוב שקיבלתי אי פעם — מקצועי, מדויק ותמיד בזמן.", author: "דני כהן" }] },
+    });
+    expect(updated.status).toBe(200);
+    const recompleted = await apiCall(state.clientAlphaToken, "POST", `/api/projects/${state.projectId}/discovery/sections/trust/complete`, { organizationId: ORG_ALPHA });
+    expect(recompleted.status, JSON.stringify(recompleted.data)).toBe(200);
+
+    // Previous, unrelated project data (a completely different section, answered back in 10b) must
+    // not be accidentally disturbed by this reopen/update cycle.
+    const businessDoc = await adminDb.doc(`organizations/${ORG_ALPHA}/projects/${state.projectId}/discovery/business`).get();
+    expect(businessDoc.data()?.responses["business.publicName"]).toBe("מספרת שלום");
+
     const resubmitted = await apiCall(state.clientAlphaToken, "POST", `/api/projects/${state.projectId}/discovery/submit`, { organizationId: ORG_ALPHA });
     expect(resubmitted.status).toBe(202);
+
+    // Owner sees the customer's response to the request — the same discovery_submitted signal
+    // fires again on resubmission, correctly surfacing "customer responded" (PRD.md §15).
+    const finalRead = await apiCall(state.ownerAlphaToken, "GET", withQuery(`/api/projects/${state.projectId}/discovery`, { organizationId: ORG_ALPHA }));
+    expect(finalRead.data.data!.progress.status).toBe("submitted");
+    expect(finalRead.data.data!.sections.trust.responses["trust.hasTestimonials"]).toBe(true);
+  });
+
+  // ===== 10e: disabling then re-enabling the customer's portal access via the REAL admin endpoint =====
+  // ===== (not a rules-layer bypass) preserves every byte of Discovery data. =====
+  it("10e. Disabling then re-enabling the customer's portal access (the real admin endpoint) does not lose any Discovery data", async () => {
+    const disable = await apiCall(state.ownerAlphaToken, "PATCH", `/api/admin/customers/${state.customerId}/portal-users/${CLIENT_ALPHA_UID}`, { organizationId: ORG_ALPHA, disabled: true });
+    expect(disable.status).toBe(200);
+
+    // Denied via the real API while disabled — not just a Firestore-rules-layer check.
+    const deniedWhileDisabled = await apiCall(state.clientAlphaToken, "GET", withQuery(`/api/projects/${state.projectId}/discovery`, { organizationId: ORG_ALPHA }));
+    expect(deniedWhileDisabled.status).toBe(403);
+
+    // Staff confirms the data is completely untouched while the customer is disabled.
+    const whileDisabled = await apiCall(state.ownerAlphaToken, "GET", withQuery(`/api/projects/${state.projectId}/discovery`, { organizationId: ORG_ALPHA }));
+    expect(whileDisabled.data.data!.sections.business.responses["business.publicName"]).toBe("מספרת שלום");
+    expect(whileDisabled.data.data!.progress.percentComplete).toBe(100);
+
+    const reEnable = await apiCall(state.ownerAlphaToken, "PATCH", `/api/admin/customers/${state.customerId}/portal-users/${CLIENT_ALPHA_UID}`, { organizationId: ORG_ALPHA, disabled: false });
+    expect(reEnable.status).toBe(200);
+
+    // The customer regains access to the EXACT same data, unmodified — nothing was lost or migrated.
+    const restored = await apiCall(state.clientAlphaToken, "GET", withQuery(`/api/projects/${state.projectId}/discovery`, { organizationId: ORG_ALPHA }));
+    expect(restored.status).toBe(200);
+    expect(restored.data.data!.sections.business.responses["business.publicName"]).toBe("מספרת שלום");
+    expect(restored.data.data!.sections.trust.responses["trust.hasTestimonials"]).toBe(true);
+    expect(restored.data.data!.progress.percentComplete).toBe(100);
   });
 
   // ===== 11: media upload =====

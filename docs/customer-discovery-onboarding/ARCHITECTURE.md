@@ -76,10 +76,12 @@ assets --(AssetsValidated)--> research
 
 Today, `onboarding-journey-api.ts`'s `POST /projects/:id/payment-confirmed` handler
 synchronously drives `PaymentConfirmed → OnboardingStarted → OnboardingCompleted` and
-**also** auto-creates the Website Brief questionnaire in the same request. The one change
-to that handler: instead of (or in addition to, per the open decision in `PRD.md` §37)
-auto-creating a Website Brief questionnaire, it initializes `discoveryProgress/current`
-with `status: "not_started"` and `templateVersion: DISCOVERY_TEMPLATE_VERSION`.
+**also** auto-creates the Website Brief questionnaire in the same request. **Implemented
+and approved** (`PRD.md` §37, decision 1, resolved): that handler now initializes
+`discoveryProgress/current` (`status: "not_started"`, `templateVersion:
+DISCOVERY_TEMPLATE_VERSION`) **instead of** auto-creating a Website Brief questionnaire.
+The Website Brief mechanism itself is untouched and remains reachable via the existing
+generic `POST /projects/:id/questionnaires` staff endpoint.
 
 `POST /projects/:id/discovery/submit` (new, in `discovery-api.ts`) is the functional
 replacement for the existing `POST /projects/:id/questionnaires/:id/complete`'s
