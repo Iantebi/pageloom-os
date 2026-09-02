@@ -10,7 +10,7 @@ function Shell({children}:{children:React.ReactNode}){const pathname=usePathname
   // and color from the same operations-health endpoint the dashboard card uses, and falls back to
   // an explicit "unknown" state (never a fabricated "operational") while loading or on failure.
   const[health,setHealth]=useState<HealthReport>();
-  const loadHealth=useCallback(()=>{if(isClient||!organizationId){setHealth(undefined);return}api<HealthReport>(`/operations/${organizationId}/health`).then(setHealth).catch(()=>setHealth(undefined))},[isClient,organizationId]);
+  const loadHealth=useCallback(()=>{if(isClient||!organizationId)return;api<HealthReport>(`/operations/${organizationId}/health`).then(setHealth).catch(()=>setHealth(undefined))},[isClient,organizationId]);
   useEffect(()=>{loadHealth();const timer=setInterval(loadHealth,120_000);return()=>clearInterval(timer)},[loadHealth]);
   const healthTone=health?.status==="healthy"?"ok":health?.status==="degraded"?"warn":health?.status==="critical"?"bad":"idle";
   // Route-level guard, not just a hidden nav link: a client-role account must never render a
