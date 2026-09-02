@@ -17,6 +17,18 @@ describe("scheduled function memory allocation", () => {
   it("gives dailyCeoReport 512MiB", () => {
     expect(indexSource).toMatch(/dailyCeoReport=onSchedule\(\{[^}]*memory:"512MiB"/);
   });
+  // 2026-09-02 production incident: backupFreshnessWatchdog crash-looped on every scheduled
+  // invocation that day (confirmed via Cloud Logging: 256-266MiB used against the 256MiB
+  // default on every attempt, zero successful watchdog.heartbeat logs in the preceding 14
+  // days) and dailyFirestoreBackup was observed with the same near-zero headroom historically,
+  // even though its most recent run happened to complete. Same fix as the three functions
+  // above, applied to the two backup-reliability functions that were missed.
+  it("gives backupFreshnessWatchdog 512MiB", () => {
+    expect(indexSource).toMatch(/backupFreshnessWatchdog=onSchedule\(\{[^}]*memory:"512MiB"/);
+  });
+  it("gives dailyFirestoreBackup 512MiB", () => {
+    expect(indexSource).toMatch(/dailyFirestoreBackup=onSchedule\(\{[^}]*memory:"512MiB"/);
+  });
 });
 
 describe("backup freshness watchdog wiring", () => {
