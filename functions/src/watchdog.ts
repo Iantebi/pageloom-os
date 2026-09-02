@@ -1,6 +1,6 @@
 import { params } from "./config.js";
 import { operationalLog, safeErrorName } from "./observability.js";
-import { isFirestoreBackupStale, isStorageBackupStale, isRelevantActiveServiceHealthEvent, latestTimestamp } from "./watchdog-policy.js";
+import { isFirestoreBackupStale, isStorageBackupStale, isRelevantActiveServiceHealthEvent, latestTimestamp, collectAllPages } from "./watchdog-policy.js";
 
 async function accessToken(): Promise<string> {
   const { google } = await import("googleapis");
@@ -19,11 +19,21 @@ async function checkFirestoreFreshness(now: Date): Promise<void> {
     // day during Israeli Daylight Time - so the folder's date and the run's actual wall-clock
     // completion time can differ by up to a day. Anchoring to the folder name's midnight UTC
     // previously overestimated elapsed time by ~23.5h and produced false "stale" alerts.
-    const response = await fetch(`https://storage.googleapis.com/storage/v1/b/${bucket}/o?prefix=firestore/&fields=items(timeCreated)`, {
-      headers: { Authorization: `Bearer ${token}` },
+    //
+    // Paginated: 90 days of daily exports (each writing several objects) can exceed a single GCS
+    // list page. `fields` must explicitly request nextPageToken - the partial-response filter drops
+    // it otherwise - or a full bucket silently truncates to its oldest objects (GCS lists
+    // alphabetically, and "firestore/YYYY-MM-DD/" sorts oldest-first) and the most recent backup is
+    // never seen. See watchdog-policy.ts's collectAllPages for the pagination cap.
+    const items = await collectAllPages<{ timeCreated?: string }>(async (pageToken) => {
+      const url = new URL(`https://storage.googleapis.com/storage/v1/b/${bucket}/o`);
+      url.searchParams.set("prefix", "firestore/");
+      url.searchParams.set("fields", "nextPageToken,items(timeCreated)");
+      if (pageToken) url.searchParams.set("pageToken", pageToken);
+      const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      return (await response.json()) as { items?: Array<{ timeCreated?: string }>; nextPageToken?: string };
     });
-    const result = (await response.json()) as { items?: Array<{ timeCreated?: string }> };
-    const latest = latestTimestamp((result.items ?? []).map((item) => item.timeCreated));
+    const latest = latestTimestamp(items.map((item) => item.timeCreated));
     if (!latest) {
       operationalLog("warning", "watchdog.check_failed", { check: "firestore", reason: "no_backup_objects_found" });
       return;
@@ -45,11 +55,13 @@ async function checkStorageFreshness(now: Date): Promise<void> {
     const projectId = params.gcpDeployProject.value();
     const token = await accessToken();
     const filter = encodeURIComponent(JSON.stringify({ projectId, jobNames: [jobName] }));
-    const response = await fetch(`https://storagetransfer.googleapis.com/v1/transferOperations?filter=${filter}`, {
-      headers: { Authorization: `Bearer ${token}` },
+    const operations = await collectAllPages<{ metadata?: { status?: string; endTime?: string } }>(async (pageToken) => {
+      const url = `https://storagetransfer.googleapis.com/v1/transferOperations?filter=${filter}${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ""}`;
+      const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const result = (await response.json()) as { operations?: Array<{ metadata?: { status?: string; endTime?: string } }>; nextPageToken?: string };
+      return { items: result.operations, nextPageToken: result.nextPageToken };
     });
-    const result = (await response.json()) as { operations?: Array<{ metadata?: { status?: string; endTime?: string } }> };
-    const successEndTimes = (result.operations ?? [])
+    const successEndTimes = operations
       .map((op) => op.metadata)
       .filter((metadata): metadata is { status?: string; endTime?: string } => metadata?.status === "SUCCESS" && Boolean(metadata.endTime))
       .map((metadata) => metadata.endTime as string)

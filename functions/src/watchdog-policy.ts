@@ -29,3 +29,30 @@ const RELEVANT_SERVICE_HEALTH_RELEVANCE = new Set(["RELATED", "IMPACTED"]);
 export function isRelevantActiveServiceHealthEvent(event: { state?: string; relevance?: string }): boolean {
   return event.state === "ACTIVE" && Boolean(event.relevance) && RELEVANT_SERVICE_HEALTH_RELEVANCE.has(event.relevance!);
 }
+
+// A GCS bucket holding 90 days of daily Firestore exports easily accumulates more objects than a
+// single list page (each day's export writes an overall_export_metadata file plus multiple
+// per-collection shard files) - Google's list APIs default to capping a single page around 1000
+// items and only surface later items via nextPageToken. A watchdog that reads just the first page
+// silently checks freshness against whatever objects happen to sort first, which - since GCS lists
+// alphabetically by name and our export paths are "firestore/YYYY-MM-DD/..." - means the OLDEST
+// backups once the bucket holds enough of them, permanently missing the actually-latest backup and
+// risking a false "stale" alert (or worse, masking a real staleness by continuing to report an old
+// backup as fresh forever). MAX_PAGES bounds worst-case memory/time if a misconfigured filter ever
+// returns pages endlessly.
+export const MAX_PAGINATION_PAGES = 50;
+
+export async function collectAllPages<Item>(
+  fetchPage: (pageToken: string | undefined) => Promise<{ items?: Item[]; nextPageToken?: string }>,
+): Promise<Item[]> {
+  const items: Item[] = [];
+  let pageToken: string | undefined;
+  let pages = 0;
+  do {
+    const page = await fetchPage(pageToken);
+    items.push(...(page.items ?? []));
+    pageToken = page.nextPageToken;
+    pages += 1;
+  } while (pageToken && pages < MAX_PAGINATION_PAGES);
+  return items;
+}

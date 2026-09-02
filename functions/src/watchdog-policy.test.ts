@@ -1,11 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   FIRESTORE_FRESHNESS_HOURS,
   STORAGE_FRESHNESS_HOURS,
+  MAX_PAGINATION_PAGES,
   isFirestoreBackupStale,
   isStorageBackupStale,
   latestTimestamp,
   isRelevantActiveServiceHealthEvent,
+  collectAllPages,
 } from "./watchdog-policy.js";
 
 describe("Firestore backup freshness", () => {
@@ -62,6 +64,36 @@ describe("Firestore freshness regression: DST-shifted backup time must not read 
     const latest = latestTimestamp(["2026-08-30T23:30:00Z"]);
     const now = new Date("2026-08-31T09:00:00Z");
     expect(isFirestoreBackupStale(now, latest!)).toBe(false);
+  });
+});
+
+describe("collectAllPages", () => {
+  // Regression: a bucket holding 90 days of daily Firestore exports (each writing several objects)
+  // can exceed a single GCS list page. Without following nextPageToken, the freshness watchdog only
+  // ever saw the alphabetically-first (i.e. OLDEST, since paths are "firestore/YYYY-MM-DD/...") page
+  // of objects and could never observe the actual latest backup.
+  it("follows nextPageToken across multiple pages and concatenates every item", async () => {
+    const fetchPage = vi
+      .fn()
+      .mockResolvedValueOnce({ items: [{ timeCreated: "2026-08-12T00:00:00Z" }], nextPageToken: "page-2" })
+      .mockResolvedValueOnce({ items: [{ timeCreated: "2026-08-30T23:30:00Z" }], nextPageToken: undefined });
+    const items = await collectAllPages(fetchPage);
+    expect(items).toEqual([{ timeCreated: "2026-08-12T00:00:00Z" }, { timeCreated: "2026-08-30T23:30:00Z" }]);
+    expect(fetchPage).toHaveBeenNthCalledWith(1, undefined);
+    expect(fetchPage).toHaveBeenNthCalledWith(2, "page-2");
+  });
+  it("returns a single page's items unchanged when there is no nextPageToken", async () => {
+    const items = await collectAllPages(async () => ({ items: [{ timeCreated: "2026-08-30T00:00:00Z" }] }));
+    expect(items).toEqual([{ timeCreated: "2026-08-30T00:00:00Z" }]);
+  });
+  it("returns an empty array when a page has no items", async () => {
+    expect(await collectAllPages(async () => ({}))).toEqual([]);
+  });
+  it("stops following nextPageToken after MAX_PAGINATION_PAGES, never looping forever", async () => {
+    const fetchPage = vi.fn().mockResolvedValue({ items: [{}], nextPageToken: "always-more" });
+    const items = await collectAllPages(fetchPage);
+    expect(fetchPage).toHaveBeenCalledTimes(MAX_PAGINATION_PAGES);
+    expect(items).toHaveLength(MAX_PAGINATION_PAGES);
   });
 });
 
