@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import { firebaseStorage } from "@/lib/firebase";
 
@@ -17,6 +17,9 @@ const ALLOWED_TYPES = /^(image\/(jpeg|png|webp)|application\/pdf)$/;
 
 export function useFileUpload() {
   const [state, setState] = useState<UploadState>({ status: "idle" });
+  // Remembers the last attempted (path, file, metadata) so retry() can re-attempt the SAME file
+  // without asking the customer to reselect it — see UX-FLOW.md §4.5's explicit requirement.
+  const lastAttempt = useRef<{ path: string; file: File; metadata?: Record<string, string> }>(undefined);
 
   function precheck(file: File): string | undefined {
     if (file.size > MAX_BYTES) return "too_large";
@@ -25,6 +28,7 @@ export function useFileUpload() {
   }
 
   function upload(path: string, file: File, metadata?: Record<string, string>): Promise<{ path: string; fileName: string; sizeBytes: number; downloadUrl: string }> {
+    lastAttempt.current = { path, file, metadata };
     return new Promise((resolve, reject) => {
       const precheckError = precheck(file);
       if (precheckError) { setState({ status: "error", message: precheckError }); reject(new Error(precheckError)); return; }
@@ -43,7 +47,15 @@ export function useFileUpload() {
     });
   }
 
+  /** Re-attempts the exact same file/path/metadata as the last upload() call. Throws if nothing
+   *  has been attempted yet (callers only show a retry control once an attempt has failed). */
+  function retry() {
+    if (!lastAttempt.current) return Promise.reject(new Error("nothing_to_retry"));
+    const { path, file, metadata } = lastAttempt.current;
+    return upload(path, file, metadata);
+  }
+
   function reset() { setState({ status: "idle" }); }
 
-  return { state, upload, reset };
+  return { state, upload, retry, reset };
 }

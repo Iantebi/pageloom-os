@@ -1,9 +1,27 @@
 "use client";
+import { useEffect, useState } from "react";
 import { Plus, X } from "lucide-react";
+import { getDownloadURL, ref } from "firebase/storage";
 import type { DiscoveryQuestion, DiscoverySectionId } from "@pageloom/core";
-import { firebaseAuth } from "@/lib/firebase";
+import { firebaseAuth, firebaseStorage } from "@/lib/firebase";
 import { useFileUpload } from "@/lib/hooks/useFileUpload";
 import { t } from "@/lib/i18n";
+
+/** Resolves an existing image's download URL for a real thumbnail preview (the first surface in
+ *  this codebase to preview an uploaded image at all — see PRD.md §14). Freshly uploaded files
+ *  already carry their URL from useFileUpload's own upload() result; this only covers the
+ *  "loaded from a previously saved response" case. */
+function useImagePreviewUrl(path: string | undefined) {
+  const [url, setUrl] = useState<string>();
+  useEffect(() => {
+    let active = true;
+    // No synchronous setState for the "no path" case: the caller only ever renders this hook's
+    // returned url when it already has a record to show, so a stale value here is simply unused.
+    if (path) void getDownloadURL(ref(firebaseStorage, path)).then(resolved => { if (active) setUrl(resolved); }).catch(() => { if (active) setUrl(undefined); });
+    return () => { active = false; };
+  }, [path]);
+  return url;
+}
 
 type FileRecord = { path: string; fileName: string; uploadedAt: string; sizeBytes: number; source: "customer" | "ai_generated" };
 type ServiceEntry = { name: string; forWhom?: string; problem?: string; outcome?: string; priceLabel?: string; promote: boolean };
@@ -123,9 +141,10 @@ function UploadSlot({ organizationId, projectId, sectionId, questionId, itemInde
   organizationId: string; projectId: string; sectionId: string; questionId: string; itemIndex: number;
   record?: FileRecord; onDone: (record: FileRecord) => void; onRemove: () => void;
 }) {
-  const { state, upload } = useFileUpload();
+  const { state, upload, retry } = useFileUpload();
   const s = t("discoveryShell");
   const isImage = record?.fileName ? /\.(jpe?g|png|webp)$/i.test(record.fileName) : false;
+  const previewUrl = useImagePreviewUrl(isImage ? record?.path : undefined);
 
   async function handleSelect(file?: File) {
     if (!file) return;
@@ -137,9 +156,21 @@ function UploadSlot({ organizationId, projectId, sectionId, questionId, itemInde
 
   if (record && state.status !== "uploading") {
     return <div className="flex items-center gap-3 rounded-xl border border-[var(--border)] p-2">
-      {isImage ? <span className="grid h-10 w-10 place-items-center overflow-hidden rounded-lg bg-[var(--surface-2)] text-[9px]">🖼</span> : <span className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--surface-2)] text-[9px]">📄</span>}
+      {previewUrl
+        ? <img src={previewUrl} alt="" className="h-10 w-10 rounded-lg object-cover" />
+        : isImage ? <span className="grid h-10 w-10 place-items-center overflow-hidden rounded-lg bg-[var(--surface-2)] text-[9px]">🖼</span> : <span className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--surface-2)] text-[9px]">📄</span>}
       <span className="min-w-0 flex-1 truncate text-[10px]">{record.fileName}</span>
       <button type="button" className="text-[var(--muted)]" onClick={onRemove} aria-label={s.uploadRemove}><X className="h-4 w-4" /></button>
+    </div>;
+  }
+  // A failed attempt keeps the SAME file remembered by useFileUpload — retry() re-sends it
+  // without asking the customer to reselect (UX-FLOW.md §4.5).
+  if (state.status === "error") {
+    return <div className="rounded-xl border border-dashed border-[var(--danger-text)]/40 p-3">
+      <p className="text-[10px] text-[var(--danger-text)]">{state.message === "too_large" ? s.uploadTooLarge : state.message === "wrong_type" ? s.uploadWrongType : s.uploadFailed}</p>
+      {state.message !== "too_large" && state.message !== "wrong_type"
+        ? <button type="button" className="button button-secondary mt-2 w-full justify-center" onClick={() => void retry().then(result => onDone({ path: result.path, fileName: result.fileName, uploadedAt: new Date().toISOString(), sizeBytes: result.sizeBytes, source: "customer" })).catch(() => { /* stays in error state */ })}>{s.uploadRetry}</button>
+        : <label className="button button-secondary mt-2 w-full cursor-pointer justify-center">{s.uploadFile}<input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={event => void handleSelect(event.target.files?.[0])} /></label>}
     </div>;
   }
   return <div className="rounded-xl border border-dashed border-[var(--border)] p-3">
@@ -148,7 +179,6 @@ function UploadSlot({ organizationId, projectId, sectionId, questionId, itemInde
       <input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" disabled={state.status === "uploading"} onChange={event => void handleSelect(event.target.files?.[0])} />
     </label>
     {state.status === "uploading" && <div className="progress mt-2"><i style={{ width: `${state.percent}%` }} /></div>}
-    {state.status === "error" && <p className="mt-2 text-[10px] text-[var(--danger-text)]">{state.message === "too_large" ? s.uploadTooLarge : state.message === "wrong_type" ? s.uploadWrongType : s.uploadFailed}</p>}
   </div>;
 }
 

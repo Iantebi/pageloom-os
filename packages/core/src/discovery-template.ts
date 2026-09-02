@@ -181,8 +181,16 @@ export function isQuestionVisible(question: DiscoveryQuestion, responses: Discov
   });
 }
 
+// Deliberately does NOT treat `false` as empty: a raw response value of `false` only ever comes
+// from a boolean-type question (see DiscoveryResponseValue in discovery.ts — no other question
+// type serializes to a bare boolean), and "No" is a complete, meaningful answer to a required
+// boolean question (trust.hasTestimonials, branding.hasLogo, presence.hasWebsite,
+// presence.hasDomain), not a missing one. The generic client-management.ts questionnaire helper
+// this was originally modeled on has the same `value === false` check, but it has never been
+// exercised there because no Website Brief field is boolean-typed — Discovery is the first
+// consumer to actually have a required boolean question, which is what surfaced this.
 function isEmptyResponse(value: unknown): boolean {
-  if (value === undefined || value === null || value === false || value === "") return true;
+  if (value === undefined || value === null || value === "") return true;
   return Array.isArray(value) && value.length === 0;
 }
 

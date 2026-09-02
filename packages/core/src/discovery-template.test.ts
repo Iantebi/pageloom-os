@@ -102,10 +102,29 @@ describe("missingRequiredDiscoveryFields / isSectionComplete", () => {
     expect(missing).not.toContain("trust.testimonials");
   });
 
-  it("treats an empty array, empty string, false, undefined as missing for a required field", () => {
+  it("treats an empty array, empty string, and undefined as missing for a required field", () => {
     const section = discoverySection("services");
     expect(missingRequiredDiscoveryFields(section, { "services.list": [] })).toContain("services.list");
     expect(missingRequiredDiscoveryFields(section, {})).toContain("services.list");
+  });
+
+  // Regression test for a real bug caught by the customer-lifecycle e2e test on CI (not by this
+  // file): isEmptyResponse used to treat `value === false` as missing, which made every required
+  // boolean question permanently unsatisfiable when answered "No" — a customer who truthfully said
+  // they have no testimonials could never complete the Trust section. `false` is a complete,
+  // meaningful answer and must never be reported as a missing required field.
+  it("treats an explicit `false` answer to a required boolean question as answered, not missing", () => {
+    const trust = discoverySection("trust");
+    expect(missingRequiredDiscoveryFields(trust, { "trust.hasTestimonials": false })).not.toContain("trust.hasTestimonials");
+    expect(missingRequiredDiscoveryFields(trust, { "trust.hasTestimonials": true })).not.toContain("trust.hasTestimonials");
+    expect(missingRequiredDiscoveryFields(trust, {})).toContain("trust.hasTestimonials");
+
+    const branding = discoverySection("branding");
+    expect(missingRequiredDiscoveryFields(branding, { "branding.hasLogo": false, "branding.colors": ["#112233"], "branding.style": ["modern"] })).toEqual([]);
+
+    const presence = discoverySection("presence");
+    const answered = { "presence.phone": "x", "presence.email": "x", "presence.hasWebsite": false, "presence.hasDomain": false };
+    expect(missingRequiredDiscoveryFields(presence, answered)).toEqual([]);
   });
 
   it("isSectionComplete reflects missingRequiredDiscoveryFields exactly", () => {
