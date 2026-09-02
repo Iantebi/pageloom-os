@@ -661,9 +661,9 @@ describe("Customer lifecycle (end-to-end, real Functions/Firestore/Auth/Storage 
     // Security property: a client cannot create a generic questionnaire (staff-only), matching
     // api.ts's requireRole default (owner/admin/operator, no client).
     const deniedCreate = await apiCall(state.clientAlphaToken, "POST", `/api/projects/${state.projectId}/questionnaires`, {
-      organizationId: ORG_ALPHA, title: "Attempted client-created questionnaire", fields: [{ id: "x", label: "x", type: "short_text", required: false }],
+      organizationId: ORG_ALPHA, title: "Attempted client-created questionnaire", fields: [{ id: "note", label: "Attempted field", type: "short_text", required: false }],
     });
-    expect(deniedCreate.status).toBe(403);
+    expect(deniedCreate.status, JSON.stringify(deniedCreate.data)).toBe(403);
 
     // But the client CAN complete it (requireProjectAccess includes client) — same as the Website
     // Brief always could.
