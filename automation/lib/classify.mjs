@@ -64,7 +64,10 @@ export function classify(task, policy) {
   }
 
   // 4. Must positively match a recognized SAFE category, or carry an explicit human "safe" label.
-  const safeHit = findKeywordHit(text, policy.safeCategories);
+  //    Business/Operations categories (repository-based docs, onboarding, templates) are also
+  //    SAFE-qualifying here — route.mjs only decides which worker role handles an already-SAFE
+  //    task, it never has authority to classify PROTECTED work as SAFE.
+  const safeHit = findKeywordHit(text, [...policy.safeCategories, ...(policy.businessOpsCategories ?? [])]);
   if (safeHit) {
     return {
       classification: "SAFE",

@@ -1,19 +1,23 @@
 # ---------------------------------------------------------------------------------------
-# TEMPLATE — not active until Isaac copies this file to .github/workflows/autonomous-manager.yml
+# TEMPLATE — copy this file over .github/workflows/autonomous-manager.yml to install it.
 #
 # Why this lives here instead of already being in .github/workflows/: the Claude Code
 # GitHub App's permissions intentionally do not allow it to create or modify files under
 # .github/workflows (a standard GitHub App restriction, so an agent can never grant itself
-# more CI/CD power). Copying this one file in is a deliberate one-time human action.
+# more CI/CD power). Copying this one file in is a deliberate one-time human action —
+# including re-copying it after this update, since the previously-installed workflow
+# predates the Developer / QA & Safety / Business & Operations roles below.
 #
 # What this does NOT duplicate: it never invokes claude-code-action itself. It reuses the
-# existing .github/workflows/claude.yml (triggered by an "@claude" issue comment) to do the
-# actual implementation work, and the existing .github/workflows/claude-code-review.yml to
-# review the resulting PR. This file only decides *which* approved backlog issue to hand to
-# that pipeline next, and later whether the PR it produced is safe to auto-merge.
+# existing .github/workflows/claude.yml (triggered by an "@claude" issue or PR comment) to
+# do the actual implementation and QA/Safety review work, and the existing
+# .github/workflows/claude-code-review.yml to run the generic code review on the resulting
+# PR. This file only decides *which* approved backlog issue to hand to which agent role
+# next, requests independent QA/Safety review on worker PRs, and tracks readiness for a
+# human to merge — it never merges anything itself.
 #
 # See docs/AUTONOMOUS-MANAGER.md for the full design and automation/policy.json for the
-# SAFE/PROTECTED rules this workflow enforces.
+# SAFE/PROTECTED rules and role-routing this workflow enforces.
 # ---------------------------------------------------------------------------------------
 name: Autonomous Development Manager
 
@@ -50,13 +54,69 @@ jobs:
           gh label create "autonomous:approved" --color 0E8A16 --description "Isaac has approved this issue for the autonomous manager" --force
           gh label create "autonomous:safe" --color 0E8A16 --description "Classified SAFE by automation/policy.json" --force
           gh label create "autonomous:protected" --color B60205 --description "Requires Isaac's explicit approval before any action" --force
-          gh label create "autonomous:in-progress" --color FBCA04 --description "Autonomous manager is currently working this task" --force
-          gh label create "autonomous:blocked" --color B60205 --description "Approved but classified PROTECTED; needs Isaac" --force
+          gh label create "autonomous:in-progress" --color FBCA04 --description "A worker agent is currently working this task" --force
+          gh label create "autonomous:blocked" --color B60205 --description "Needs Isaac: approved-but-PROTECTED, or repeated check failures" --force
           gh label create "autonomous:done" --color 6E5494 --description "Autonomous manager completed this task" --force
           gh label create "autonomous:status-board" --color 1D76DB --description "Pinned status-reporting issue for the autonomous manager" --force
+          gh label create "autonomous:role-developer" --color 5319E7 --description "Assigned to the Developer Agent" --force
+          gh label create "autonomous:role-business-ops" --color 5319E7 --description "Assigned to the Business & Operations Agent" --force
+          gh label create "autonomous:role-qa-safety" --color 5319E7 --description "Assigned to the QA & Safety Agent" --force
+          gh label create "autonomous:qa-requested" --color FBCA04 --description "Independent QA/Safety review has been requested" --force
+          gh label create "autonomous:qa-passed" --color 0E8A16 --description "Independent QA/Safety review passed" --force
+          gh label create "autonomous:qa-changes-requested" --color B60205 --description "Independent QA/Safety review requested changes" --force
+          gh label create "autonomous:ready-for-merge" --color 0E8A16 --description "CI green + QA passed; ready for Isaac to merge by hand (never auto-merged)" --force
+
+  check-worker-health-and-readiness:
+    # Re-checks every open, SAFE-labeled PR: readiness for a human to merge (requires QA
+    # passed, on top of the pre-existing CI/review/conflict checks) and worker health
+    # (fail-closed: a PR with failing checks gets its linked issue labeled
+    # autonomous:blocked, which pauses NEW dispatch below until a human resolves it).
+    # Runs BEFORE dispatch-next-task so a freshly-detected blocker is respected the same
+    # cycle it's found. Never runs `gh pr merge` — there is no auto-merge path.
+    needs: [ensure-labels]
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Evaluate readiness and worker health for open SAFE PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          PRS=$(gh pr list --repo "${{ github.repository }}" --label "autonomous:safe" --state open --json number --jq '.[].number')
+          for PR in $PRS; do
+            node automation/check-merge-eligibility.mjs --repo "${{ github.repository }}" --pr "$PR"
+          done
+
+  dispatch-qa-review:
+    # Requests an independent QA & Safety Agent review on any open worker PR that doesn't
+    # have one yet. Independent of dispatch-next-task's concurrency cap: reviewing existing
+    # PRs is not itself a new worker task.
+    needs: [ensure-labels]
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Request QA/Safety review on eligible worker PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node automation/dispatch-qa-review.mjs --repo "${{ github.repository }}"
 
   dispatch-next-task:
-    needs: [ensure-labels]
+    needs: [ensure-labels, check-worker-health-and-readiness]
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
@@ -68,7 +128,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Select and start the next SAFE approved task
+      - name: Select and start the next SAFE approved task(s), up to max concurrency
         id: select
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -110,29 +170,9 @@ jobs:
             NUM=$(echo "$PR_BODY" | grep -oE '#[0-9]+' | head -1 | tr -d '#')
           fi
           if [ -n "$NUM" ]; then
-            gh issue edit "$NUM" --repo "${{ github.repository }}" --remove-label "autonomous:in-progress" --add-label "autonomous:done" || true
+            gh issue edit "$NUM" --repo "${{ github.repository }}" --remove-label "autonomous:in-progress" --remove-label "autonomous:blocked" --add-label "autonomous:done" || true
           fi
 
-  auto-merge-check:
-    # Re-checks every open, SAFE-labeled, manager-created PR on the same schedule. Kept as
-    # a periodic sweep (rather than reacting to every check/review event) so this stays a
-    # single simple job instead of wiring up check_suite/workflow_run/review-event fan-in.
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-      - name: Evaluate and enable auto-merge for eligible SAFE PRs
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -e
-          PRS=$(gh pr list --repo "${{ github.repository }}" --label "autonomous:safe" --state open --json number --jq '.[].number')
-          for PR in $PRS; do
-            node automation/check-merge-eligibility.mjs --repo "${{ github.repository }}" --pr "$PR"
-          done
+  # Deliberately no auto-merge job, and no job anywhere in this workflow ever runs
+  # `gh pr merge`. Autonomous agents may create, validate, and QA-review PRs, but merging
+  # remains a human-approved action Isaac takes by hand.
