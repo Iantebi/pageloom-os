@@ -8,4 +8,9 @@ describe("platform master control API",()=>{it("requires an explicit platform ad
 // live production audit 2026-08-31: dashboard showed "degraded" while backups were confirmed
 // healthy). This guards against silently reintroducing that disconnect.
 it("derives backup status from the real backup run record, not only the unused organization-scoped collection",()=>{expect(source).toContain('db.collection("systemOperations/backups/runs")');expect(source).toContain("latestBackupRun")});
-it("does not fabricate infrastructure metrics it cannot actually verify",()=>{expect(source).not.toContain('firestoreStatus:"operational"');expect(source).not.toMatch(/cloudFunctions:\s*\d/)})});
+it("does not fabricate infrastructure metrics it cannot actually verify",()=>{expect(source).not.toContain('firestoreStatus:"operational"');expect(source).not.toMatch(/cloudFunctions:\s*\d/)});
+// Regression: "rules enforced" / "indexes configured" / "permissions enforced" were previously
+// hardcoded string literals in the security/infrastructure sections - claims presented to Master
+// Panel staff as if verified, when nothing in this handler ever checks the deployed Firestore
+// rules, indexes, or IAM state. Guards against reintroducing an unverifiable fixed claim.
+it("does not present rule, index, or permission enforcement as verified when it is not checked",()=>{expect(source).not.toContain('rules:"enforced"');expect(source).not.toContain('indexes:"configured"');expect(source).not.toContain('permissions:"enforced"');expect(source).toContain('rules:"unknown"');expect(source).toContain('indexes:"unknown"');expect(source).toContain('permissions:"unknown"')})});
