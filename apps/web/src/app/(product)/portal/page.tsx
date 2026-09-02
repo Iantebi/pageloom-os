@@ -13,6 +13,7 @@ import { WebsiteContentWorkspace } from "@/components/website-content-workspace"
 import { WebsiteContentReviewPanel } from "@/components/website-content-preview";
 import { WelcomePanel } from "@/components/welcome-panel";
 import { CustomerJourneyTimeline } from "@/components/customer-journey-timeline";
+import { DiscoveryTaskCard } from "@/components/discovery-task-card";
 import { t, dateTime } from "@/lib/i18n";
 
 type QuestionnaireField = { id: string; label: string; type: "short_text" | "long_text" | "email" | "phone" | "url" | "select" | "multi_select" | "boolean" | "file"; required: boolean; options?: string[]; helpText?: string };
@@ -77,6 +78,7 @@ export default function Portal() {
       <div className="grid gap-4 lg:grid-cols-2">
         <WelcomePanel project={project} />
         <div className="lg:col-span-2"><CustomerJourneyTimeline project={project} /></div>
+        <DiscoveryTaskCard organizationId={organizationId} projectId={project.id} />
         <Card aria-label={s.progressTitle}><div className="flex items-start justify-between gap-3"><div><h2 className="text-sm font-semibold">{s.progressTitle}</h2><p className="mt-1 text-xs text-[var(--muted)]">{s.currentStageLabel(project.workflowStage ?? project.journeyStage)}</p></div><Status value={project.workflowStatus ?? project.status} /></div><b className="mt-5 block text-3xl" aria-label={s.progressPercentAria(project.progress)}>{project.progress}%</b><div className="progress mt-4" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={project.progress}><i style={{ width: `${project.progress}%` }} /></div>{project.blockedReason && <p className="mt-4 rounded-lg bg-[var(--warn-bg)] p-3 text-xs text-[var(--warn-text)]">{s.blockedNotice}</p>}</Card>
         <Card><h2 className="text-sm font-semibold">{s.materialsTitle}</h2><p className="mt-2 text-xs leading-5 text-[var(--muted)]">{s.materialsDescription}</p><label className="button button-secondary mt-5 cursor-pointer justify-center"><UploadCloud className="h-4 w-4" />{busy ? s.uploading : s.chooseFile}<input className="sr-only" type="file" disabled={busy} onChange={upload} /></label></Card>
         <div id="website-brief" className="contents">{(project.workflowStage === "questionnaire" || questionnaires.data.length > 0) && <CustomerQuestionnaire organizationId={organizationId} projectId={project.id} questionnaires={questionnaires} />}</div>

@@ -24,6 +24,11 @@ service firebase.storage {
     match /organizations/{orgId}/uploads/{userId}/{projectId}/{allPaths=**} { allow read: if staff(orgId) || clientProject(orgId,projectId); allow write: if safeUploadShape() && (staff(orgId) || (safeUpload(orgId,userId) && clientProject(orgId,projectId) && clientPermission(orgId,'assets'))); }
     match /organizations/{orgId}/customers/{customerId}/{userId}/{allPaths=**} { allow read: if staff(orgId) || clientCustomer(orgId,customerId); allow write: if safeUploadShape() && (staff(orgId) || (safeUpload(orgId,userId) && clientCustomer(orgId,customerId))); }
     match /organizations/{orgId}/questionnaires/{projectId}/{questionnaireId}/{fieldId}/{userId}/{allPaths=**} { allow read: if staff(orgId) || clientProject(orgId,projectId); allow write: if safeUploadShape() && (staff(orgId) || (safeUpload(orgId,userId) && clientProject(orgId,projectId))); }
+    // Business Discovery uploads (logo, photos, testimonial screenshots, price lists) — same
+    // tenant/project scoping and safeUpload() same-uid + safeUploadShape() size/type ceiling as
+    // the questionnaires path above, with {sectionId} in place of {questionnaireId}. See
+    // docs/customer-discovery-onboarding/SECURITY.md §5.
+    match /organizations/{orgId}/discovery/{projectId}/{sectionId}/{fieldId}/{userId}/{allPaths=**} { allow read: if staff(orgId) || clientProject(orgId,projectId); allow write: if safeUploadShape() && (staff(orgId) || (safeUpload(orgId,userId) && clientProject(orgId,projectId))); }
     match /organizations/{orgId}/website-media/{customerId}/{projectId}/{websiteId}/{userId}/{fileName} {
       allow read: if staff(orgId) || (clientCustomer(orgId,customerId) && clientProject(orgId,projectId));
       allow create, update: if safeWebsiteMedia(orgId,userId,fileName) && (staff(orgId) || (clientCustomer(orgId,customerId) && clientProject(orgId,projectId) && clientPermission(orgId,'contentEdit')));

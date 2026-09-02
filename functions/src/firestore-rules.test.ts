@@ -10,6 +10,19 @@ describe("website content isolation",()=>{it("allows customers to read only cont
 describe("customer access lifecycle",()=>{it("denies disabled members and honors optional project assignments",()=>{expect(rules).toContain("data.disabled != true");expect(rules).toContain("'projectIds' in get(");expect(rules).toContain("projectId in get(")});it("treats an empty projectIds list as unrestricted, not as a deny-all list",()=>expect(rules).toContain(".data.projectIds.size() == 0 ||"))});
 describe("platform administrators",()=>{it("uses an immutable Firebase claim for cross-organization read access, read via get() so a token without the claim evaluates false instead of throwing",()=>{expect(rules).toContain("request.auth.token.get('platformRole', null) in ['owner','admin']");expect(rules).toContain("function staff(orgId) { return platformAdmin()")});it("keeps content submissions server-write-only",()=>expect(rules).toContain("contentSubmissions/{submissionId} { allow read: if privileged(orgId); allow write: if false; }"))});
 describe("staff invitations and support internal notes",()=>{it("restricts pending staff invitations to privileged staff and denies direct writes",()=>{expect(rules).toContain("match /staffInvitations/{docId} { allow read: if privileged(orgId); allow write: if false; }")});it("keeps support ticket internal notes staff-only, never client-readable",()=>{expect(rules).toContain("match /supportTickets/{ticketId}/internalNotes/{noteId} { allow read: if staff(orgId); allow write: if false; }")})});
+describe("Business Discovery isolation",()=>{
+  it("lets staff or the assigned client read discovery sections and progress, with no client write path",()=>{
+    expect(rules).toContain("match /projects/{projectId}/discovery/{sectionId} { allow read: if staff(orgId) || clientProject(orgId, projectId); allow write: if false; }");
+    expect(rules).toContain("match /projects/{projectId}/discoveryProgress/{docId} { allow read: if staff(orgId) || clientProject(orgId, projectId); allow write: if false; }");
+  });
+  it("keeps discoveryNotes staff-only with NO clientProject() clause — customers must never read internal notes",()=>{
+    expect(rules).toContain("match /projects/{projectId}/discoveryNotes/{noteId} { allow read: if staff(orgId); allow write: if false; }");
+    expect(rules).not.toMatch(/discoveryNotes\/\{noteId\} \{ allow read: if staff\(orgId\) \|\|/);
+  });
+  it("keeps businessProfile staff-only at launch (unpopulated, internal AI-analysis destination)",()=>{
+    expect(rules).toContain("match /projects/{projectId}/businessProfile/{docId} { allow read: if staff(orgId); allow write: if false; }");
+  });
+});
 describe("client project list-query safety (clientProjectList)",()=>{
   const clientProjectListSrc=(rules.match(/function clientProjectList\(orgId\) \{[^}]*\}/)??[""])[0];
   it("defines clientProjectList and wires it into the top-level projects list/query match instead of the get()-based clientProject",()=>{

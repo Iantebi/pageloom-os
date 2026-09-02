@@ -44,6 +44,9 @@ import { workflowTimeline } from "./dictionaries/workflowTimeline";
 import { appearanceSettings } from "./dictionaries/appearanceSettings";
 import { customerJourney } from "./dictionaries/customerJourney";
 import { onboardingJourneyPanel } from "./dictionaries/onboardingJourneyPanel";
+import { discoveryQuestions } from "./dictionaries/discoveryQuestions";
+import { discoveryShell } from "./dictionaries/discoveryShell";
+import { discoveryPanel } from "./dictionaries/discoveryPanel";
 
 const dictionaries = {
   common,
@@ -93,6 +96,9 @@ const dictionaries = {
   appearanceSettings,
   customerJourney,
   onboardingJourneyPanel,
+  discoveryQuestions,
+  discoveryShell,
+  discoveryPanel,
 } as const;
 
 type Dictionaries = typeof dictionaries;

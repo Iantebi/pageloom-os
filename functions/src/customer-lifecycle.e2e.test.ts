@@ -58,6 +58,7 @@ import {
 } from "@firebase/rules-unit-testing";
 import { doc, getDoc } from "firebase/firestore";
 import { ref, uploadBytes } from "firebase/storage";
+import { discoverySectionOrder } from "@pageloom/core";
 
 const PROJECT_ID = "demo-pageloom-e2e";
 if (!PROJECT_ID.startsWith("demo-")) {
@@ -181,7 +182,7 @@ const state: {
   ownerAlphaToken?: string; staffMemberAlphaToken?: string; clientAlphaToken?: string;
   ownerBetaToken?: string; clientBetaToken?: string;
   leadId?: string; projectId?: string; customerId?: string;
-  websiteId?: string; websiteBriefId?: string;
+  websiteId?: string;
   uploadedMediaPath?: string;
   version1RevisionId?: string; version1HeroHeading?: string;
 } = {};
@@ -306,14 +307,15 @@ describe("Customer lifecycle (end-to-end, real Functions/Firestore/Auth/Storage 
 
   // ===== 7a: PAYMENT CONFIRMED — the new, dedicated, Owner-only endpoint (mission section 1). =====
   // Advances the workflow through the new payment_confirmed stage into "questionnaire" and
-  // auto-creates the Website Brief, all in one manual Owner action - no Stripe call, no scheduler.
-  it("7a. Owner confirms payment via the dedicated payment-confirmed endpoint, which records payment state and auto-creates the Website Brief", async () => {
+  // initializes Business Discovery (NOT the legacy Website Brief — see the product decision recorded
+  // in onboarding-journey-api.ts and docs/customer-discovery-onboarding/PRD.md §37), all in one
+  // manual Owner action - no Stripe call, no scheduler.
+  it("7a. Owner confirms payment via the dedicated payment-confirmed endpoint, which records payment state and initializes Business Discovery (not the legacy Website Brief)", async () => {
     const confirmed = await apiCall(state.ownerAlphaToken, "POST", `/api/projects/${state.projectId}/payment-confirmed`, {
       organizationId: ORG_ALPHA, paymentReference: "e2e-test-payment-ref-001",
       evidence: "Synthetic e2e-test evidence: payment confirmed by the owner, no real Stripe call.",
     });
     expect(confirmed.status).toBe(202);
-    state.websiteBriefId = confirmed.data.data!.websiteBriefId;
 
     const [customerDoc, projectDoc] = await Promise.all([
       adminDb.doc(`organizations/${ORG_ALPHA}/customers/${state.customerId}`).get(),
@@ -325,9 +327,14 @@ describe("Customer lifecycle (end-to-end, real Functions/Firestore/Auth/Storage 
     expect(Object.keys(customerDoc.data() ?? {}).some(key => /card/i.test(key))).toBe(false);
     expect(projectDoc.data()?.workflowStage).toBe("questionnaire");
 
-    const briefDoc = await adminDb.doc(`organizations/${ORG_ALPHA}/projects/${state.projectId}/questionnaires/${state.websiteBriefId}`).get();
-    expect(briefDoc.data()?.kind).toBe("website_brief");
-    expect((briefDoc.data()?.fields as unknown[]).length).toBeGreaterThan(10);
+    // Business Discovery is initialized — NOT a Website Brief questionnaire document. This is the
+    // one behavioral difference from the pre-Discovery flow: no questionnaires/{id} doc is created
+    // here at all any more.
+    const discoveryProgressDoc = await adminDb.doc(`organizations/${ORG_ALPHA}/projects/${state.projectId}/discoveryProgress/current`).get();
+    expect(discoveryProgressDoc.data()?.status).toBe("not_started");
+    expect(discoveryProgressDoc.data()?.completedSectionIds).toEqual([]);
+    const questionnairesSnap = await adminDb.collection(`organizations/${ORG_ALPHA}/projects/${state.projectId}/questionnaires`).get();
+    expect(questionnairesSnap.empty).toBe(true);
 
     // Idempotent: confirming payment again for the same project is a no-op, not a duplicate advance.
     const again = await apiCall(state.ownerAlphaToken, "POST", `/api/projects/${state.projectId}/payment-confirmed`, {
@@ -371,29 +378,107 @@ describe("Customer lifecycle (end-to-end, real Functions/Firestore/Auth/Storage 
     expect(portal.data.data!.configured).toBe(true);
   });
 
-  // ===== 10b: WEBSITE BRIEF — the customer completes the brief auto-created at payment time. =====
-  // Requires the project to already be in "questionnaire" stage (set by 7a above) - this is the
-  // existing, unchanged /questionnaires/:id/complete endpoint, exercised here with the new brief.
-  it("10b. Customer completes the Website Brief, which advances the workflow into materials collection", async () => {
-    // Longer than vitest's default 5000ms test timeout: this test polls (via waitFor, up to
-    // 10000ms) for the async processWorkflowEvent Firestore trigger to apply the transition -
-    // the emulator's cold-start latency for a fresh trigger can exceed 5s under CI load.
-    const briefDoc = await adminDb.doc(`organizations/${ORG_ALPHA}/projects/${state.projectId}/questionnaires/${state.websiteBriefId}`).get();
-    const fields = briefDoc.data()!.fields as { id: string; required: boolean }[];
-    const responses = Object.fromEntries(fields.filter(field => field.required).map(field => [field.id, `Synthetic e2e-test answer for ${field.id}`]));
-    const completed = await apiCall(state.clientAlphaToken, "POST", `/api/projects/${state.projectId}/questionnaires/${state.websiteBriefId}/complete`, {
-      organizationId: ORG_ALPHA, responses, filePaths: [],
-    });
-    expect(completed.status).toBe(202);
-    // QuestionnaireCompleted is only emitted here, not processed synchronously (unlike the
-    // payment-confirmed endpoint) - the transition lands asynchronously via the
-    // processWorkflowEvent Firestore trigger, so poll rather than asserting immediately.
+  // ===== 10b: BUSINESS DISCOVERY — the customer works through all 9 stages, section by section, =====
+  // ===== then submits, which advances the workflow into materials collection. =====
+  // Requires the project to already be in "questionnaire" stage (set by 7a above) - exercises
+  // discovery-api.ts's autosave (PATCH), per-section complete, and final submit endpoints end to end,
+  // including the conditional-visibility-aware required-field validation and the boolean answers
+  // chosen deliberately to keep every conditionally-required upload optional (hasTestimonials:false,
+  // hasLogo:false, hasWebsite:false, hasDomain:false — so this test never needs a real file upload).
+  it("10b. Customer completes Business Discovery section by section, then submits, which advances the workflow into materials collection", async () => {
+    // A hardcoded, explicit map (not derived from the template) so that a future required-question
+    // added to discovery-template.ts without updating this test fails loudly here (a 422 from
+    // /complete or /submit) rather than silently passing with a stale answer set.
+    expect([...discoverySectionOrder]).toEqual(["business", "customers", "services", "differentiation", "trust", "branding", "materials", "presence", "goals"]);
+
+    const responsesBySection: Record<string, Record<string, unknown>> = {
+      business: { "business.publicName": "E2E Test Customer Co", "business.whatItDoes": "Synthetic e2e-test business description", "business.customerFeeling": "Synthetic e2e-test customer feeling" },
+      customers: { "customers.idealCustomer": "Synthetic ideal customer", "customers.beforeContact": "Synthetic trigger", "customers.realProblem": "Synthetic problem", "customers.desiredOutcome": "Synthetic outcome" },
+      services: { "services.list": [{ name: "Synthetic Service", promote: false }] },
+      differentiation: { "differentiation.whyCustomersChoseYou": "Synthetic differentiator", "differentiation.processAdvantages": ["availability"] },
+      trust: { "trust.hasTestimonials": false },
+      branding: { "branding.hasLogo": false, "branding.colors": ["#112233"], "branding.style": ["modern"] },
+      materials: {},
+      presence: { "presence.phone": "0500000000", "presence.email": "synthetic@e2e-test-customer-alpha.example.com", "presence.hasWebsite": false, "presence.hasDomain": false },
+      goals: { "goals.biggestProblem": "Synthetic biggest problem", "goals.sixMonthSuccess": "Synthetic six-month success", "goals.priorityOutcomes": ["more_inquiries"], "goals.capacityCheck": "Synthetic capacity answer" },
+    };
+
+    for (const sectionId of discoverySectionOrder) {
+      const saved = await apiCall(state.clientAlphaToken, "PATCH", `/api/projects/${state.projectId}/discovery/sections/${sectionId}`, {
+        organizationId: ORG_ALPHA, responses: responsesBySection[sectionId],
+      });
+      expect(saved.status, `save ${sectionId}`).toBe(200);
+      const completedSection = await apiCall(state.clientAlphaToken, "POST", `/api/projects/${state.projectId}/discovery/sections/${sectionId}/complete`, { organizationId: ORG_ALPHA });
+      expect(completedSection.status, `complete ${sectionId}: ${JSON.stringify(completedSection.data)}`).toBe(200);
+    }
+
+    const progressDoc = await adminDb.doc(`organizations/${ORG_ALPHA}/projects/${state.projectId}/discoveryProgress/current`).get();
+    expect(progressDoc.data()?.percentComplete).toBe(100);
+
+    const submitted = await apiCall(state.clientAlphaToken, "POST", `/api/projects/${state.projectId}/discovery/submit`, { organizationId: ORG_ALPHA });
+    expect(submitted.status, JSON.stringify(submitted.data)).toBe(202);
+    // Unlike the Website Brief's completion, /discovery/submit calls engine.process() synchronously
+    // (see discovery-api.ts), so the transition is already applied by the time this call returns -
+    // no polling needed, though waitFor is still a correct (just redundant) safety net here.
     const projectDoc = await waitFor(
       () => adminDb.doc(`organizations/${ORG_ALPHA}/projects/${state.projectId}`).get(),
       snap => snap.data()?.workflowStage === "assets",
     );
     expect(projectDoc.data()?.workflowStage).toBe("assets");
+
+    // Idempotent: submitting an already-submitted Discovery is a no-op, not a duplicate advance.
+    const again = await apiCall(state.clientAlphaToken, "POST", `/api/projects/${state.projectId}/discovery/submit`, { organizationId: ORG_ALPHA });
+    expect(again.status).toBe(200);
+    expect(again.data.data!.alreadySubmitted).toBe(true);
   }, 15_000);
+
+  // ===== 10c: internal Discovery notes are staff-only — never visible to the customer, at either =====
+  // the API or the Firestore-rules layer, matching the platform-wide "customer must never see
+  // internal notes" guarantee (SECURITY.md §3.3).
+  it("10c. Owner adds an internal Discovery note; the customer can neither read it via the API nor via a direct Firestore rules read", async () => {
+    const note = await apiCall(state.ownerAlphaToken, "POST", `/api/projects/${state.projectId}/discovery/notes`, {
+      organizationId: ORG_ALPHA, sectionId: "branding", body: "Internal-only: ask the customer for a higher-resolution logo before build starts.",
+    });
+    expect(note.status).toBe(201);
+    const noteId = note.data.data!.id as string;
+
+    // Denied as the customer, via the API...
+    const deniedApi = await apiCall(state.clientAlphaToken, "GET", withQuery(`/api/projects/${state.projectId}/discovery/notes`, { organizationId: ORG_ALPHA }));
+    expect(deniedApi.status).toBe(403);
+    // ...and denied directly at the Firestore rules layer, independent of the API.
+    const clientFirestore = testEnv.authenticatedContext(CLIENT_ALPHA_UID).firestore();
+    await assertFails(getDoc(doc(clientFirestore, `organizations/${ORG_ALPHA}/projects/${state.projectId}/discoveryNotes/${noteId}`)));
+
+    // Positive control: staff can read it.
+    const asStaff = await apiCall(state.ownerAlphaToken, "GET", withQuery(`/api/projects/${state.projectId}/discovery/notes`, { organizationId: ORG_ALPHA }));
+    expect(asStaff.status).toBe(200);
+    expect(asStaff.data.data!.some((n: { id: string }) => n.id === noteId)).toBe(true);
+  });
+
+  // ===== 10d: staff reopens a section — the customer sees a "more information needed" notification =====
+  // and can re-edit the previously-completed section without losing their earlier answers.
+  it("10d. Owner reopens a completed Discovery section with a reason; the customer's prior answers are preserved and they can resubmit", async () => {
+    const reopened = await apiCall(state.ownerAlphaToken, "POST", `/api/projects/${state.projectId}/discovery/sections/branding/reopen`, {
+      organizationId: ORG_ALPHA, reason: "Please share your two brand colors again — the hex codes did not come through clearly.",
+    });
+    expect(reopened.status).toBe(200);
+
+    const sectionDoc = await adminDb.doc(`organizations/${ORG_ALPHA}/projects/${state.projectId}/discovery/branding`).get();
+    expect(sectionDoc.data()?.status).toBe("draft");
+    expect(sectionDoc.data()?.responses["branding.colors"]).toEqual(["#112233"]); // preserved, not cleared
+
+    // A client cannot reopen a section themselves (staff-only action).
+    const deniedClientReopen = await apiCall(state.clientAlphaToken, "POST", `/api/projects/${state.projectId}/discovery/sections/branding/reopen`, {
+      organizationId: ORG_ALPHA, reason: "Attempting to self-approve.",
+    });
+    expect(deniedClientReopen.status).toBe(403);
+
+    // The customer re-completes the reopened section and the project can be resubmitted.
+    const recompleted = await apiCall(state.clientAlphaToken, "POST", `/api/projects/${state.projectId}/discovery/sections/branding/complete`, { organizationId: ORG_ALPHA });
+    expect(recompleted.status).toBe(200);
+    const resubmitted = await apiCall(state.clientAlphaToken, "POST", `/api/projects/${state.projectId}/discovery/submit`, { organizationId: ORG_ALPHA });
+    expect(resubmitted.status).toBe(202);
+  });
 
   // ===== 11: media upload =====
   it("11. uploads customer website media under the customer/project/website storage boundary", async () => {

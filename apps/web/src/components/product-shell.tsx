@@ -1,6 +1,10 @@
 "use client";
 import Link from"next/link";import{usePathname,useRouter}from"next/navigation";import{BarChart3,Bell,Blocks,BriefcaseBusiness,Bot,Building2,CalendarDays,ChevronDown,ContactRound,Globe2,LayoutDashboard,LogOut,Menu,MessageCircleMore,Search,Settings2,ShieldCheck,Sparkles,UsersRound,X}from"lucide-react";import{useEffect,useState}from"react";import{useAuth}from"@/lib/auth";import{OrganizationProvider,useOrganization}from"@/lib/organization";import{t}from"@/lib/i18n";import{SignIn}from"./sign-in";
-export function ProductShell({children}:{children:React.ReactNode}){const{user,loading}=useAuth();if(loading)return <div className="grid min-h-screen place-items-center bg-[var(--bg)]"><Sparkles className="h-5 w-5 animate-pulse"/></div>;if(!user)return <SignIn/>;return <OrganizationProvider><Shell>{children}</Shell></OrganizationProvider>}
+// Auth-gate + OrganizationProvider, factored out so a route that wants a minimal/focused shell
+// (no sidebar nav — see apps/web/src/app/discovery/layout.tsx) doesn't have to duplicate the
+// sign-in/loading gate to still get useAuth()/useOrganization() context.
+export function AuthenticatedOrganization({children}:{children:React.ReactNode}){const{user,loading}=useAuth();if(loading)return <div className="grid min-h-screen place-items-center bg-[var(--bg)]"><Sparkles className="h-5 w-5 animate-pulse"/></div>;if(!user)return <SignIn/>;return <OrganizationProvider>{children}</OrganizationProvider>}
+export function ProductShell({children}:{children:React.ReactNode}){return <AuthenticatedOrganization><Shell>{children}</Shell></AuthenticatedOrganization>}
 function Shell({children}:{children:React.ReactNode}){const pathname=usePathname();const router=useRouter();const{organizations,organizationId,setOrganizationId,membership,loading}=useOrganization();const{user,signOut}=useAuth();const s=t("nav"),c=t("common");const[mobile,setMobile]=useState(false);const isClient=membership?.role==="client";
   // Route-level guard, not just a hidden nav link: a client-role account must never render a
   // staff-only page component at all, even via a typed/bookmarked/back-button URL — otherwise its

@@ -20,7 +20,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { collection, doc, documentId, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
+import { collection, deleteDoc, doc, documentId, getDoc, getDocs, query, setDoc, updateDoc, where } from "firebase/firestore";
 
 const RULES_PATH = new URL("../../firestore.rules", import.meta.url);
 const PROJECT_ID = "demo-pageloom-rules-fs";
@@ -100,6 +100,16 @@ async function seed() {
       set(`organizations/${ORG}/projects/${PROJ_BETA_1}/launchChecklist/current`, { items: [{ id: "domain", complete: false }] }),
       set(`organizations/${ORG}/projects/${PROJ_ALPHA_1}/handover/current`, { liveUrl: "https://alpha.example.com" }),
       set(`organizations/${ORG}/projects/${PROJ_BETA_1}/handover/current`, { liveUrl: "https://beta.example.com" }),
+
+      // Business Discovery fixtures — see docs/customer-discovery-onboarding/DATA-MODEL.md §2.
+      set(`organizations/${ORG}/projects/${PROJ_ALPHA_1}/discovery/business`, { id: "business", projectId: PROJ_ALPHA_1, templateVersion: 1, status: "completed", responses: { "business.publicName": "Alpha Co" } }),
+      set(`organizations/${ORG}/projects/${PROJ_ALPHA_2}/discovery/business`, { id: "business", projectId: PROJ_ALPHA_2, templateVersion: 1, status: "draft", responses: {} }),
+      set(`organizations/${ORG}/projects/${PROJ_BETA_1}/discovery/business`, { id: "business", projectId: PROJ_BETA_1, templateVersion: 1, status: "draft", responses: {} }),
+      set(`organizations/${ORG}/projects/${PROJ_ALPHA_1}/discoveryProgress/current`, { id: "current", projectId: PROJ_ALPHA_1, templateVersion: 1, status: "in_progress", completedSectionIds: ["business"], percentComplete: 11, lastActivityAt: "2026-01-01T00:00:00.000Z" }),
+      set(`organizations/${ORG}/projects/${PROJ_BETA_1}/discoveryProgress/current`, { id: "current", projectId: PROJ_BETA_1, templateVersion: 1, status: "not_started", completedSectionIds: [], percentComplete: 0, lastActivityAt: "2026-01-01T00:00:00.000Z" }),
+      set(`organizations/${ORG}/projects/${PROJ_ALPHA_1}/discoveryNotes/note-1`, { id: "note-1", projectId: PROJ_ALPHA_1, authorId: OWNER_UID, authorName: "Owner", body: "Ask them for higher-res logo", createdAt: "2026-01-01T00:00:00.000Z" }),
+      set(`organizations/${ORG}/projects/${PROJ_BETA_1}/discoveryNotes/note-1`, { id: "note-1", projectId: PROJ_BETA_1, authorId: OWNER_UID, authorName: "Owner", body: "Internal note", createdAt: "2026-01-01T00:00:00.000Z" }),
+      set(`organizations/${ORG}/projects/${PROJ_ALPHA_1}/businessProfile/current`, { id: "current", projectId: PROJ_ALPHA_1, status: "not_generated", schemaVersion: 1 }),
 
       set(`organizations/${ORG}/leads/lead-1`, { name: "Prospective Co" }),
       set(`organizations/${ORG}/customers/${CUST_ALPHA}`, { name: "Alpha Inc" }),
@@ -309,6 +319,105 @@ describe("Firestore rules engine (behavioral, via emulator)", () => {
       await assertFails(setDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/revisionRequests/rev-1`), { status: "resolved" }));
       await assertFails(setDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/launchChecklist/current`), { items: [] }));
       await assertFails(setDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/handover/current`), { liveUrl: "https://hacked.example.com" }));
+    });
+  });
+
+  describe("Business Discovery — valid access", () => {
+    it("lets a client read their own project's discovery section, progress, and businessProfile is denied (staff-only)", async () => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      await assertSucceeds(getDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/discovery/business`)));
+      await assertSucceeds(getDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/discoveryProgress/current`)));
+    });
+
+    it("lets a plain staff 'member' role, and an owner/admin, read discovery, progress, notes, and businessProfile across any project", async () => {
+      const staffMember = testEnv.authenticatedContext(STAFF_MEMBER_UID);
+      await assertSucceeds(getDoc(doc(staffMember.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/discovery/business`)));
+      await assertSucceeds(getDoc(doc(staffMember.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/discoveryProgress/current`)));
+      await assertSucceeds(getDoc(doc(staffMember.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/discoveryNotes/note-1`)));
+      await assertSucceeds(getDoc(doc(staffMember.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/businessProfile/current`)));
+
+      const owner = testEnv.authenticatedContext(OWNER_UID);
+      await assertSucceeds(getDoc(doc(owner.firestore(), `organizations/${ORG}/projects/${PROJ_BETA_1}/discovery/business`)));
+      await assertSucceeds(getDoc(doc(owner.firestore(), `organizations/${ORG}/projects/${PROJ_BETA_1}/discoveryNotes/note-1`)));
+    });
+  });
+
+  describe("Business Discovery — cross-customer read rejection", () => {
+    it("denies a client from reading another customer's discovery section or progress", async () => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      await assertFails(getDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_BETA_1}/discovery/business`)));
+      await assertFails(getDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_BETA_1}/discoveryProgress/current`)));
+    });
+
+    it("denies a restricted client (non-empty projectIds excluding this project) from reading discovery on an unassigned project of their own customer", async () => {
+      const restricted = testEnv.authenticatedContext(CLIENT_ALPHA_RESTRICTED_UID);
+      await assertFails(getDoc(doc(restricted.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_2}/discovery/business`)));
+    });
+  });
+
+  describe("Business Discovery — internal notes rejection (customer must never see internal notes)", () => {
+    it("denies a client from reading discoveryNotes on their OWN assigned project — the load-bearing guarantee", async () => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      await assertFails(getDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/discoveryNotes/note-1`)));
+    });
+
+    it("denies a client from reading businessProfile (internal AI-analysis destination, staff-only at launch)", async () => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      await assertFails(getDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/businessProfile/current`)));
+    });
+  });
+
+  describe("Business Discovery — disabled-user rejection", () => {
+    it("denies a disabled member from reading discovery data even though role would otherwise permit staff access", async () => {
+      const disabled = testEnv.authenticatedContext(DISABLED_MEMBER_UID);
+      await assertFails(getDoc(doc(disabled.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/discovery/business`)));
+      await assertFails(getDoc(doc(disabled.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/discoveryProgress/current`)));
+      await assertFails(getDoc(doc(disabled.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/discoveryNotes/note-1`)));
+    });
+  });
+
+  describe("Business Discovery — cross-customer write rejection, and no client write path exists at all", () => {
+    it("denies a client from writing (create/update/delete) their own project's discovery section — mutation is server/Admin-SDK only", async () => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      await assertFails(setDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/discovery/business`), { responses: { hacked: true } }));
+      await assertFails(updateDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/discovery/business`), { status: "completed" }));
+      await assertFails(deleteDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/discovery/business`)));
+    });
+
+    it("denies a client from writing to another customer's discovery data (cross-customer write rejection)", async () => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      await assertFails(setDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_BETA_1}/discovery/business`), { responses: { hacked: true } }));
+      await assertFails(setDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_BETA_1}/discoveryProgress/current`), { status: "submitted" }));
+    });
+
+    it("denies a client from writing (or forging) discoveryNotes, whether on their own or another project", async () => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      await assertFails(setDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/discoveryNotes/forged`), { body: "not internal at all" }));
+      await assertFails(setDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_BETA_1}/discoveryNotes/forged`), { body: "cross-tenant forge" }));
+    });
+
+    it("denies unauthorized archive/restore-shaped writes — no role can flip status fields directly via the client SDK, since ALL client writes are denied and archive/restore is server-authorized only", async () => {
+      const owner = testEnv.authenticatedContext(OWNER_UID);
+      // Even an Owner cannot write directly from the client SDK — every mutation, including a
+      // future archive/restore/reopen action, must go through the Admin-SDK-authorized API layer.
+      await assertFails(updateDoc(doc(owner.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/discoveryProgress/current`), { status: "reopened" }));
+      await assertFails(setDoc(doc(owner.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/discovery/business`), { status: "draft", reopenedAt: "now" }, { merge: true }));
+    });
+
+    it("denies unauthorized permanent-delete of Discovery data by any role — no client-SDK delete path exists for discovery, discoveryProgress, discoveryNotes, or businessProfile", async () => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      const owner = testEnv.authenticatedContext(OWNER_UID);
+      const staffMember = testEnv.authenticatedContext(STAFF_MEMBER_UID);
+      for (const path of [
+        `organizations/${ORG}/projects/${PROJ_ALPHA_1}/discovery/business`,
+        `organizations/${ORG}/projects/${PROJ_ALPHA_1}/discoveryProgress/current`,
+        `organizations/${ORG}/projects/${PROJ_ALPHA_1}/discoveryNotes/note-1`,
+        `organizations/${ORG}/projects/${PROJ_ALPHA_1}/businessProfile/current`,
+      ]) {
+        await assertFails(deleteDoc(doc(client.firestore(), path)));
+        await assertFails(deleteDoc(doc(owner.firestore(), path)));
+        await assertFails(deleteDoc(doc(staffMember.firestore(), path)));
+      }
     });
   });
 
