@@ -148,6 +148,61 @@ describe("Storage rules engine (behavioral, via emulator)", () => {
     });
   });
 
+  describe("organizations/{orgId}/discovery/{projectId}/{sectionId}/{fieldId}/{userId} tenant + owner-path scoping", () => {
+    const discoveryPath = (projectId: string, uid: string, fileName: string) =>
+      `organizations/${ORG}/discovery/${projectId}/business/branding.logo/${uid}/${fileName}`;
+
+    it("lets a client upload and read a Discovery file under their own uid and their own assigned project", async () => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      const path = discoveryPath(PROJ_ALPHA_1, CLIENT_ALPHA_UID, "logo.png");
+      await assertSucceeds(uploadBytes(ref(client.storage(), path), PNG_BYTES, { contentType: "image/png" }));
+      await assertSucceeds(getBytes(ref(client.storage(), path)));
+    });
+
+    it("denies a client from uploading a Discovery file under another user's uid segment, even within their own project", async () => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      const path = discoveryPath(PROJ_ALPHA_1, OWNER_UID, "logo.png");
+      await assertFails(uploadBytes(ref(client.storage(), path), PNG_BYTES, { contentType: "image/png" }));
+    });
+
+    it("denies a client from uploading OR reading a Discovery file scoped to another customer's project (cross-customer upload rejection)", async () => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      const path = discoveryPath(PROJ_BETA_1, CLIENT_ALPHA_UID, "logo.png");
+      await assertFails(uploadBytes(ref(client.storage(), path), PNG_BYTES, { contentType: "image/png" }));
+
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await uploadBytes(ref(context.storage(), path), PNG_BYTES, { contentType: "image/png" });
+      });
+      await assertFails(getBytes(ref(client.storage(), path)));
+    });
+
+    it("denies a disabled member from uploading a Discovery file even to their own uid/project path", async () => {
+      const disabled = testEnv.authenticatedContext(DISABLED_MEMBER_UID);
+      const path = discoveryPath(PROJ_ALPHA_1, DISABLED_MEMBER_UID, "logo.png");
+      await assertFails(uploadBytes(ref(disabled.storage(), path), PNG_BYTES, { contentType: "image/png" }));
+    });
+
+    it("rejects a Discovery upload whose content-type is outside the declared safeUpload allow-list", async () => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      const path = discoveryPath(PROJ_ALPHA_1, CLIENT_ALPHA_UID, "payload.exe");
+      await assertFails(uploadBytes(ref(client.storage(), path), TEXT_BYTES, { contentType: "application/x-msdownload" }));
+    });
+
+    it("rejects a Discovery upload larger than the declared 25MB safeUpload size limit", async () => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      const path = discoveryPath(PROJ_ALPHA_1, CLIENT_ALPHA_UID, "big.bin");
+      const oversized = new Uint8Array(26 * 1024 * 1024);
+      await assertFails(uploadBytes(ref(client.storage(), path), oversized, { contentType: "application/zip" }));
+    }, 30000);
+
+    it("lets staff read/write Discovery uploads across any project regardless of the uid segment", async () => {
+      const owner = testEnv.authenticatedContext(OWNER_UID);
+      const path = discoveryPath(PROJ_BETA_1, CLIENT_BETA_UID, "staff-uploaded.png");
+      await assertSucceeds(uploadBytes(ref(owner.storage(), path), PNG_BYTES, { contentType: "image/png" }));
+      await assertSucceeds(getBytes(ref(owner.storage(), path)));
+    });
+  });
+
   describe("organizations/{orgId}/customers/{customerId}/{userId} tenant scoping", () => {
     it("lets a client read/write under their own customerId", async () => {
       const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);

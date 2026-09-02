@@ -110,6 +110,18 @@ service cloud.firestore {
       match /projects/{projectId}/revisionRequests/{requestId} { allow read: if staff(orgId) || clientProject(orgId, projectId); allow write: if false; }
       match /projects/{projectId}/launchChecklist/{docId} { allow read: if staff(orgId); allow write: if false; }
       match /projects/{projectId}/handover/{docId} { allow read: if staff(orgId) || clientProject(orgId, projectId); allow write: if false; }
+
+      // Business Discovery ("אפיון העסק") — see docs/customer-discovery-onboarding/SECURITY.md §3.
+      // discovery/{sectionId} and discoveryProgress/{docId} mirror the questionnaires/revisionRequests/
+      // handover pattern above exactly: staff or the project's assigned client can read, no client write
+      // path exists anywhere (server/Admin SDK only). discoveryNotes is deliberately staff-only with NO
+      // clientProject() clause — this is the enforcement point for "customer must never see internal
+      // notes" and must never gain one. businessProfile is staff-only at launch (unpopulated in this
+      // release; its eventual content is internal AI analysis, not customer-facing by default).
+      match /projects/{projectId}/discovery/{sectionId} { allow read: if staff(orgId) || clientProject(orgId, projectId); allow write: if false; }
+      match /projects/{projectId}/discoveryProgress/{docId} { allow read: if staff(orgId) || clientProject(orgId, projectId); allow write: if false; }
+      match /projects/{projectId}/discoveryNotes/{noteId} { allow read: if staff(orgId); allow write: if false; }
+      match /projects/{projectId}/businessProfile/{docId} { allow read: if staff(orgId); allow write: if false; }
     }
     match /{document=**} { allow read, write: if false; }
   }

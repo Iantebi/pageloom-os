@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { z } from "zod";
 import {
-  createQuestionnaireSchema, createRevisionRequestSchema, launchChecklist, missingRequiredQuestionnaireFields,
-  recordHandoverSchema, resolveRevisionRequestSchema, websiteBriefFields, websiteBriefTitle,
-  type LaunchChecklistItem, type RevisionRequest,
+  createRevisionRequestSchema, launchChecklist, missingRequiredQuestionnaireFields,
+  recordHandoverSchema, resolveRevisionRequestSchema, DISCOVERY_TEMPLATE_VERSION,
+  type LaunchChecklistItem, type RevisionRequest, type DiscoveryProgressDocument,
 } from "@pageloom/core";
 import { requireCeo, requireProjectAccess, requireRole, type AuthenticatedRequest } from "./auth.js";
 import { db } from "./firebase.js";
@@ -28,11 +28,26 @@ function fail(res: import("express").Response, error: unknown, code: string, eve
 // Stripe webhook or any scheduler (see functions/src/api.ts's stripe webhook handler, which only
 // ever records the raw event — nothing reads it). Bundles exactly what the mission's step 1 asks
 // for: record payment state/reference (never card details), advance the workflow through the new
-// payment_confirmed stage into onboarding, and auto-create the Website Brief questionnaire so the
-// customer's portal immediately shows the Welcome + Brief flow. The three workflow events below are
-// processed synchronously (not left to the async Firestore trigger) purely to guarantee ordering —
-// WorkflowEngine.process() is idempotent (it no-ops on an already-processed event id), so the normal
-// trigger firing afterwards for the same event is harmless.
+// payment_confirmed stage into onboarding, and initialize Business Discovery ("אפיון העסק", see
+// docs/customer-discovery-onboarding/) so the customer's portal immediately shows the Welcome +
+// Discovery flow. The three workflow events below are processed synchronously (not left to the
+// async Firestore trigger) purely to guarantee ordering — WorkflowEngine.process() is idempotent
+// (it no-ops on an already-processed event id), so the normal trigger firing afterwards for the
+// same event is harmless.
+//
+// Why Business Discovery and not the legacy Website Brief: this is a deliberate, approved product
+// decision (docs/customer-discovery-onboarding/PRD.md §37, open decision 1) — new projects should
+// not be asked to write marketing copy or fill one giant flat form. The Website Brief mechanism
+// (createQuestionnaireSchema, websiteBriefFields, POST /projects/:id/questionnaires,
+// POST /projects/:id/questionnaires/:id/complete) is NOT removed, NOT deprecated in code, and NOT
+// touched by this change — it remains fully available as a generic, staff-created questionnaire
+// tool for ad-hoc/internal use. Any project that already has a Website Brief questionnaire document
+// from before this change is completely unaffected: nothing here reads, writes, or migrates
+// existing questionnaire documents, and the Website Brief's own completion endpoint
+// (api.ts's /questionnaires/:id/complete) is unchanged. Both mechanisms independently satisfy the
+// same "questionnaire" workflow stage's exit event (QuestionnaireCompleted, emitted by
+// discovery-api.ts's /discovery/submit exactly as it already was by the Website Brief's own
+// completion) — so no downstream stage (assets, research, ...) needed any change.
 const paymentConfirmedSchema = z.object({ organizationId: z.string().min(1), paymentReference: z.string().min(1).max(200), evidence: z.string().min(3).max(2000) });
 onboardingJourneyRouter.post("/projects/:projectId/payment-confirmed", async (req: AuthenticatedRequest, res) => {
   try {
@@ -59,19 +74,20 @@ onboardingJourneyRouter.post("/projects/:projectId/payment-confirmed", async (re
     const onboardingStartedId = await engine.emit({ organizationId: input.organizationId, projectId, type: "OnboardingStarted", source: "api", sourceId: req.user!.uid, payload: {}, occurredAt: now, idempotencyKey: `onboarding-started-${projectId}` });
     await engine.process(input.organizationId, onboardingStartedId);
 
-    // Auto-create the Website Brief questionnaire (version 1) so it's waiting the moment the
-    // customer opens the portal, then advance straight into the "questionnaire" stage — the
-    // existing /questionnaires/:id/complete endpoint (unchanged) is what the customer's submission
-    // will call next, and it already requires the project to be sitting in "questionnaire".
-    const briefRef = db.collection(`organizations/${input.organizationId}/projects/${projectId}/questionnaires`).doc();
-    const briefInput = createQuestionnaireSchema.parse({ organizationId: input.organizationId, title: websiteBriefTitle, fields: websiteBriefFields });
-    await briefRef.set({ id: briefRef.id, projectId, ...briefInput, kind: "website_brief", version: 1, status: "draft", responses: {}, filePaths: [], createdAt: now, updatedAt: now, createdBy: req.user!.uid });
-    const onboardingCompletedId = await engine.emit({ organizationId: input.organizationId, projectId, type: "OnboardingCompleted", source: "api", sourceId: req.user!.uid, payload: { questionnaireId: briefRef.id }, occurredAt: now, idempotencyKey: `onboarding-completed-${projectId}` });
+    // Initialize Business Discovery (not the legacy Website Brief — see the comment above) so it's
+    // waiting the moment the customer opens the portal, then advance straight into the
+    // "questionnaire" stage — discovery-api.ts's GET /projects/:id/discovery and its section
+    // save/complete/submit endpoints are what the customer's portal will call next, and /submit
+    // already requires the project to be sitting in "questionnaire" (via its own dealClosedAt +
+    // idempotent-status checks) exactly like the Website Brief's completion did.
+    const discoveryProgress: DiscoveryProgressDocument = { id: "current", projectId, templateVersion: DISCOVERY_TEMPLATE_VERSION, status: "not_started", completedSectionIds: [], percentComplete: 0, lastActivityAt: now };
+    await db.doc(`organizations/${input.organizationId}/projects/${projectId}/discoveryProgress/current`).set(discoveryProgress);
+    const onboardingCompletedId = await engine.emit({ organizationId: input.organizationId, projectId, type: "OnboardingCompleted", source: "api", sourceId: req.user!.uid, payload: { discoveryInitialized: true, templateVersion: DISCOVERY_TEMPLATE_VERSION }, occurredAt: now, idempotencyKey: `onboarding-completed-${projectId}` });
     await engine.process(input.organizationId, onboardingCompletedId);
 
-    await notify(input.organizationId, { audience: "customer", customerId, projectId, title: "Payment received — welcome to PageLoom", body: "Your project is open. Please complete your Website Brief to get started.", type: "payment_confirmed", params: { projectId }, });
+    await notify(input.organizationId, { audience: "customer", customerId, projectId, title: "Payment received — welcome to PageLoom", body: "Your project is open. Please complete your Business Discovery to get started.", type: "payment_confirmed", params: { projectId }, });
     await activity(input.organizationId, "payment.confirmed", req.user!.uid, { projectId, customerId, paymentReference: input.paymentReference });
-    return res.status(202).json({ data: { projectId, customerId, websiteBriefId: briefRef.id } });
+    return res.status(202).json({ data: { projectId, customerId } });
   } catch (error) { return fail(res, error, "PAYMENT_CONFIRMATION_FAILED", "onboarding.payment_confirmed.failed", "Payment confirmation failed"); }
 });
 
@@ -181,10 +197,11 @@ onboardingJourneyRouter.get("/organizations/:organizationId/onboarding-overview"
     const onboardingProjects = projectsSnap.docs.filter(projectDoc => Boolean(projectDoc.data().dealClosedAt)).slice(0, 100);
     const overview = await Promise.all(onboardingProjects.map(async projectDoc => {
       const project = projectDoc.data(), projectId = projectDoc.id;
-      const [questionnaires, revisions, checklist] = await Promise.all([
+      const [questionnaires, revisions, checklist, discoveryProgress] = await Promise.all([
         db.collection(`organizations/${organizationId}/projects/${projectId}/questionnaires`).orderBy("version", "desc").limit(1).get(),
         db.collection(`organizations/${organizationId}/projects/${projectId}/revisionRequests`).where("status", "==", "open").get(),
         db.doc(`organizations/${organizationId}/projects/${projectId}/launchChecklist/current`).get(),
+        db.doc(`organizations/${organizationId}/projects/${projectId}/discoveryProgress/current`).get(),
       ]);
       const brief = questionnaires.docs[0]?.data();
       const missingMaterials = brief && brief.status !== "completed" ? missingRequiredQuestionnaireFields(brief.fields, brief.responses ?? {}, brief.filePaths ?? []) : [];
@@ -203,6 +220,12 @@ onboardingJourneyRouter.get("/organizations/:organizationId/onboarding-overview"
         openRevisionCount: revisions.size,
         finalApprovalRecorded: Boolean(project.customerApprovedAt),
         launchReady,
+        // Business Discovery — read-only rollup, computed live from discoveryProgress/current
+        // (which may not exist yet for a project that hasn't started it). See
+        // docs/customer-discovery-onboarding/PRD.md §16 and SECURITY.md §4.
+        discoveryStatus: discoveryProgress.exists ? String(discoveryProgress.data()?.status) : "not_started",
+        discoveryPercent: discoveryProgress.exists ? Number(discoveryProgress.data()?.percentComplete ?? 0) : 0,
+        discoverySubmittedAt: discoveryProgress.exists ? (discoveryProgress.data()?.submittedAt ?? null) : null,
       };
     }));
     return res.json({ data: overview });

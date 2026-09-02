@@ -30,3 +30,5 @@ export * from "./website-brief.js";
 export * from "./launch-checklist.js";
 export * from "./revision-requests.js";
 export * from "./handover.js";
+export * from "./discovery-template.js";
+export * from "./discovery.js";

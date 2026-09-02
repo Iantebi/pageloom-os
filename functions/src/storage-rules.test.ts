@@ -12,6 +12,9 @@ describe("Storage tenant isolation policy", () => {
     expect(rules).toContain("questionnaires/{projectId}/{questionnaireId}/{fieldId}/{userId}");
     expect(rules).toContain("staff(orgId) || clientProject(orgId,projectId)");
   });
+  it("scopes Business Discovery uploads by project, reusing safeUpload/safeUploadShape verbatim (no parallel upload-permission logic)", () => {
+    expect(rules).toContain("discovery/{projectId}/{sectionId}/{fieldId}/{userId}/{allPaths=**} { allow read: if staff(orgId) || clientProject(orgId,projectId); allow write: if safeUploadShape() && (staff(orgId) || (safeUpload(orgId,userId) && clientProject(orgId,projectId))); }");
+  });
   it("keeps generated artifacts inside the matching project", () => {
     expect(rules).toContain("projects/{projectId}/artifacts/{allPaths=**}");
     expect(rules).toContain("staff(orgId) || clientProject(orgId,projectId)");
