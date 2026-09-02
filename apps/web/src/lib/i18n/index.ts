@@ -47,6 +47,7 @@ import { onboardingJourneyPanel } from "./dictionaries/onboardingJourneyPanel";
 import { discoveryQuestions } from "./dictionaries/discoveryQuestions";
 import { discoveryShell } from "./dictionaries/discoveryShell";
 import { discoveryPanel } from "./dictionaries/discoveryPanel";
+import { errorBoundary } from "./dictionaries/errorBoundary";
 
 const dictionaries = {
   common,
@@ -99,6 +100,7 @@ const dictionaries = {
   discoveryQuestions,
   discoveryShell,
   discoveryPanel,
+  errorBoundary,
 } as const;
 
 type Dictionaries = typeof dictionaries;
