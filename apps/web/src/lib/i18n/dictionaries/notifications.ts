@@ -146,7 +146,11 @@ const formattersEn: Formatters = {
   discovery_information_requested: params => `More information is needed in the "${discoveryQuestions.en.sections[str(params.sectionId) as keyof typeof discoveryQuestions.en.sections]?.title ?? str(params.sectionId)}" stage of Business Discovery`,
 };
 
+// A recognized `type` with a missing/undefined `params` document field (the #27 crash: every
+// formatter above reads its fields off `params` without checking `params` itself first) must still
+// degrade to the item.title/item.body fallback the callers already have, not throw and take the
+// whole notification list - and the page it's embedded in - down with it.
 export const notifications = {
-  he: { format: (type: string | undefined, params: Record<string, unknown> | undefined): string | undefined => (type && isKnownType(type) ? formattersHe[type](params as never) : undefined) },
-  en: { format: (type: string | undefined, params: Record<string, unknown> | undefined): string | undefined => (type && isKnownType(type) ? formattersEn[type](params as never) : undefined) },
+  he: { format: (type: string | undefined, params: Record<string, unknown> | undefined): string | undefined => (type && isKnownType(type) ? formattersHe[type]((params ?? {}) as never) : undefined) },
+  en: { format: (type: string | undefined, params: Record<string, unknown> | undefined): string | undefined => (type && isKnownType(type) ? formattersEn[type]((params ?? {}) as never) : undefined) },
 } as const;
