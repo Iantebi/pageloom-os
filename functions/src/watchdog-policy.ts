@@ -43,7 +43,7 @@ export function isRelevantActiveServiceHealthEvent(event: { state?: string; rele
 export const MAX_PAGINATION_PAGES = 50;
 
 export async function collectAllPages<Item>(
-  fetchPage: (pageToken: string | undefined) => Promise<{ items?: Item[]; nextPageToken?: string }>,
+  fetchPage: (pageToken: string | undefined) => Promise<{ items?: Item[] | undefined; nextPageToken?: string | undefined }>,
 ): Promise<Item[]> {
   const items: Item[] = [];
   let pageToken: string | undefined;
