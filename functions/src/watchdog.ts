@@ -59,7 +59,7 @@ async function checkStorageFreshness(now: Date): Promise<void> {
       const url = `https://storagetransfer.googleapis.com/v1/transferOperations?filter=${filter}${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ""}`;
       const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       const result = (await response.json()) as { operations?: Array<{ metadata?: { status?: string; endTime?: string } }>; nextPageToken?: string };
-      return { items: result.operations, nextPageToken: result.nextPageToken };
+      return { items: result.operations ?? [], nextPageToken: result.nextPageToken };
     });
     const successEndTimes = operations
       .map((op) => op.metadata)
