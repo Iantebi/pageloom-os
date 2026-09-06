@@ -1,5 +1,6 @@
 "use client";
 import { Check, Monitor, Moon, RotateCcw, Sun } from "lucide-react";
+import { AccountSecurity } from "@/components/account-security";
 import { Button, Card, CardHeader, PageHeader, Status } from "@/components/product-ui";
 import { t } from "@/lib/i18n";
 import { useTheme, type Accent, type Background } from "@/lib/theme";
@@ -23,6 +24,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader eyebrow={s.eyebrow} title={s.title} description={s.description} />
+      <AccountSecurity />
       <Card>
         <CardHeader title={s.sectionTitle} subtitle={s.sectionDescription} />
 

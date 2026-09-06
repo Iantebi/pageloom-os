@@ -19,6 +19,14 @@ Production secrets live in Google Secret Manager through Firebase `defineSecret`
 
 ## Production controls
 
-Enable Firebase App Check, organization MFA policy, Secret Manager rotation, Cloud Audit Logs, budget alerts, log-based anomaly alerts, retention rules, backup/PITR, and regional data controls before customer onboarding. Configure Google OAuth delegation and each connector with least privilege. Run dependency, rules, prompt-injection, tenant-isolation, and webhook-replay tests in CI.
+Firebase App Check (monitoring mode) and staged Owner/Admin MFA are implemented — see
+`docs/mfa-app-check/` for the design, security model, test plan, staged rollout, and recovery
+runbook. Both ship inert by default (no site key configured; `MFA_ENFORCEMENT_MODE` unset), and
+enabling either further (App Check enforcement, or MFA `optional`/`required`) is an operator action
+in `docs/mfa-app-check/ROLLOUT.md`, not something this repository's code decides on its own. Secret
+Manager rotation, Cloud Audit Logs, budget alerts, log-based anomaly alerts, retention rules,
+backup/PITR, and regional data controls remain to enable before customer onboarding. Configure
+Google OAuth delegation and each connector with least privilege. Run dependency, rules,
+prompt-injection, tenant-isolation, and webhook-replay tests in CI.
 
 The repository intentionally contains no plaintext credentials. The existing OpenAI key remains local and must be imported into Firebase Secret Manager for deployment.

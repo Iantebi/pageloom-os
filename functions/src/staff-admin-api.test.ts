@@ -25,3 +25,23 @@ describe("staff admin API security", () => {
     expect(source).not.toContain("allow write");
   });
 });
+
+describe("MFA recovery (/staff/:uid/mfa-reset)", () => {
+  it("is restricted to an Owner, same as other escalation-sensitive staff changes", () => {
+    expect(source).toContain('requireRole(req, res, input.organizationId, ["owner"])');
+  });
+  it("refuses to let an Owner reset their own MFA enrollment through the recovery endpoint", () => {
+    expect(source).toContain("SELF_CHANGE_DENIED");
+    expect(source).toContain("uid === req.user!.uid");
+  });
+  it("never targets a customer portal user through the recovery endpoint", () => {
+    expect(source).toContain('member.data()?.role === "client"');
+  });
+  it("clears enrolled factors and revokes refresh tokens so the reset takes effect immediately", () => {
+    expect(source).toContain("multiFactor: { enrolledFactors: null }");
+    expect(source).toContain("auth.revokeRefreshTokens(uid)");
+  });
+  it("records the reset in the organization activity log for auditability", () => {
+    expect(source).toContain('type: "staff.mfa_reset"');
+  });
+});
