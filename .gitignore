@@ -7,6 +7,8 @@ lib/
 !apps/web/src/lib/**
 !automation/lib/
 !automation/lib/**
+!scripts/backup-verification/lib/
+!scripts/backup-verification/lib/**
 dist/
 coverage/
 .firebase/
