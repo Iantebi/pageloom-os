@@ -1,7 +1,7 @@
 import { Router, type Response } from "express";
 import { z } from "zod";
 import { requireRole, type AuthenticatedRequest } from "./auth.js";
-import { db } from "./firebase.js";
+import { auth, db } from "./firebase.js";
 import { invitationExpiresAt, normalizeInvitationEmail } from "./customer-invitations.js";
 import { createHash } from "node:crypto";
 import { operationalLog, safeErrorName } from "./observability.js";
@@ -47,6 +47,27 @@ staffAdminRouter.patch("/staff/:uid", async (req: AuthenticatedRequest, res) => 
     await ref.update({ ...(input.role ? { role: input.role } : {}), ...(input.disabled !== undefined ? { disabled: input.disabled } : {}), updatedBy: req.user!.uid, updatedAt: now });
     await db.collection(`organizations/${input.organizationId}/activity`).add({ type: "staff.member_updated", actorId: req.user!.uid, targetUid: uid, role: input.role ?? currentRole, disabled: input.disabled ?? member.data()?.disabled ?? false, createdAt: now });
     return res.json({ data: { uid, role: input.role ?? currentRole, disabled: input.disabled ?? member.data()?.disabled ?? false } });
+  } catch (error) { return fail(error, res); }
+});
+
+// Account-recovery path for a staff member locked out of MFA (lost device, uninstalled
+// authenticator, etc). A locked-out user cannot call any API themself — resolving a second-factor
+// challenge happens before a session/ID token exists — so recovery must come from another already
+// signed-in Owner. Restricted to Owner (not Admin) and never the caller's own account, mirroring
+// the existing escalation/self-change guards below. If the sole Owner is the one locked out, see
+// docs/mfa-app-check/RECOVERY.md for the CLI-based (functions/scripts/mfa-recovery.mjs) path.
+staffAdminRouter.post("/staff/:uid/mfa-reset", async (req: AuthenticatedRequest, res) => {
+  try {
+    const input = z.object({ organizationId: org }).parse(req.body), uid = String(req.params.uid);
+    const actor = await requireRole(req, res, input.organizationId, ["owner"]); if (actor === undefined) return;
+    if (uid === req.user!.uid) return res.status(409).json({ error: { code: "SELF_CHANGE_DENIED", message: "You cannot reset your own MFA enrollment — unenroll the factor from your account settings instead" } });
+    const member = await db.doc(`organizations/${input.organizationId}/members/${uid}`).get();
+    if (!member.exists || member.data()?.role === "client") return res.status(404).json({ error: { code: "STAFF_MEMBER_NOT_FOUND", message: "Staff member not found" } });
+    await auth.updateUser(uid, { multiFactor: { enrolledFactors: null } });
+    await auth.revokeRefreshTokens(uid);
+    const now = new Date().toISOString();
+    await db.collection(`organizations/${input.organizationId}/activity`).add({ type: "staff.mfa_reset", actorId: req.user!.uid, targetUid: uid, createdAt: now });
+    return res.json({ data: { uid, mfaReset: true } });
   } catch (error) { return fail(error, res); }
 });
 

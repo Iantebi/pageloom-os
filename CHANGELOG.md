@@ -1,5 +1,11 @@
 # Changelog
 
+## Sprint Zeta — Identity Hardening
+
+- Added staged, opt-in TOTP multi-factor authentication for Owner/Admin: enrollment/sign-in/recovery UX, an in-app Owner-triggered MFA reset, and a CLI recovery path for a locked-out sole Owner — off by default, cannot lock out an existing user.
+- Added Firebase App Check client initialization and server-side monitoring-only verification, gated entirely behind an optional site-key env var; never rejects a request and leaves Console enforcement untouched.
+- Documented the full design, security model, test plan, staged rollout, and recovery runbook under `docs/mfa-app-check/`.
+
 ## Sprint Epsilon — Launch Experience
 
 - Simplified the Hebrew customer portal around progress, assets, website preview, comments, revisions and approval with accessible loading/error/progress states.

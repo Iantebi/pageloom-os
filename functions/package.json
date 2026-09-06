@@ -15,6 +15,7 @@
     "test:behavioral": "vitest run --no-file-parallelism src/firestore-rules.behavioral.test.ts src/storage-rules.behavioral.test.ts",
     "test:e2e": "vitest run --no-file-parallelism src/customer-lifecycle.e2e.test.ts",
     "provision:owner": "node scripts/provision-platform-owner.mjs",
+    "recover:mfa": "node scripts/mfa-recovery.mjs",
     "verify:client-project-list": "node scripts/verify-client-project-list.mjs"
   },
   "dependencies": {

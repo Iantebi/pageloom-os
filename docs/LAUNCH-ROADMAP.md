@@ -42,8 +42,8 @@ Status values: `DONE`, `IN PROGRESS`, `NOT STARTED`, and `OWNER BLOCKED`.
 
 | Priority | Launch requirement | Effort | Dependencies | Status |
 |---|---|---:|---|---|
-| P1 | Firebase App Check for browser-originated requests | 0.5–1 day | Production domain | NOT STARTED |
-| P1 | Owner MFA and documented account-recovery procedure | 0.5 day | Firebase Authentication | NOT STARTED |
+| P1 | Firebase App Check for browser-originated requests | 0.5–1 day | Production domain | IN PROGRESS — client init + server-side monitoring-only verification shipped behind `NEXT_PUBLIC_APP_CHECK_SITE_KEY` (see `docs/mfa-app-check/`); enabling Console enforcement is a separate staged step, not yet done |
+| P1 | Owner MFA and documented account-recovery procedure | 0.5 day | Firebase Authentication | IN PROGRESS — enrollment/sign-in/recovery code shipped behind `MFA_ENFORCEMENT_MODE` (default off, see `docs/mfa-app-check/`); enabling MFA in the Firebase Console and moving the mode to `optional`/`required` is a separate staged step, not yet done |
 | P1 | Per-user/API rate limits and abuse alerts | 1 day | Functions/Firestore | DONE — Firestore-transaction-backed limiter on AI-triggering endpoints, fails closed on infra errors, 18 passing unit tests |
 | P1 | Automated Firestore and Storage security-rules tests for staff and client roles | 1 day | Firebase test environment | DONE — behavioral suite runs the real rules engine in CI, 45/45 passing |
 | P1 | Customer-facing progress, approvals, file upload, comments, and final handoff checklist | 1 day | Client portal access | PARTIAL |

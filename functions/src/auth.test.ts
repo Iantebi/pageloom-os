@@ -21,6 +21,28 @@ describe("client project access", () => {
   });
 });
 
+describe("staged MFA enforcement", () => {
+  it("reads the enforcement mode once at module load through the shared, defaulted-to-off parser", () => {
+    expect(source).toContain('parseMfaEnforcementMode(process.env.MFA_ENFORCEMENT_MODE)');
+  });
+  it("captures the ID token's native second-factor claim rather than inventing a custom one", () => {
+    expect(source).toContain("mfaVerified:Boolean(token.firebase?.sign_in_second_factor)");
+  });
+  it("checks MFA only after the disabled/role checks already denied access, never before", () => {
+    const requireRoleBody = source.slice(source.indexOf("export async function requireRole"), source.indexOf("export async function requireCeo"));
+    const disabledCheckIndex = requireRoleBody.indexOf("disabled===true");
+    const mfaCheckIndex = requireRoleBody.indexOf("requireMfaForRole");
+    expect(disabledCheckIndex).toBeGreaterThan(-1);
+    expect(mfaCheckIndex).toBeGreaterThan(disabledCheckIndex);
+  });
+  it("gates platform-administrator access (claim or registry) behind the same MFA check as org roles", () => {
+    expect(source).toContain("if(!requireMfaForRole(req,res,administrator.role))return undefined;return administrator");
+  });
+  it("returns a distinct, non-generic error code so the client can route straight to MFA UI", () => {
+    expect(source).toContain('"MFA_REQUIRED"');
+  });
+});
+
 describe("token revocation check", () => {
   it("still checks revocation in production (or any real deployment) — only skips it under the Functions emulator", () => {
     // verifyIdToken's checkRevoked=true performs a live call to the Identity Toolkit backend, which needs

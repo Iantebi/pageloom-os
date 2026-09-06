@@ -48,6 +48,8 @@ import { discoveryQuestions } from "./dictionaries/discoveryQuestions";
 import { discoveryShell } from "./dictionaries/discoveryShell";
 import { discoveryPanel } from "./dictionaries/discoveryPanel";
 import { errorBoundary } from "./dictionaries/errorBoundary";
+import { accountSecurity } from "./dictionaries/accountSecurity";
+import { mfaChallenge } from "./dictionaries/mfaChallenge";
 
 const dictionaries = {
   common,
@@ -101,6 +103,8 @@ const dictionaries = {
   discoveryShell,
   discoveryPanel,
   errorBoundary,
+  accountSecurity,
+  mfaChallenge,
 } as const;
 
 type Dictionaries = typeof dictionaries;
