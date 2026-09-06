@@ -141,3 +141,38 @@ In order, assuming total loss of the laptop, both Owner accounts, and needing to
 4. If Firestore data is intact: nothing to restore, proceed to step 5. If Firestore data was lost/corrupted: follow §5's restore procedure from the most recent daily export.
 5. Redeploy Functions, Hosting, and Rules from the current `main` branch (`npm run build && firebase deploy --only functions`, then `npm run deploy:hosting`, then `firebase deploy --only firestore:rules,storage` — always the safe deploy paths documented in `CLAUDE.md`, never a bare `firebase deploy --only hosting`).
 6. Verify: sign in as the recovered Owner account, confirm `/master` loads, confirm a real customer portal loads, confirm a support ticket and content edit both work end-to-end before considering recovery complete.
+
+## 12. Coverage matrix (repository-side audit, 2026-09-02)
+
+This section answers, per data category, whether it is covered by a working backup mechanism
+today. "Repo-verifiable" means the claim is checkable by reading this repository's source (code,
+rules, tests); it is not itself a live production check. See "External verification required"
+below for what still needs a human with production access to confirm.
+
+| Data category | Status | Mechanism | Repo-verifiable evidence |
+|---|---|---|---|
+| **All Firestore data** — organizations, customers, leads/CRM, projects, websites/content, `contentRevisions`, support tickets, notifications, sales/onboarding (leads, calendar events, discovery), approvals, audit records (`auditLogs`, `activity`), configuration (`agentSettings`, `pricingPackages`, `legalDocuments`), and every other collection, present or future | **BACKED UP** | Daily full-database export (`dailyFirestoreBackup`, `30 2 * * *` agency-timezone) | `functions/src/backup.ts` calls the Firestore Admin `:exportDocuments` API with only `outputUriPrefix` set — **no `collectionIds` filter is ever passed**, so the export is unfiltered and covers every collection in the database by construction. This means coverage does not depend on maintaining an enumerated list of "known" collections; a newly-added collection is backed up automatically the next time the export runs, with zero code changes required. |
+| Website content edits specifically | **BACKED UP** (two independent paths) | (a) Included in the daily Firestore export above; (b) every edit also creates an immutable `contentRevisions` document, with an in-app "Rollback" action that doesn't require any infrastructure-level restore | `apps/web` Website Content Editor rollback action (§6 above); `contentRevisions` is part of the unfiltered export in (a) |
+| Cloud Storage / customer media | **BACKED UP** | Weekly incremental copy (Storage Transfer Service) to an isolated backup bucket, plus Object Versioning on the production bucket itself for same-bucket point-in-time restore | Documented in §6; the transfer job configuration itself lives in GCP, not this repository — see "External verification required" |
+| Source code, `firestore.rules`, `storage.rules`, `firestore.indexes.json`, `firebase.json`, Functions/web source | **BACKED UP** | Full git history on `origin/main` | Inherent to using GitHub as the canonical source; every commit is a recovery point |
+| `.env.pageloom-os-production` values, Secret Manager secrets | **NOT BACKED UP** (deliberate) | None — recreated from source/`.env.example` structure and re-entering each secret value | `docs/disaster-recovery-runbook.md` §9 documents this as an intentional decision, not an oversight: exporting live secret *values* into a backup artifact would create a second place they could leak from. If this tradeoff is ever revisited, it needs Isaac's explicit sign-off before implementing, since it changes the secret-handling security model. |
+| Backup *mechanism* health (schedule ran, freshness, retries, memory/timeouts, isolation from the live app) | **BACKED UP** (by test coverage, not data) | `functions/src/backup.ts`, `functions/src/watchdog.ts`, `functions/src/watchdog-policy.ts` and their test files | `backup.test.ts`, `watchdog.test.ts`, `watchdog-policy.test.ts`, `index.test.ts` — see the "SAFE fixes made in this audit" note below for the one real gap found and fixed (GCS list pagination) |
+| GCS backup bucket lifecycle rule (90-day auto-delete), Firestore delete protection, Storage Transfer job existence/IAM, Cloud Monitoring alert policies P1–P10, PITR status | **EXTERNAL VERIFICATION REQUIRED** | GCP-side configuration, not expressed as code in this repository | These are asserted as facts in §6/§9 with specific verification dates (2026-08-29 through 2026-08-31); they cannot be re-confirmed by reading source code alone. Re-verifying them requires live, read-only GCP/Firebase Console or `gcloud`/`gsutil` access — out of scope for this repository-only audit per the issue's safety boundary. Recommended cadence: re-confirm at the same time as the next quarterly restore drill (§10). |
+| Whether the daily/weekly runs have kept succeeding continuously since the last dated verification (2026-08-31) through today | **EXTERNAL VERIFICATION REQUIRED** | Cloud Scheduler / Cloud Logging history | Same reasoning as above — this is live operational state, not something derivable from the repository. |
+
+**SAFE fix made in this audit (2026-09-02):** `checkFirestoreFreshness` and `checkStorageFreshness`
+in `functions/src/watchdog.ts` previously read only the first page of their GCS/Storage-Transfer
+list responses, with no `nextPageToken` handling — and the Firestore listing's `fields` parameter
+explicitly excluded `nextPageToken` from the response, so a full page couldn't even be detected.
+Ninety days of daily Firestore exports (each writing several objects — a metadata file plus
+per-collection shards) can plausibly exceed a single list page long before the 90-day retention
+window is reached. Since GCS lists objects alphabetically and export paths are
+`firestore/YYYY-MM-DD/...`, a truncated first page silently reads the OLDEST objects, not the
+newest — meaning the watchdog could permanently stop seeing the actual latest backup once the
+bucket grew past one page, risking a false "stale" alert or, worse, never detecting a real staleness
+again. Fixed with a shared, capped pagination helper (`collectAllPages` in
+`functions/src/watchdog-policy.ts`, capped at `MAX_PAGINATION_PAGES` to bound worst-case
+memory/time) used by both checks; behavior is covered by `watchdog-policy.test.ts`'s
+`collectAllPages` suite and `watchdog.test.ts`. This was found by code inspection, not a live
+incident — no evidence exists (or was sought) that this has actually caused a missed alert in
+production.
