@@ -32,7 +32,11 @@ vi.mock("@/lib/organization", () => ({
 }));
 
 vi.mock("@/lib/auth", () => ({
-  useAuth: () => ({ user: { uid: "u1", displayName: "Test Owner" }, loading: false, signOut: async () => {} }),
+  // _onReload: a real Firebase User instance's internal reload-listener registration method,
+  // called synchronously (no network/async work - just registers a callback) by firebase/auth's
+  // own multiFactor(user) the moment account-security.tsx reads a user's enrolled MFA factor
+  // during render. A no-op stub is enough: nothing here needs the callback to ever fire.
+  useAuth: () => ({ user: { uid: "u1", displayName: "Test Owner", _onReload: () => {} }, loading: false, signOut: async () => {} }),
 }));
 
 vi.mock("@/lib/firebase", () => ({

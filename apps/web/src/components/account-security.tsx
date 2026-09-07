@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { KeyRound, ShieldCheck, ShieldOff } from "lucide-react";
 import type { MultiFactorInfo, TotpSecret } from "firebase/auth";
 import { useAuth } from "@/lib/auth";
@@ -19,8 +19,6 @@ export function AccountSecurity() {
   const s = t("accountSecurity");
   const { user } = useAuth();
   const { membership } = useOrganization();
-  const [factor, setFactor] = useState<MultiFactorInfo | undefined>(undefined);
-  const [checked, setChecked] = useState(false);
   const [step, setStep] = useState<Step>("idle");
   const [secret, setSecret] = useState<TotpSecret | undefined>(undefined);
   const [otpauthUri, setOtpauthUri] = useState("");
@@ -29,14 +27,14 @@ export function AccountSecurity() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  useEffect(() => {
-    if (!user) return;
-    setFactor(enrolledTotpFactor(user));
-    setChecked(true);
-  }, [user]);
-
   const eligible = membership && ["owner", "admin"].includes(membership.role);
   if (!eligible || !user) return null;
+
+  // Derived directly from `user`, not effect+state: multiFactor(user).enroll()/.unenroll() (in mfa.ts)
+  // mutate the same User object's multiFactor state in place, so this always reflects the latest
+  // enrollment the moment either action's own setState calls below trigger a re-render - no separate
+  // "have we checked yet" state or effect needed.
+  const factor: MultiFactorInfo | undefined = enrolledTotpFactor(user);
 
   async function beginEnroll() {
     setBusy(true); setError(""); setMessage("");
@@ -51,14 +49,14 @@ export function AccountSecurity() {
     setBusy(true); setError("");
     try {
       await finishTotpEnrollment(user!, secret, code, s.defaultFactorName);
-      setFactor(enrolledTotpFactor(user!)); setStep("idle"); setCode(""); setSecret(undefined); setOtpauthUri(""); setMessage(s.enrollSuccess);
+      setStep("idle"); setCode(""); setSecret(undefined); setOtpauthUri(""); setMessage(s.enrollSuccess);
     } catch (failure) { setError(failure instanceof Error ? failure.message : s.verifyError); }
     finally { setBusy(false); }
   }
   async function removeFactor() {
     if (!factor || !window.confirm(s.unenrollConfirm)) return;
     setBusy(true); setError("");
-    try { await unenrollTotpFactor(user!, factor); setFactor(undefined); setStep("idle"); setMessage(s.unenrollSuccess); }
+    try { await unenrollTotpFactor(user!, factor); setStep("idle"); setMessage(s.unenrollSuccess); }
     catch (failure) { setError(failure instanceof Error ? failure.message : s.unenrollError); }
     finally { setBusy(false); }
   }
@@ -67,7 +65,7 @@ export function AccountSecurity() {
   return (
     <Card>
       <CardHeader icon={ShieldCheck} title={s.title} subtitle={s.subtitle} />
-      {!checked ? null : factor ? (
+      {factor ? (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--border)] p-3">
           <span className="min-w-0 flex-1"><b className="block truncate text-[11px]">{factor.displayName ?? s.defaultFactorName}</b></span>
           <Status value="active" label={s.enrolledLabel} />

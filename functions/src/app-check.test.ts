@@ -14,6 +14,13 @@ afterEach(() => { vi.restoreAllMocks(); vi.doUnmock("firebase-admin/app-check");
 
 describe("monitorAppCheck", () => {
   it("passes through and marks unverified when the X-Firebase-AppCheck header is missing", async () => {
+    // Mocked even though this code path never calls getAppCheck(): app-check.ts imports
+    // "firebase-admin/app-check" at module top level, so merely importing app-check.js pulls in
+    // the real Admin SDK submodule - whose own import-time initialization (credential
+    // auto-detection) is slow/hangs with no real GCP environment behind it. Mocking keeps this
+    // test's import fast and deterministic, matching the other two cases below.
+    vi.doMock("firebase-admin/app-check", () => ({ getAppCheck: () => ({ verifyToken: vi.fn() }) }));
+    vi.resetModules();
     const { monitorAppCheck } = await import("./app-check.js");
     const req = { headers: {}, path: "/api/me" } as never, res = fakeRes(), next = vi.fn();
     await monitorAppCheck(req, res as never, next);
