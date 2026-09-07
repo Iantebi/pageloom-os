@@ -95,6 +95,12 @@
 .top-icon{display:grid;height:34px;width:34px;place-items:center;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--muted)}
 .live-pill{display:none;align-items:center;gap:7px;border:1px solid var(--success-border);border-radius:99px;background:var(--success-bg);padding:6px 10px;color:var(--success-text);font-size:10px;font-weight:600}
 .live-pill i,.status i{height:6px;width:6px;border-radius:50%;background:#47a66f}
+.live-pill.pill-warn{border-color:var(--warn-border);background:var(--warn-bg);color:var(--warn-text)}
+.live-pill.pill-warn i{background:#d38b18}
+.live-pill.pill-bad{border-color:var(--danger-border);background:var(--danger-bg);color:var(--danger-text)}
+.live-pill.pill-bad i{background:#d65050}
+.live-pill.pill-idle{border-color:var(--border);background:var(--idle-bg);color:var(--idle-text)}
+.live-pill.pill-idle i{background:#a5a8a1}
 .product-main{mx-width:1600px;padding:30px 24px 64px}
 .eyebrow{font-size:9px;font-weight:750;letter-spacing:.17em;color:var(--muted)}
 .card{border:1px solid var(--border);border-radius:14px;background:var(--surface);padding:20px;box-shadow:0 1px 1px #191a1705,0 10px 35px #191a1705}

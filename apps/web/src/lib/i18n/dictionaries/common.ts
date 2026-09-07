@@ -22,9 +22,12 @@ export const common = {
     back: "חזרה",
     next: "הבא",
     confirm: "אישור",
-    systemsOperational: "המערכת פעילה",
+    systemsStatus: (status: "healthy" | "degraded" | "critical" | "unknown") =>
+      ({ healthy: "המערכת פעילה", degraded: "המערכת מוגבלת", critical: "המערכת קריטית", unknown: "סטטוס לא ידוע" })[status],
     openNavigation: "פתיחת ניווט",
     closeNavigation: "סגירת ניווט",
+    adminRequiredTitle: "נדרשת הרשאת מנהל/ת מערכת",
+    adminRequiredDescription: "אזור זה זמין רק לבעלים ולמנהלי/ות מערכת מורשים של PageLoom.",
   },
   en: {
     save: "Save",
@@ -49,9 +52,12 @@ export const common = {
     back: "Back",
     next: "Next",
     confirm: "Confirm",
-    systemsOperational: "Systems operational",
+    systemsStatus: (status: "healthy" | "degraded" | "critical" | "unknown") =>
+      ({ healthy: "Systems operational", degraded: "Systems degraded", critical: "Systems critical", unknown: "Status unknown" })[status],
     openNavigation: "Open navigation",
     closeNavigation: "Close navigation",
+    adminRequiredTitle: "Administrator access required",
+    adminRequiredDescription: "This area is restricted to PageLoom Owner and authorized Admin roles.",
   },
 } as const;
 
