@@ -1,5 +1,5 @@
 import{getToken as getAppCheckToken}from"firebase/app-check";import{firebaseAppCheck,firebaseAuth}from"./firebase";import{t}from"./i18n";
-async function appCheckHeader(){if(!firebaseAppCheck)return{};try{const result=await getAppCheckToken(firebaseAppCheck,false);return result.token?{"X-Firebase-AppCheck":result.token}:{}}catch{return{}}}
+async function appCheckHeader():Promise<Record<string,string>>{if(!firebaseAppCheck)return{};try{const result=await getAppCheckToken(firebaseAppCheck,false);return result.token?{"X-Firebase-AppCheck":result.token}:{}}catch{return{}}}
 export async function api<T>(path:string,init?:RequestInit):Promise<T>{
   const[token,appCheck]=await Promise.all([firebaseAuth.currentUser?.getIdToken(),appCheckHeader()]);
   const response=await fetch(`/api${path}`,{...init,cache:"no-store",headers:{accept:"application/json","content-type":"application/json",...init?.headers,...(token?{authorization:`Bearer ${token}`}:{}),...appCheck}});
