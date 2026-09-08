@@ -14,15 +14,16 @@ export interface AppCheckRequest extends Request { appCheck?: { verified: boolea
 export async function monitorAppCheck(req: AppCheckRequest, _res: Response, next: NextFunction) {
   const token = req.headers["x-firebase-appcheck"];
   if (typeof token !== "string" || !token) {
-    operationalLog("warning", "app_check.token_missing", { path: req.path });
+    operationalLog("warning", "app_check.token_missing", {});
     req.appCheck = { verified: false };
     return next();
   }
   try {
     await getAppCheck().verifyToken(token);
+    operationalLog("info", "app_check.token_valid", {});
     req.appCheck = { verified: true };
   } catch (error) {
-    operationalLog("warning", "app_check.token_invalid", { path: req.path, errorType: safeErrorName(error) });
+    operationalLog("warning", "app_check.token_invalid", { errorType: safeErrorName(error) });
     req.appCheck = { verified: false };
   }
   return next();

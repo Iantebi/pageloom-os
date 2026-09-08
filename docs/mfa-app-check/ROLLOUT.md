@@ -31,9 +31,10 @@ performed by this PR** — it ships code, staged behind env vars defaulting to f
 
 ## Stage 2 — MFA, optional
 
-1. Set `MFA_ENFORCEMENT_MODE=optional` on Cloud Functions (`functions:config` / the same `params`
-   mechanism as `AI_EXECUTION_MODE` in `functions/src/config.ts` — add a matching `defineString` if
-   promoting this out of a raw `process.env` read).
+1. Set `MFA_ENFORCEMENT_MODE=optional` on Cloud Functions and set
+   `NEXT_PUBLIC_MFA_ENFORCEMENT_MODE=optional` for the web build. The two values must be changed
+   together; the public copy only controls whether enrollment UI is shown, while the server value
+   remains the authorization source of truth.
 2. Every Owner/Admin now sees the enrollment card on `/settings` (`account-security.tsx`) but nothing
    is blocked yet.
 3. Confirm with every current Owner/Admin that they've successfully enrolled (self-report, or check
@@ -44,7 +45,8 @@ performed by this PR** — it ships code, staged behind env vars defaulting to f
 
 1. Only after every current Owner/Admin is confirmed enrolled (Stage 2's exit criterion — skipping
    this is exactly how an existing user gets locked out).
-2. Set `MFA_ENFORCEMENT_MODE=required`. `requireRole`/`requirePlatformAdmin`/`requirePlatformOrRole`/
+2. Set both `MFA_ENFORCEMENT_MODE=required` and
+   `NEXT_PUBLIC_MFA_ENFORCEMENT_MODE=required`. `requireRole`/`requirePlatformAdmin`/`requirePlatformOrRole`/
    `requirePlatformProjectAccess` in `functions/src/auth.ts` now return `403 MFA_REQUIRED` for any
    owner/admin whose ID token lacks `firebase.sign_in_second_factor`.
 3. Keep `RECOVERY.md` on hand for the first few days — this is when a lost-device lockout would
@@ -58,8 +60,8 @@ set:
 
 | To undo | Action | Effect |
 |---|---|---|
-| Stage 3 (MFA required) | Set `MFA_ENFORCEMENT_MODE=optional` (or unset → `off`) | Immediately stops blocking anyone; already-enrolled factors are untouched and still usable |
-| Stage 2 (MFA optional) | Set `MFA_ENFORCEMENT_MODE=off` (or unset) | Enrollment UI stops appearing; existing enrolled factors are untouched (Firebase Auth still accepts them at sign-in — see note below) |
+| Stage 3 (MFA required) | Set both MFA mode variables to `optional` (or unset both → `off`) | Immediately stops blocking anyone; already-enrolled factors are untouched and still usable |
+| Stage 2 (MFA optional) | Set both MFA mode variables to `off` (or unset both) | Enrollment UI stops appearing; existing enrolled factors are untouched (Firebase Auth still accepts them at sign-in — see note below) |
 | Stage 1 (App Check monitoring) | Unset `NEXT_PUBLIC_APP_CHECK_SITE_KEY` and rebuild/redeploy hosting | `initializeAppCheck` is never called (guarded in `firebase.ts`); no header is attached; already-collected Console metrics are unaffected |
 
 **Note:** disabling `MFA_ENFORCEMENT_MODE` does **not** unenroll anyone's second factor — Firebase
