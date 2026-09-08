@@ -128,7 +128,7 @@ Firestore **delete protection: enabled** (free, no cost — done). Cloud Storage
 
 Never run a real restore against production merely to test this runbook. To verify a backup mechanism actually works, restore into a **separate, temporary Firestore database or GCP project**, confirm the data is intact and readable there, then delete the temporary target. Production is only ever the *source* of a verification restore, never the *destination*, outside of a genuine incident.
 
-**Recommended cadence**: perform one verification restore (per §5's restore procedure, into a temporary database) at least quarterly, and immediately after any change to the backup mechanism itself (e.g., the reliability fixes above, or if PITR/Storage versioning is later enabled) — a backup that has never been test-restored is unverified by definition.
+**Recommended cadence**: perform one verification restore (per §5's restore procedure, into a temporary database) at least quarterly, and immediately after any change to the backup mechanism itself (e.g., the reliability fixes above, or if PITR/Storage versioning is later enabled) — a backup that has never been test-restored is unverified by definition. §13's `restore-drill.mjs` automates this procedure against an explicit non-production target project (it can never target `pageloom-os-production`) and is the recommended way to perform this cadence going forward.
 
 **First verification performed 2026-08-31**: imported the most recent daily export (`firestore/2026-08-30/`) into a temporary, isolated database (`pageloom-restore-drill`, same `eur3` location as production, Native mode) using `databases.create` → `importDocuments` (`inputUriPrefix` = the export's original `outputUriPrefix` folder path, not the metadata filename itself) → read-only verification → `databases.delete`. Result: **487/487 documents imported successfully**; 17 real subcollections found under the restored `organizations/pageloom` document (`customers`, `projects`, `tasks`, `workflowEvents`, etc.) with document counts consistent with known real usage; a sample document read back with all fields intact. Production `(default)` was confirmed unchanged throughout (`updateTime` and delete-protection state untouched), and the temporary database was confirmed deleted afterward via a follow-up 404. This is the first time PageLoom's backups were proven actually recoverable, not merely present.
 
@@ -176,3 +176,93 @@ memory/time) used by both checks; behavior is covered by `watchdog-policy.test.t
 `collectAllPages` suite and `watchdog.test.ts`. This was found by code inspection, not a live
 incident — no evidence exists (or was sought) that this has actually caused a missed alert in
 production.
+
+## 13. Repository-side backup verification and restore-drill tooling
+
+Implemented 2026-09-06, tracked by issue #40. `scripts/backup-verification/` (see its own
+[README](../scripts/backup-verification/README.md) for the full file map) provides:
+
+- Three **read-only** verification scripts, each defaulting to `pageloom-os-production`,
+  that never mutate anything — they only ever call `gcloud storage objects list`,
+  `gcloud transfer operations list`, or `gcloud functions logs read`.
+- One **restore-drill** script that performs the §10 verification-restore procedure against
+  an explicit, non-production target project — it fails closed (throws before running any
+  command) if the target is `pageloom-os-production`, missing, or malformed, and this is
+  proven by an automated test suite, not just documented intent (see below).
+
+**Important scope note**: this tooling was added by a repository-only change. It has been
+unit-tested (pure logic — argument construction, freshness thresholds, the production
+target guard) but has **not yet been exercised against real GCP/Firebase infrastructure** —
+doing so requires a human with `gcloud`/Firebase credentials, which this change deliberately
+does not use or require. The next quarterly restore drill (§10's cadence) is the right time
+to run it for real and record the result below, the same way the 2026-08-31 and 2026-09-02
+entries elsewhere in this file record actual live runs.
+
+### Verification commands and expected output
+
+```bash
+node scripts/backup-verification/verify-firestore-backup.mjs
+node scripts/backup-verification/verify-storage-transfer.mjs
+node scripts/backup-verification/verify-watchdog-freshness.mjs
+```
+
+Each prints a JSON evidence report to stdout and exits non-zero if what it found is stale or
+nothing was found, so they can be wired into a cron/CI freshness check directly. Expected
+results when the backup mechanisms are healthy:
+
+| Script | Expected `status` | Expected evidence |
+|---|---|---|
+| `verify-firestore-backup.mjs` | `"fresh"` | `latest` within the last ~24-27h (daily export at `30 2 * * *` agency-timezone); `objectCount` > 0 |
+| `verify-storage-transfer.mjs` | `"fresh"` | `latest` within the last ~7-8.5 days (weekly transfer); `successCount` > 0 |
+| `verify-watchdog-freshness.mjs` | `heartbeatFound: true`, `concerningEvents: []` | A `watchdog.heartbeat` entry within the last 6h (the function's own schedule); no `watchdog.*_stale`/`watchdog.check_failed`/`watchdog.service_health_incident` entries in the window |
+
+A `"STALE"` or `"unknown"` status, or any `concerningEvents` entry, is evidence of a real
+problem and should be investigated the same way as a live Cloud Monitoring alert (§9's
+P1–P10 policies) — this tooling is an independent, repository-side cross-check of the same
+mechanisms, not a replacement for them.
+
+### Restore-drill workflow, evidence, and rollback
+
+```bash
+# 1. Inspect the plan first - prints the exact commands, runs nothing:
+node scripts/backup-verification/restore-drill.mjs \
+  --target-project <your-non-production-project-id> \
+  --export-date <YYYY-MM-DD> \
+  --dry-run
+
+# 2. Only once satisfied, drop --dry-run to actually perform the restore into the target:
+node scripts/backup-verification/restore-drill.mjs \
+  --target-project <your-non-production-project-id> \
+  --export-date <YYYY-MM-DD>
+```
+
+**Verification before any restore**: the script resolves `--target-project`'s identity via a
+read-only `gcloud projects describe` call and re-checks the *API-resolved* project id (not
+just the CLI argument) is not production, immediately before running the import. If the
+resolved id doesn't exactly match what was requested, it refuses to continue.
+
+**Expected results of a healthy drill** (mirroring the real 2026-08-31 restore drill in
+§10): the import command completes, the target project's restored database contains the
+same document count and top-level collections as the source export's known state, and a
+sample document reads back with all fields intact. Record the actual counts/evidence here
+(or in a dated addition to §10) the next time this is run for real.
+
+**Rollback**: because the restore only ever writes into the isolated `--target-project`
+(never into `pageloom-os-production`, enforced as above), there is no production rollback to
+perform — production is untouched throughout. "Rollback" for the drill itself means deleting
+the temporary restored database, which is always a separate, manual step:
+
+```bash
+# Printed by restore-drill.mjs at the end of a real run - never executed automatically:
+gcloud firestore databases delete --database=<database> --project=<target> --quiet --format=json
+```
+
+### Tests proving production cannot be selected as a restore target
+
+`scripts/backup-verification/lib/project-guard.test.mjs`,
+`scripts/backup-verification/lib/gcloud-commands.test.mjs`, and
+`scripts/backup-verification/restore-drill.test.mjs` together prove, at every layer from the
+raw CLI argument down to the exact `gcloud` invocation, that `pageloom-os-production` (in any
+case, with any surrounding whitespace) and a missing/empty target are always rejected before
+any command is constructed or run. Run via `npm run test:backup-tooling` (chained onto the
+root `npm test`, so CI covers it on every PR with no workflow-file change required).
