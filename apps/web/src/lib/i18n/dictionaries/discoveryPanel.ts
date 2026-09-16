@@ -19,6 +19,7 @@ const he = {
   nextActionLabel: "הפעולה הבאה", nextActionNone: "אין פעולה נדרשת כרגע",
   nextActionReadyForReview: "מוכן לבדיקת הצוות",
   nextActionWaitingOnCustomer: (sectionTitle: string) => `ממתינים ללקוח בשלב "${sectionTitle}"`,
+  copyLink: "העתקת קישור ללקוח", linkCopied: "הקישור הועתק", copyLinkAria: "העתקת קישור ישיר לאפיון העסק של הלקוח",
 } as const;
 
 const en = {
@@ -39,6 +40,7 @@ const en = {
   nextActionLabel: "Next action", nextActionNone: "No action needed right now",
   nextActionReadyForReview: "Ready for staff review",
   nextActionWaitingOnCustomer: (sectionTitle: string) => `Waiting on customer at "${sectionTitle}"`,
+  copyLink: "Copy client link", linkCopied: "Link copied", copyLinkAria: "Copy a direct link to the customer's Business Discovery",
 } as const;
 
 export const discoveryPanel = { he, en } as const;

@@ -286,6 +286,16 @@ export function missingRequiredDiscoveryFields(
 Directly extends the existing `client-management.ts` helper's shape and naming
 convention rather than inventing a different validation vocabulary.
 
+> **Amendment (2026-09-16).** A sibling function, `invalidDiscoveryFieldFormats`, was added
+> with the same shape and conditional-visibility awareness, checking `email`/`phone`/`url`-
+> typed answers against deliberately permissive format regexes (catching an obviously-wrong
+> value, not enforcing strict RFC/E.164 parsing). Previously these types relied only on the
+> browser's native `<input type="email"|"tel"|"url">`, which advises the browser's own UI but
+> never blocks a malformed value from reaching the server — `discoveryResponsesSchema` capped
+> them at the same generic 20000-char string limit as any other free-text field. Wired into
+> `discovery-api.ts`'s `/complete` and `/submit` (the real gate) and into
+> `DiscoverySection.tsx` (inline feedback before the round-trip).
+
 ## 4. `businessProfile/current` — schema only, not generated in this release
 
 Per `PRD.md` §25 and §37 (open decision 3): defined now so a future AI synthesis step has

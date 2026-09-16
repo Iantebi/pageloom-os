@@ -188,11 +188,31 @@ describe("Storage rules engine (behavioral, via emulator)", () => {
       await assertFails(uploadBytes(ref(client.storage(), path), TEXT_BYTES, { contentType: "application/x-msdownload" }));
     });
 
-    it("rejects a Discovery upload larger than the declared 25MB safeUpload size limit", async () => {
+    it("rejects a client Discovery upload larger than the feature-specific 10MB ceiling (tighter than the global 25MB safeUploadShape())", async () => {
       const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
-      const path = discoveryPath(PROJ_ALPHA_1, CLIENT_ALPHA_UID, "big.bin");
-      const oversized = new Uint8Array(26 * 1024 * 1024);
-      await assertFails(uploadBytes(ref(client.storage(), path), oversized, { contentType: "application/zip" }));
+      const path = discoveryPath(PROJ_ALPHA_1, CLIENT_ALPHA_UID, "big.png");
+      const oversized = new Uint8Array(11 * 1024 * 1024);
+      await assertFails(uploadBytes(ref(client.storage(), path), oversized, { contentType: "image/png" }));
+    }, 30000);
+
+    it("allows a client Discovery upload just under the 10MB ceiling", async () => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      const path = discoveryPath(PROJ_ALPHA_1, CLIENT_ALPHA_UID, "ok.png");
+      const underLimit = new Uint8Array(9 * 1024 * 1024);
+      await assertSucceeds(uploadBytes(ref(client.storage(), path), underLimit, { contentType: "image/png" }));
+    }, 30000);
+
+    it("rejects a client Discovery upload whose content-type would pass the broader global safeUploadShape() but not the tightened image/PDF-only allow-list", async () => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      const path = discoveryPath(PROJ_ALPHA_1, CLIENT_ALPHA_UID, "archive.zip");
+      await assertFails(uploadBytes(ref(client.storage(), path), TEXT_BYTES, { contentType: "application/zip" }));
+    });
+
+    it("still lets staff upload a Discovery file larger than the client-facing 10MB ceiling, up to the broader global safeUploadShape() limit", async () => {
+      const owner = testEnv.authenticatedContext(OWNER_UID);
+      const path = discoveryPath(PROJ_BETA_1, CLIENT_BETA_UID, "reference-pack.zip");
+      const largerThanClientLimit = new Uint8Array(15 * 1024 * 1024);
+      await assertSucceeds(uploadBytes(ref(owner.storage(), path), largerThanClientLimit, { contentType: "application/zip" }));
     }, 30000);
 
     it("lets staff read/write Discovery uploads across any project regardless of the uid segment", async () => {

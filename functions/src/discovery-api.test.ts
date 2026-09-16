@@ -56,6 +56,12 @@ describe("Business Discovery API authority", () => {
     expect(source).toContain("DISCOVERY_INCOMPLETE");
   });
 
+  it("also validates email/phone/url format server-side for both /complete and /submit (2026-09-16) — the native input type alone never blocks a malformed value from reaching the server", () => {
+    expect(source.match(/invalidDiscoveryFieldFormats\(/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(source).toContain("DISCOVERY_SECTION_INVALID_FORMAT");
+    expect(source).toContain("DISCOVERY_INVALID_FORMAT");
+  });
+
   it("submit is idempotent: a project already submitted/reviewed short-circuits before any write", () => {
     expect(source).toContain('["submitted", "reviewed"].includes(String(existingProgress.data()?.status))');
     expect(source).toContain("alreadySubmitted: true");
@@ -76,9 +82,10 @@ describe("Business Discovery API authority", () => {
     expect(reviewBlock).not.toContain("workflowStage");
   });
 
-  it("submit requires a CEO-verified closed deal, matching every other project-mutating endpoint's convention", () => {
-    expect(source).toContain('"DEAL_NOT_CLOSED"');
-    expect(source).toContain("project.data()?.dealClosedAt");
+  it("does not depend on the sales/deal-closing concept or read/write the customers collection — Discovery is a standalone module (2026-09-16 decision)", () => {
+    expect(source).not.toContain("DEAL_NOT_CLOSED");
+    expect(source).not.toContain("dealClosedAt");
+    expect(source).not.toMatch(/\/customers\//);
   });
 
   it("reopen preserves previously entered responses (spreads the existing document) rather than clearing them", () => {

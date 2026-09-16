@@ -207,6 +207,35 @@ export function isSectionComplete(section: DiscoverySectionDefinition, responses
   return missingRequiredDiscoveryFields(section, responses).length === 0;
 }
 
+// Format validation for email/phone/url-typed answers (2026-09-16). A native
+// <input type="email"|"tel"|"url"> only advises the browser's own UI — it never actually stops a
+// malformed value from reaching the server, and discovery-api.ts previously accepted any string up
+// to discoveryResponsesSchema's generic 20000-char cap for these fields. Deliberately permissive
+// (not a strict RFC-5322/E.164 parser): the goal is catching an obviously-wrong value ("no",
+// "asdf"), not rejecting a legitimately-formatted phone number this regex doesn't happen to expect.
+const emailFormat = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const phoneFormat = /^[\d\s+()-]{7,20}$/;
+const urlFormat = /^https?:\/\/.+/;
+
+function hasFormatIssue(question: DiscoveryQuestion, value: unknown): boolean {
+  if (typeof value !== "string" || value === "") return false; // empty is a required-field concern, not a format one
+  if (question.type === "email") return !emailFormat.test(value);
+  if (question.type === "phone") return !phoneFormat.test(value);
+  if (question.type === "url") return !urlFormat.test(value);
+  return false;
+}
+
+/** Mirrors missingRequiredDiscoveryFields's shape and conditional-visibility awareness, but for
+ *  format rather than presence — a question that's optional-and-empty is fine; a question that's
+ *  optional-but-filled-with-garbage is not. Used both client-side (inline feedback before save) and
+ *  server-side (discovery-api.ts's /complete and /submit — the real, non-bypassable gate). */
+export function invalidDiscoveryFieldFormats(section: DiscoverySectionDefinition, responses: DiscoveryResponses): string[] {
+  return section.questions
+    .filter(question => isQuestionVisible(question, responses))
+    .filter(question => hasFormatIssue(question, responses[question.id]))
+    .map(question => question.id);
+}
+
 /** Meaningful-completion percentage — only sections explicitly marked complete count.
  *  See PRD.md §13. */
 export function discoveryProgressPercent(completedSectionIds: readonly DiscoverySectionId[]): number {

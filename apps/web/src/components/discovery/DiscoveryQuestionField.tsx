@@ -41,12 +41,12 @@ export function DiscoveryQuestionField({ question, value, organizationId, projec
     case "url":
     case "date":
       return <input
-        className="input" type={question.type === "email" ? "email" : question.type === "url" ? "url" : question.type === "phone" ? "tel" : question.type === "date" ? "date" : "text"}
+        id={question.id} className="input" type={question.type === "email" ? "email" : question.type === "url" ? "url" : question.type === "phone" ? "tel" : question.type === "date" ? "date" : "text"}
         value={String(value ?? "")} placeholder={copy?.placeholder} maxLength={question.maxLength ?? 300}
         onChange={event => onChange(event.target.value)} />;
 
     case "long_text":
-      return <textarea className="input min-h-32" value={String(value ?? "")} placeholder={copy?.placeholder} maxLength={question.maxLength ?? 5000} onChange={event => onChange(event.target.value)} />;
+      return <textarea id={question.id} className="input min-h-32" value={String(value ?? "")} placeholder={copy?.placeholder} maxLength={question.maxLength ?? 5000} onChange={event => onChange(event.target.value)} />;
 
     case "boolean":
       return <div className="flex gap-2">
@@ -55,7 +55,7 @@ export function DiscoveryQuestionField({ question, value, organizationId, projec
       </div>;
 
     case "select":
-      return <select className="input" value={String(value ?? "")} onChange={event => onChange(event.target.value)}>
+      return <select id={question.id} className="input" value={String(value ?? "")} onChange={event => onChange(event.target.value)}>
         <option value="" />
         {question.options?.map(option => <option value={option} key={option}>{qc.options[option as keyof typeof qc.options] ?? option}</option>)}
       </select>;

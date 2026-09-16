@@ -27,7 +27,7 @@ function DiscoveryScreen() {
   const [reviewing, setReviewing] = useState(false);
   const s = t("discoveryShell");
 
-  if (!projectId) return <DiscoveryShell><Card><Empty title={s.loadError} description="" /></Card></DiscoveryShell>;
+  if (!projectId) return <DiscoveryShell><Card><Empty title={s.noProjectSelected} description="" /></Card></DiscoveryShell>;
   if (loading && !state) return <DiscoveryShell><Loading /></DiscoveryShell>;
   if (error) return <DiscoveryShell><Card role="alert"><p className="text-xs text-[var(--danger-text)]">{s.loadError}</p></Card></DiscoveryShell>;
   if (!state) return <DiscoveryShell><Loading /></DiscoveryShell>;

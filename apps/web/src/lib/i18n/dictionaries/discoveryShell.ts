@@ -36,6 +36,7 @@ const he = {
 
   // Validation
   missingRequiredTitle: (count: number) => `נותרו ${count} שדות חובה למילוי בשלב זה`,
+  invalidFormatTitle: (count: number) => `${count} שדות אינם בפורמט תקין — בדקו טלפון, אימייל או קישור`,
 
   // Review screen
   reviewTitle: "סקירת התשובות שלכם",
@@ -59,6 +60,7 @@ const he = {
 
   // Errors
   loadError: "לא הצלחנו לטעון את אפיון העסק. רעננו את הדף ונסו שוב.",
+  noProjectSelected: "לא נבחר פרויקט. יש לפתוח את אפיון העסק דרך הקישור בפרויקט שלכם.",
   networkOffline: "אין חיבור לאינטרנט כרגע. התשובות שלכם נשמרות איתכם ברגע שהחיבור יחזור.",
   sessionExpired: "החיבור פג. יש להתחבר מחדש כדי להמשיך.",
   permissionDenied: "אין לכם גישה לפרויקט הזה.",
@@ -100,6 +102,7 @@ const en = {
   whyWeAskToggle: "Why do we ask?",
 
   missingRequiredTitle: (count: number) => `${count} required field(s) remaining in this stage`,
+  invalidFormatTitle: (count: number) => `${count} field(s) aren't in a valid format — check phone, email, or link fields`,
 
   reviewTitle: "Review your answers",
   reviewDescription: "Check everything before submitting. You can go back and edit any stage.",
@@ -119,6 +122,7 @@ const en = {
   needsMoreInfoCta: "Go to stage",
 
   loadError: "We couldn't load Business Discovery. Refresh the page and try again.",
+  noProjectSelected: "No project was selected. Open Business Discovery from the link in your project.",
   networkOffline: "No internet connection right now. Your answers are kept locally until the connection returns.",
   sessionExpired: "Your session expired. Please sign in again to continue.",
   permissionDenied: "You don't have access to this project.",

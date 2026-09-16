@@ -18,6 +18,14 @@ service firebase.storage {
     function safeUploadShape() { return request.resource.size < 25 * 1024 * 1024 && request.resource.contentType.matches('(image/.*|application/pdf|text/.*|application/zip|application/vnd.*)'); }
     function safeUpload(orgId, userId) { return member(orgId) && request.auth.uid == userId && safeUploadShape(); }
     function safeWebsiteMedia(orgId, userId, fileName) { return member(orgId) && request.auth.uid == userId && request.resource.size < 15 * 1024 * 1024 && request.resource.contentType.matches('(image/jpeg|image/png|image/webp|image/gif|video/mp4|video/webm)') && fileName.matches('.*\\.(jpg|jpeg|png|webp|gif|mp4|webm)'); }
+    // Business Discovery-specific ceiling (2026-09-16), tighter than the global safeUploadShape()
+    // 25MB/broad-type allowance: matches docs/customer-discovery-onboarding/PRD.md §14's documented
+    // 10MB image/PDF limit exactly, which until now was enforced only client-side
+    // (apps/web/src/lib/hooks/useFileUpload.ts) with no matching server-side ceiling — a direct API
+    // call bypassing the browser UI could previously still land up to 25MB. Applies to client
+    // (same-uid) writes only; staff keep the broader safeUploadShape() ceiling below, since staff may
+    // legitimately need to upload a larger reference asset on a customer's behalf.
+    function safeDiscoveryUpload(orgId, userId) { return member(orgId) && request.auth.uid == userId && request.resource.size < 10 * 1024 * 1024 && request.resource.contentType.matches('(image/jpeg|image/png|image/webp|application/pdf)'); }
     match /organizations/{orgId}/artifacts/{allPaths=**} { allow read: if staff(orgId); allow write: if false; }
     match /organizations/{orgId}/internal-artifacts/{allPaths=**} { allow read: if staff(orgId); allow write: if false; }
     match /organizations/{orgId}/projects/{projectId}/artifacts/{allPaths=**} { allow read: if staff(orgId) || clientProject(orgId,projectId); allow write: if false; }
@@ -25,10 +33,15 @@ service firebase.storage {
     match /organizations/{orgId}/customers/{customerId}/{userId}/{allPaths=**} { allow read: if staff(orgId) || clientCustomer(orgId,customerId); allow write: if safeUploadShape() && (staff(orgId) || (safeUpload(orgId,userId) && clientCustomer(orgId,customerId))); }
     match /organizations/{orgId}/questionnaires/{projectId}/{questionnaireId}/{fieldId}/{userId}/{allPaths=**} { allow read: if staff(orgId) || clientProject(orgId,projectId); allow write: if safeUploadShape() && (staff(orgId) || (safeUpload(orgId,userId) && clientProject(orgId,projectId))); }
     // Business Discovery uploads (logo, photos, testimonial screenshots, price lists) — same
-    // tenant/project scoping and safeUpload() same-uid + safeUploadShape() size/type ceiling as
-    // the questionnaires path above, with {sectionId} in place of {questionnaireId}. See
-    // docs/customer-discovery-onboarding/SECURITY.md §5.
-    match /organizations/{orgId}/discovery/{projectId}/{sectionId}/{fieldId}/{userId}/{allPaths=**} { allow read: if staff(orgId) || clientProject(orgId,projectId); allow write: if safeUploadShape() && (staff(orgId) || (safeUpload(orgId,userId) && clientProject(orgId,projectId))); }
+    // tenant/project scoping as the questionnaires path above, with {sectionId} in place of
+    // {questionnaireId}. Write ceiling: staff get the broader safeUploadShape() (25MB/broad types,
+    // matching every other staff-write path in this file); a client is held to the tighter, feature-
+    // specific safeDiscoveryUpload() (10MB, image/PDF only) rather than inheriting the global
+    // ceiling. See docs/customer-discovery-onboarding/SECURITY.md §5.
+    match /organizations/{orgId}/discovery/{projectId}/{sectionId}/{fieldId}/{userId}/{allPaths=**} {
+      allow read: if staff(orgId) || clientProject(orgId,projectId);
+      allow write: if staff(orgId) ? safeUploadShape() : (safeDiscoveryUpload(orgId,userId) && clientProject(orgId,projectId));
+    }
     match /organizations/{orgId}/website-media/{customerId}/{projectId}/{websiteId}/{userId}/{fileName} {
       allow read: if staff(orgId) || (clientCustomer(orgId,customerId) && clientProject(orgId,projectId));
       allow create, update: if safeWebsiteMedia(orgId,userId,fileName) && (staff(orgId) || (clientCustomer(orgId,customerId) && clientProject(orgId,projectId) && clientPermission(orgId,'contentEdit')));

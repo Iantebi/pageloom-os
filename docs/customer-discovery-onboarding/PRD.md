@@ -10,6 +10,17 @@ Companion documents (do not duplicate content already covered there):
 [`SECURITY.md`](./SECURITY.md) · [`UX-FLOW.md`](./UX-FLOW.md) ·
 [`IMPLEMENTATION-PLAN.md`](./IMPLEMENTATION-PLAN.md) · [`TEST-PLAN.md`](./TEST-PLAN.md)
 
+> **Standalone-module decision (2026-09-16).** Business Discovery is now maintained as an
+> independent module: it must not reference, depend on, or modify CRM/sales-pipeline code
+> (leads, deals, proposals, invoices, the `customers` collection). It connects only to the
+> Customer Portal, the Backend Master Panel, Firestore, and Firebase Storage. The one
+> pre-existing coupling this PRD's original design carried — `/submit` requiring a
+> CEO-verified `dealClosedAt` before accepting a submission — has been removed
+> (`functions/src/discovery-api.ts`); tenant isolation and role authorization
+> (`requireProjectAccess`/`requireRole`) are unaffected, since that was a business-workflow
+> gate, not a security boundary. See `docs/ARCHITECTURE.md` §12 for the durable project-level
+> record of this decision.
+
 ---
 
 ## 1. Executive Summary
