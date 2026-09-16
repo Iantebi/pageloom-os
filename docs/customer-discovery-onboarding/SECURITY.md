@@ -128,6 +128,15 @@ No rule change is needed for the existing `questionnaires/...` or `uploads/...` 
 pre-existing loose end in `DATA-MODEL.md`'s sibling audit, not something Discovery
 introduces or is responsible for fixing).
 
+> **Implemented (2026-09-16).** The Phase-5-recommended `safeDiscoveryUpload()` helper above
+> is now live in `storage.rules`: client (same-uid) writes to the Discovery path are held to
+> 10MB / `image/jpeg|png|webp|application/pdf` — previously only enforced client-side
+> (`useFileUpload.ts`'s precheck), with the server/rules layer still allowing the broader
+> global 25MB/broad-type ceiling. Staff writes keep the broader `safeUploadShape()` ceiling.
+> Verified against the real Firestore/Storage emulator (73/73 behavioral tests passing,
+> including 4 new/updated cases covering the tightened ceiling, the tightened type list, and
+> staff's continued broader access).
+
 ## 6. Notifications — no rule change
 
 `notifications` stays staff-only-readable in `firestore.rules` (existing rule, unchanged)

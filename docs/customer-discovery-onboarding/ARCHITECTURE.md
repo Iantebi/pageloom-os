@@ -100,6 +100,19 @@ section), it:
 This is a **direct extension of the file's own established pattern** (auto-create →
 drive workflow → notify), not a new architectural idiom.
 
+> **Amendment (2026-09-16).** `/submit` no longer requires `project.dealClosedAt`. Business
+> Discovery is now maintained as a standalone module and must not depend on the CRM/sales-
+> pipeline concept of a closed deal. Every other part of this section — the
+> `QuestionnaireCompleted` event, the `assets` transition, `requireProjectAccess` role
+> authorization — is unaffected; only the deal-closed precondition was removed.
+>
+> This session also added: Discovery status visibility in the Backend Master Panel's
+> top-level customer table (`functions/src/platform-master-api.ts`, `apps/web/src/
+> components/master-control-center.tsx` — a per-project `discoveryProgress/current`
+> point-read, since that document isn't part of the bulk org-collection scan the rest of
+> that endpoint uses), and the `DiscoveryPanel` embed on `/master/customer` from an earlier
+> session in this same initiative (`apps/web/src/app/(product)/master/customer/page.tsx`).
+
 ## 4. Assets/materials — deliberate non-goal
 
 The existing `assets` workflow stage's exit condition

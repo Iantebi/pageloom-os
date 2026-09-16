@@ -13,7 +13,10 @@
 > business workflow in the repository). **Revised same day** after a completeness review
 > added §12 (Company operating docs), expanded the API surface (§4), domain modules
 > (§5), frontend components (§3), and operations (§11) sections, and added a Support
-> workflow subsection (§10) that the first pass had dropped.
+> workflow subsection (§10) that the first pass had dropped. **Revised again same day**
+> (§10) noting Business Discovery's standalone-module decision — see that section's
+> amendment note for the summary and `docs/customer-discovery-onboarding/*.md` for full
+> detail.
 
 PageLoom is a multi-tenant, event-driven agency control plane. The dashboard never
 invokes models or third-party services directly. Authenticated commands enter the
@@ -597,6 +600,16 @@ webhooks record payment state only and never auto-advance the workflow.
 
 Both emit the same `QuestionnaireCompleted` event, so every downstream stage is
 unaffected by which one ran.
+
+> **Amendment (2026-09-16): Business Discovery is now a standalone module.** By explicit
+> decision, Discovery must not reference, depend on, or modify CRM/sales-pipeline code
+> (leads, deals, proposals, invoices, the `customers` collection) — it connects only to the
+> Customer Portal, the Backend Master Panel, Firestore, and Storage. The one coupling that
+> existed — `/discovery/submit` requiring `project.dealClosedAt` — was removed
+> (`functions/src/discovery-api.ts`); `requireProjectAccess` role/tenant authorization is
+> unaffected. Discovery status is now also visible in the Master Panel's top-level customer
+> table, not only per-project. See `docs/customer-discovery-onboarding/ARCHITECTURE.md`'s own
+> amendment note for the full detail.
 
 ### Delivery, review & handoff
 
