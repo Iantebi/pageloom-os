@@ -103,16 +103,24 @@ export function DiscoverySection({ organizationId, projectId, sectionId, initial
     <fieldset disabled={readOnly} className="space-y-6 disabled:opacity-70">
       {visibleQuestions.map(question => {
         const copy = qc.questions[question.id];
+        // A screen reader needs a programmatic label-to-control association, not just visual
+        // proximity — <label htmlFor> covers the single-input types (short_text/email/phone/
+        // url/date/long_text/select, see DiscoveryQuestionField.tsx's matching id={question.id}
+        // below); role="group" + aria-labelledby on the field wrapper additionally covers every
+        // composite type (multi_select checkboxes, color_pair swatches, address, repeaters,
+        // uploads) uniformly, without needing per-control ids threaded through 10 different
+        // rendering branches. Fixes a real gap: PRD.md §29 already documented "every input has a
+        // visible, associated label" as a requirement, but the association was visual-only.
         return <div className="field" key={question.id}>
           <div className="flex items-start justify-between gap-3">
-            <span className="text-xs font-medium">{copy?.label ?? question.id}{question.required && " *"}</span>
+            <label id={`${question.id}-label`} htmlFor={question.id} className="text-xs font-medium">{copy?.label ?? question.id}{question.required && " *"}</label>
             {copy?.whyWeAsk && <button type="button" className="flex items-center gap-1 text-[10px] text-[var(--muted)]" onClick={() => toggleWhy(question.id)}>
               <Info className="h-3 w-3" />{s.whyWeAskToggle}
             </button>}
           </div>
           {copy?.helpText && <small className="mt-1 block text-[10px] leading-4 text-[var(--muted)]">{copy.helpText}</small>}
           {copy?.whyWeAsk && expanded.has(question.id) && <p className="mt-2 rounded-lg bg-[var(--surface-2)] p-2 text-[10px] leading-5 text-[var(--muted)]">{copy.whyWeAsk}</p>}
-          <div className="mt-2">
+          <div className="mt-2" role="group" aria-labelledby={`${question.id}-label`}>
             <DiscoveryQuestionField question={question} value={responses[question.id]} organizationId={organizationId} projectId={projectId} sectionId={sectionId} onChange={value => update(question.id, value)} />
           </div>
         </div>;
