@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { discoverySectionOrder, type DiscoverySectionId, type DiscoveryResponses } from "@pageloom/core";
 import { useOrganization } from "@/lib/organization";
+import { useAuth } from "@/lib/auth";
 import { useDiscovery } from "@/lib/discovery";
 import { Button, Card, Empty, Loading } from "@/components/product-ui";
 import { DiscoveryStepper, DiscoveryStagesMenu } from "@/components/discovery/DiscoveryStepper";
@@ -18,7 +19,8 @@ export default function DiscoveryPage() {
 function DiscoveryScreen() {
   const projectId = useSearchParams().get("projectId") ?? "";
   const { organizationId } = useOrganization();
-  const { state, loading, error, reload } = useDiscovery(organizationId, projectId);
+  const { signOut } = useAuth();
+  const { state, loading, error, errorKind, reload } = useDiscovery(organizationId, projectId);
   // Only explicit user navigation (clicking a stepper step, "next", or completing a section) ever
   // calls this setter — the *default* section is derived from `state` at render time below, never
   // set via an effect (React's own guidance: don't sync state from a prop/async value in an effect
@@ -29,7 +31,21 @@ function DiscoveryScreen() {
 
   if (!projectId) return <DiscoveryShell><Card><Empty title={s.noProjectSelected} description="" /></Card></DiscoveryShell>;
   if (loading && !state) return <DiscoveryShell><Loading /></DiscoveryShell>;
-  if (error) return <DiscoveryShell><Card role="alert"><p className="text-xs text-[var(--danger-text)]">{s.loadError}</p></Card></DiscoveryShell>;
+  // Distinct, accurate messages per failure cause (docs/customer-discovery-onboarding/PRD.md §30)
+  // instead of one generic string regardless of why the load failed. Session-expiry offers a
+  // "sign in again" action rather than auto-forcing sign-out — a 401 can be a transient
+  // token-refresh hiccup, not necessarily a dead session. Since the URL never changes across
+  // sign-out/sign-in, AuthenticatedOrganization (product-shell.tsx) re-renders this exact page
+  // once signed back in — "return to Discovery" is satisfied by simply never navigating away.
+  if (error) return <DiscoveryShell><Card role="alert">
+    <p className="text-xs text-[var(--danger-text)]">
+      {errorKind === "network" ? s.networkOffline
+        : errorKind === "session_expired" ? s.sessionExpired
+        : errorKind === "permission_denied" ? s.permissionDenied
+        : s.loadError}
+    </p>
+    {errorKind === "session_expired" && <Button className="mt-4" onClick={() => void signOut()}>{s.signInAgain}</Button>}
+  </Card></DiscoveryShell>;
   if (!state) return <DiscoveryShell><Loading /></DiscoveryShell>;
 
   const firstIncomplete = discoverySectionOrder.find(id => !(state.progress?.completedSectionIds ?? []).includes(id));
