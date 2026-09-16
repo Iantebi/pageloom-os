@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, Info, LoaderCircle } from "lucide-react";
-import { discoverySection, isQuestionVisible, missingRequiredDiscoveryFields, type DiscoverySectionId, type DiscoveryResponses } from "@pageloom/core";
+import { discoverySection, isQuestionVisible, missingRequiredDiscoveryFields, invalidDiscoveryFieldFormats, type DiscoverySectionId, type DiscoveryResponses } from "@pageloom/core";
 import { Button } from "@/components/product-ui";
 import { DiscoveryQuestionField } from "./DiscoveryQuestionField";
 import { saveDiscoverySection, completeDiscoverySection, type SaveStatus } from "@/lib/discovery";
@@ -22,6 +22,7 @@ export function DiscoverySection({ organizationId, projectId, sectionId, initial
   const [completing, setCompleting] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showMissing, setShowMissing] = useState(false);
+  const [showInvalid, setShowInvalid] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // The latest edit not yet sent to the server. Set by update(), cleared once flush() actually
   // starts sending it. Exists so the unmount cleanup below can send a still-pending edit instead of
@@ -31,6 +32,7 @@ export function DiscoverySection({ organizationId, projectId, sectionId, initial
   const section = discoverySection(sectionId);
   const visibleQuestions = section.questions.filter(question => isQuestionVisible(question, responses));
   const missing = missingRequiredDiscoveryFields(section, responses);
+  const invalidFormats = invalidDiscoveryFieldFormats(section, responses);
 
   // No reset-on-sectionId-change effect here by design: the parent renders this component with
   // key={sectionId} (see app/discovery/page.tsx), so React remounts it fresh for every section —
@@ -71,6 +73,7 @@ export function DiscoverySection({ organizationId, projectId, sectionId, initial
   async function complete() {
     await flush(responses);
     if (missing.length > 0) { setShowMissing(true); return; }
+    if (invalidFormats.length > 0) { setShowInvalid(true); return; }
     setCompleting(true);
     try {
       await completeDiscoverySection(organizationId, projectId, sectionId);
@@ -91,6 +94,10 @@ export function DiscoverySection({ organizationId, projectId, sectionId, initial
     {showMissing && missing.length > 0 && <div className="mb-5 rounded-xl bg-[var(--warn-bg)] p-3 text-xs text-[var(--warn-text)]">
       <b>{s.missingRequiredTitle(missing.length)}</b>
       <ul className="mt-1 list-inside list-disc">{missing.map(id => <li key={id}>{qc.questions[id]?.label ?? id}</li>)}</ul>
+    </div>}
+    {showInvalid && invalidFormats.length > 0 && <div className="mb-5 rounded-xl bg-[var(--warn-bg)] p-3 text-xs text-[var(--warn-text)]">
+      <b>{s.invalidFormatTitle(invalidFormats.length)}</b>
+      <ul className="mt-1 list-inside list-disc">{invalidFormats.map(id => <li key={id}>{qc.questions[id]?.label ?? id}</li>)}</ul>
     </div>}
 
     <fieldset disabled={readOnly} className="space-y-6 disabled:opacity-70">

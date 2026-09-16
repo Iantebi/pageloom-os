@@ -4,7 +4,7 @@ import {
   discoverySectionIdSchema, saveDiscoverySectionSchema, submitDiscoverySchema,
   reopenDiscoverySectionSchema, discoveryNoteSchema,
   discoverySectionOrder, discoverySection, discoveryQuestion, missingRequiredDiscoveryFields,
-  discoveryProgressPercent, DISCOVERY_TEMPLATE_VERSION,
+  invalidDiscoveryFieldFormats, discoveryProgressPercent, DISCOVERY_TEMPLATE_VERSION,
   type DiscoverySectionId, type DiscoveryResponses,
   type DiscoverySectionDocument, type DiscoveryProgressDocument, type DiscoveryNoteDocument,
 } from "@pageloom/core";
@@ -22,6 +22,14 @@ import { operationalLog, safeErrorName } from "./observability.js";
 // ("questionnaire" -> "assets") transition the existing Website Brief path already drives, via the
 // same QuestionnaireCompleted event — so wiring Discovery into the real onboarding flow later is a
 // change to *what gets created at payment time*, not a change to how Discovery itself behaves.
+//
+// Standalone-module decision (2026-09-16): this router must not depend on the CRM/sales-pipeline
+// (leads, deals, proposals, invoices, the customers collection). /submit previously required the
+// project's deal-closed timestamp before accepting a submission — that check is deliberately
+// removed. Tenant isolation and role authorization (requireProjectAccess/requireRole) are
+// unaffected and remain the real access-control boundary; the removed check was a business-workflow
+// gate, not a security one. See discovery-api.test.ts's "does not depend on the sales/deal-closing
+// concept" test, which pins this by asserting the field name is absent from this file's source.
 export const discoveryRouter = Router();
 
 const staff = ["owner", "admin", "operator"];
@@ -116,6 +124,8 @@ discoveryRouter.post("/projects/:projectId/discovery/sections/:sectionId/complet
     const responses = secSnap.exists ? (secSnap.data()!.responses as DiscoveryResponses) : {};
     const missing = missingRequiredDiscoveryFields(section, responses);
     if (missing.length > 0) return res.status(422).json({ error: { code: "DISCOVERY_SECTION_INCOMPLETE", message: "Required questions are still unanswered", missingFields: missing } });
+    const invalid = invalidDiscoveryFieldFormats(section, responses);
+    if (invalid.length > 0) return res.status(422).json({ error: { code: "DISCOVERY_SECTION_INVALID_FORMAT", message: "Some answers are not in a valid format", invalidFields: invalid } });
     const now = new Date().toISOString();
     await db.runTransaction(async tx => {
       const [secSnap2, progSnap] = await Promise.all([tx.get(secRef), tx.get(progRef)]);
@@ -148,7 +158,6 @@ discoveryRouter.post("/projects/:projectId/discovery/submit", async (req: Authen
     if (await requireProjectAccess(req, res, input.organizationId, projectId) === undefined) return;
     const projectRef = db.doc(`organizations/${input.organizationId}/projects/${projectId}`), project = await projectRef.get();
     if (!project.exists) return res.status(404).json({ error: { code: "NOT_FOUND", message: "Project not found" } });
-    if (!project.data()?.dealClosedAt) return res.status(409).json({ error: { code: "DEAL_NOT_CLOSED", message: "Discovery submission requires a CEO-verified closed deal" } });
 
     const progRef = progressRef(input.organizationId, projectId);
     const existingProgress = await progRef.get();
@@ -157,15 +166,20 @@ discoveryRouter.post("/projects/:projectId/discovery/submit", async (req: Authen
     }
 
     const sectionSnaps = await Promise.all(discoverySectionOrder.map(sectionId => sectionRef(input.organizationId, projectId, sectionId).get()));
-    const missingBySection: Record<string, string[]> = {};
+    const missingBySection: Record<string, string[]> = {}, invalidBySection: Record<string, string[]> = {};
     sectionSnaps.forEach((snap, index) => {
       const sectionId = discoverySectionOrder[index]!;
       const responses = snap.exists ? (snap.data()!.responses as DiscoveryResponses) : {};
       const missing = missingRequiredDiscoveryFields(discoverySection(sectionId), responses);
       if (missing.length > 0) missingBySection[sectionId] = missing;
+      const invalid = invalidDiscoveryFieldFormats(discoverySection(sectionId), responses);
+      if (invalid.length > 0) invalidBySection[sectionId] = invalid;
     });
     if (Object.keys(missingBySection).length > 0) {
       return res.status(422).json({ error: { code: "DISCOVERY_INCOMPLETE", message: "Some required Discovery questions are still unanswered", missingBySection } });
+    }
+    if (Object.keys(invalidBySection).length > 0) {
+      return res.status(422).json({ error: { code: "DISCOVERY_INVALID_FORMAT", message: "Some Discovery answers are not in a valid format", invalidBySection } });
     }
 
     const now = new Date().toISOString();

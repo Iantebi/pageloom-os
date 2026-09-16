@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   discoverySectionOrder, discoveryTemplate, discoveryQuestion, discoverySection,
-  isQuestionVisible, missingRequiredDiscoveryFields, isSectionComplete, discoveryProgressPercent,
-  semanticTags, type DiscoveryResponses,
+  isQuestionVisible, missingRequiredDiscoveryFields, invalidDiscoveryFieldFormats, isSectionComplete,
+  discoveryProgressPercent, semanticTags, type DiscoveryResponses,
 } from "./discovery-template.js";
 import {
   saveDiscoverySectionSchema, submitDiscoverySchema, reopenDiscoverySectionSchema,
@@ -135,6 +135,41 @@ describe("missingRequiredDiscoveryFields / isSectionComplete", () => {
       "goals.priorityOutcomes": ["more_inquiries"], "goals.capacityCheck": "x",
     };
     expect(isSectionComplete(section, complete)).toBe(true);
+  });
+});
+
+describe("invalidDiscoveryFieldFormats", () => {
+  const presence = discoverySection("presence");
+
+  it("flags an obviously malformed email/phone/url and accepts well-formed ones", () => {
+    const bad = invalidDiscoveryFieldFormats(presence, {
+      "presence.phone": "not a phone", "presence.email": "not-an-email", "presence.googleBusinessUrl": "not a url",
+    });
+    expect(bad).toEqual(expect.arrayContaining(["presence.phone", "presence.email", "presence.googleBusinessUrl"]));
+
+    const good = invalidDiscoveryFieldFormats(presence, {
+      "presence.phone": "+972 50-123-4567", "presence.email": "owner@example.com", "presence.googleBusinessUrl": "https://g.co/kgs/abc123",
+    });
+    expect(good).toEqual([]);
+  });
+
+  it("never flags an empty optional field — that's missingRequiredDiscoveryFields's concern, not this function's", () => {
+    expect(invalidDiscoveryFieldFormats(presence, {})).toEqual([]);
+    expect(invalidDiscoveryFieldFormats(presence, { "presence.whatsapp": "" })).toEqual([]);
+  });
+
+  it("never flags a required-but-hidden question, matching isQuestionVisible", () => {
+    const bad = invalidDiscoveryFieldFormats(presence, { "presence.hasWebsite": false, "presence.existingWebsiteUrl": "garbage" });
+    expect(bad).not.toContain("presence.existingWebsiteUrl");
+  });
+
+  it("never flags a non-string value (e.g. a file/array response accidentally under a text question id)", () => {
+    expect(invalidDiscoveryFieldFormats(presence, { "presence.email": ["not", "a", "string"] })).toEqual([]);
+  });
+
+  it("does not check text/long_text/select-typed questions at all — only email/phone/url", () => {
+    const business = discoverySection("business");
+    expect(invalidDiscoveryFieldFormats(business, { "business.publicName": "anything goes here, no format constraint" })).toEqual([]);
   });
 });
 

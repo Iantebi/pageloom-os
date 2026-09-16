@@ -36,6 +36,7 @@ const he = {
 
   // Validation
   missingRequiredTitle: (count: number) => `נותרו ${count} שדות חובה למילוי בשלב זה`,
+  invalidFormatTitle: (count: number) => `${count} שדות אינם בפורמט תקין — בדקו טלפון, אימייל או קישור`,
 
   // Review screen
   reviewTitle: "סקירת התשובות שלכם",
@@ -101,6 +102,7 @@ const en = {
   whyWeAskToggle: "Why do we ask?",
 
   missingRequiredTitle: (count: number) => `${count} required field(s) remaining in this stage`,
+  invalidFormatTitle: (count: number) => `${count} field(s) aren't in a valid format — check phone, email, or link fields`,
 
   reviewTitle: "Review your answers",
   reviewDescription: "Check everything before submitting. You can go back and edit any stage.",
