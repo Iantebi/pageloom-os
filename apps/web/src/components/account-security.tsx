@@ -7,6 +7,7 @@ import { useOrganization } from "@/lib/organization";
 import { enrolledTotpFactor, finishTotpEnrollment, startTotpEnrollment, unenrollTotpFactor } from "@/lib/mfa";
 import { Button, Card, CardHeader, Status } from "./product-ui";
 import { t } from "@/lib/i18n";
+import { mfaEnrollmentOffered, parseMfaEnforcementMode } from "@pageloom/core";
 
 type Step = "idle" | "verifying";
 
@@ -18,7 +19,7 @@ type Step = "idle" | "verifying";
 export function AccountSecurity() {
   const s = t("accountSecurity");
   const { user } = useAuth();
-  const { membership } = useOrganization();
+  const { membership, platformRole } = useOrganization();
   const [step, setStep] = useState<Step>("idle");
   const [secret, setSecret] = useState<TotpSecret | undefined>(undefined);
   const [otpauthUri, setOtpauthUri] = useState("");
@@ -27,7 +28,8 @@ export function AccountSecurity() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  const eligible = membership && ["owner", "admin"].includes(membership.role);
+  const mode = parseMfaEnforcementMode(process.env.NEXT_PUBLIC_MFA_ENFORCEMENT_MODE);
+  const eligible = mfaEnrollmentOffered(platformRole ?? membership?.role ?? "", mode);
   if (!eligible || !user) return null;
 
   // Derived directly from `user`, not effect+state: multiFactor(user).enroll()/.unenroll() (in mfa.ts)
