@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { CheckCircle2, ChevronDown, ChevronUp, MessageSquarePlus, Sparkles } from "lucide-react";
-import { discoverySectionOrder, discoverySection, isQuestionVisible, missingRequiredDiscoveryFields, type DiscoverySectionId, type Project } from "@pageloom/core";
+import { discoverySectionOrder, discoverySection, isQuestionVisible, missingRequiredDiscoveryFields, type DiscoverySectionId } from "@pageloom/core";
 import { useDiscovery, markDiscoveryReviewed, reopenDiscoverySection, loadDiscoveryNotes, addDiscoveryNote, type DiscoveryNote } from "@/lib/discovery";
 import { Button, Card, dateTime } from "./product-ui";
 import { t } from "@/lib/i18n";
@@ -11,7 +11,14 @@ import { t } from "@/lib/i18n";
 // Shows everything an Owner/Admin needs without opening the raw Firestore console: status, percent,
 // current section, missing information, last activity, submitted date, per-section answers, and
 // internal notes (never customer-visible — see SECURITY.md §3.3).
-export function DiscoveryPanel({ organizationId, project }: { organizationId: string; project: Project }) {
+//
+// `project` is intentionally the minimal shape this component actually reads (id, plus an optional
+// name a caller may already have on hand) rather than the full @pageloom/core `Project` type — this
+// component is embedded both from a page that already has a fully-typed Project (projects/view) and
+// from the Master Panel's admin-API customer profile, whose /admin/customers/:id response returns
+// loosely-typed Firestore records rather than validated Project objects. A full `Project` still
+// satisfies this narrower type structurally, so the existing call site needs no change.
+export function DiscoveryPanel({ organizationId, project }: { organizationId: string; project: { id: string; name?: string } }) {
   const { state, loading, reload } = useDiscovery(organizationId, project.id);
   const [reopenTarget, setReopenTarget] = useState<DiscoverySectionId>();
   const [expandedSectionId, setExpandedSectionId] = useState<DiscoverySectionId>();
