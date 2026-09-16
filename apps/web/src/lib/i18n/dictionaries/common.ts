@@ -131,6 +131,10 @@ export const statusLabels = {
     deployment: "פריסה",
     support: "תמיכה",
     maintenance: "תחזוקה",
+    not_started: "טרם התחיל",
+    submitted: "הוגש",
+    reviewed: "נבדק",
+    reopened: "הוחזר לעריכה",
   },
   en: {
     completed: "Completed",
@@ -201,5 +205,9 @@ export const statusLabels = {
     deployment: "Deployment",
     support: "Support",
     maintenance: "Maintenance",
+    not_started: "Not started",
+    submitted: "Submitted",
+    reviewed: "Reviewed",
+    reopened: "Reopened",
   },
 } as const;

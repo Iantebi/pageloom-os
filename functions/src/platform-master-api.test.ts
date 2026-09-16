@@ -13,4 +13,7 @@ it("does not fabricate infrastructure metrics it cannot actually verify",()=>{ex
 // hardcoded string literals in the security/infrastructure sections - claims presented to Master
 // Panel staff as if verified, when nothing in this handler ever checks the deployed Firestore
 // rules, indexes, or IAM state. Guards against reintroducing an unverifiable fixed claim.
-it("does not present rule, index, or permission enforcement as verified when it is not checked",()=>{expect(source).not.toContain('rules:"enforced"');expect(source).not.toContain('indexes:"configured"');expect(source).not.toContain('permissions:"enforced"');expect(source).toContain('rules:"unknown"');expect(source).toContain('indexes:"unknown"');expect(source).toContain('permissions:"unknown"')})});
+it("does not present rule, index, or permission enforcement as verified when it is not checked",()=>{expect(source).not.toContain('rules:"enforced"');expect(source).not.toContain('indexes:"configured"');expect(source).not.toContain('permissions:"enforced"');expect(source).toContain('rules:"unknown"');expect(source).toContain('indexes:"unknown"');expect(source).toContain('permissions:"unknown"')});
+// 2026-09-16: surfaces Business Discovery status per customer so staff can scan progress across
+// every customer from the top-level table, not only by opening each customer's own profile.
+it("surfaces Business Discovery status per customer via its own point-read, not the bulk collection scan",()=>{expect(source).toContain("discoveryStatus");expect(source).toContain("discoveryPercent");expect(source).toContain("/discoveryProgress/current")})});
