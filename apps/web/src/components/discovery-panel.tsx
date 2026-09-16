@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
-import { CheckCircle2, ChevronDown, ChevronUp, MessageSquarePlus, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { CheckCircle2, ChevronDown, ChevronUp, Link2, MessageSquarePlus, Sparkles } from "lucide-react";
 import { discoverySectionOrder, discoverySection, isQuestionVisible, missingRequiredDiscoveryFields, type DiscoverySectionId } from "@pageloom/core";
 import { useDiscovery, markDiscoveryReviewed, reopenDiscoverySection, loadDiscoveryNotes, addDiscoveryNote, type DiscoveryNote } from "@/lib/discovery";
 import { Button, Card, dateTime } from "./product-ui";
@@ -23,10 +23,35 @@ export function DiscoveryPanel({ organizationId, project }: { organizationId: st
   const [reopenTarget, setReopenTarget] = useState<DiscoverySectionId>();
   const [expandedSectionId, setExpandedSectionId] = useState<DiscoverySectionId>();
   const [busy, setBusy] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const s = t("discoveryPanel"), qc = t("discoveryQuestions");
 
+  useEffect(() => () => { if (copyTimerRef.current) clearTimeout(copyTimerRef.current); }, []);
+
+  // Deep-links straight to the authenticated Discovery flow for this project — it does not grant
+  // any new access on its own. Whoever opens it still needs to sign in as a member already scoped
+  // to this project (see firestore.rules' clientProject()); staff decide how to send it (email,
+  // WhatsApp, etc.), matching the platform's existing "generate a link, never auto-send" pattern
+  // (customer-admin-api.ts's portal password-reset link works the same way).
+  async function copyDiscoveryLink() {
+    const link = `${window.location.origin}/discovery?projectId=${project.id}`;
+    await navigator.clipboard.writeText(link);
+    setLinkCopied(true);
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setLinkCopied(false), 2500);
+  }
+
   if (loading && !state) return <Card aria-busy="true"><h3 className="text-sm font-semibold">{s.title}</h3><p className="mt-3 text-xs text-[var(--muted)]">{s.loading}</p></Card>;
-  if (!state?.progress) return null; // Discovery not started for this project — nothing to show yet.
+  // No discoveryProgress doc means the client hasn't opened Discovery yet — this is exactly when
+  // staff most need to hand them the link, so show a minimal card with just the copy action
+  // rather than returning null and hiding the feature until after the client has already started.
+  if (!state?.progress) return <Card>
+    <div className="flex items-center justify-between gap-3">
+      <h3 className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4" />{s.title}</h3>
+      <CopyLinkButton copied={linkCopied} onCopy={() => void copyDiscoveryLink()} s={s} />
+    </div>
+  </Card>;
 
   const progress = state.progress;
   const statusLabel = { not_started: s.statusNotStarted, in_progress: s.statusInProgress, submitted: s.statusSubmitted, reviewed: s.statusReviewed, reopened: s.statusReopened }[progress.status];
@@ -43,7 +68,10 @@ export function DiscoveryPanel({ organizationId, project }: { organizationId: st
   return <Card>
     <div className="flex items-center justify-between gap-3">
       <h3 className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4" />{s.title}</h3>
-      <span className="status status-idle"><i aria-hidden="true" />{statusLabel}</span>
+      <div className="flex items-center gap-2">
+        <CopyLinkButton copied={linkCopied} onCopy={() => void copyDiscoveryLink()} s={s} />
+        <span className="status status-idle"><i aria-hidden="true" />{statusLabel}</span>
+      </div>
     </div>
 
     <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -86,6 +114,13 @@ export function DiscoveryPanel({ organizationId, project }: { organizationId: st
 
     <DiscoveryNotes organizationId={organizationId} projectId={project.id} />
   </Card>;
+}
+
+function CopyLinkButton({ copied, onCopy, s }: { copied: boolean; onCopy: () => void; s: ReturnType<typeof t<"discoveryPanel">> }) {
+  return <button type="button" className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-[10px] text-[var(--muted)] hover:text-[var(--text)]" onClick={onCopy} aria-label={s.copyLinkAria}>
+    {copied ? <CheckCircle2 className="h-3.5 w-3.5 text-[var(--success-text)]" /> : <Link2 className="h-3.5 w-3.5" />}
+    {copied ? s.linkCopied : s.copyLink}
+  </button>;
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
