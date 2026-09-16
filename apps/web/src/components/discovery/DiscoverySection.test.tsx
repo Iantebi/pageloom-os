@@ -47,3 +47,26 @@ describe("DiscoverySection accessibility", () => {
     }
   });
 });
+
+// Regression coverage for a real gap found 2026-09-16 during a mobile-responsiveness audit: the
+// platform-wide `.input`/`.button` base classes measure roughly 34-36px tall — under the
+// 44x44px touch-target minimum docs/customer-discovery-onboarding/PRD.md §29 requires. Rather
+// than change those shared classes (used across the entire product, not just Discovery, and
+// impossible to visually verify everywhere blind), Discovery's own input renderers and the
+// "Finish section" button carry an explicit min-h-11 (44px) override. This proves the override
+// actually landed in the rendered output, not just in the source.
+describe("DiscoverySection mobile touch targets", () => {
+  it("gives every single-input question's control a min-h-11 (44px) touch target", () => {
+    const html = renderToStaticMarkup(
+      <DiscoverySection organizationId="org1" projectId="p1" sectionId="business" initialResponses={{}} readOnly={false} onSectionCompleted={() => {}} />,
+    );
+    expect(html).toContain('class="input min-h-11"');
+  });
+
+  it("gives the Finish section button a min-h-11 touch target", () => {
+    const html = renderToStaticMarkup(
+      <DiscoverySection organizationId="org1" projectId="p1" sectionId="business" initialResponses={{}} readOnly={false} onSectionCompleted={() => {}} />,
+    );
+    expect(html).toMatch(/class="button button-primary[^"]*\bmin-h-11\b[^"]*"/);
+  });
+});

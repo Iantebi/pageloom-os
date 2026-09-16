@@ -15,6 +15,8 @@ vi.mock("@/lib/organization", () => ({
   useOrganization: () => ({ organizationId: "org1", organizations: [{ id: "org1", name: "Org", role: "owner" }], setOrganizationId: () => {}, loading: false, error: "", retry: () => {} }),
 }));
 
+vi.mock("@/lib/auth", () => ({ useAuth: () => ({ signOut: () => Promise.resolve() }) }));
+
 // Deliberately returns a "loading" (never resolved) state - if the bare-URL branch in page.tsx
 // weren't hit first, this mock would make the page hang on <Loading/> forever, never on loadError.
 vi.mock("@/lib/discovery", () => ({

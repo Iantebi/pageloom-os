@@ -64,6 +64,7 @@ const he = {
   networkOffline: "אין חיבור לאינטרנט כרגע. התשובות שלכם נשמרות איתכם ברגע שהחיבור יחזור.",
   sessionExpired: "החיבור פג. יש להתחבר מחדש כדי להמשיך.",
   permissionDenied: "אין לכם גישה לפרויקט הזה.",
+  signInAgain: "התחברות מחדש",
 
   // Multi-select / repeater controls
   yesLabel: "כן", noLabel: "לא",
@@ -126,6 +127,7 @@ const en = {
   networkOffline: "No internet connection right now. Your answers are kept locally until the connection returns.",
   sessionExpired: "Your session expired. Please sign in again to continue.",
   permissionDenied: "You don't have access to this project.",
+  signInAgain: "Sign in again",
 
   yesLabel: "Yes", noLabel: "No",
   addItem: "Add", removeItem: "Remove",

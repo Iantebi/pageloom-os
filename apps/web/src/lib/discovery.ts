@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import type { DiscoveryProgressDocument, DiscoverySectionDocument, DiscoverySectionId } from "@pageloom/core";
-import { api } from "./api";
+import { api, classifyApiErrorKind, type ApiErrorKind } from "./api";
 
 // Shared data-fetching for Business Discovery — used by the customer flow (app/discovery),
 // the dashboard/portal task card, and the staff Backend Master panel.
@@ -15,6 +15,11 @@ export function useDiscovery(organizationId: string | undefined, projectId: stri
   const [state, setState] = useState<DiscoveryState>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // Distinguishes *why* the load failed so the UI can show an accurate, specific message
+  // (offline / session expired / not authorized / something else) instead of one generic
+  // "couldn't load" string regardless of cause — see docs/customer-discovery-onboarding/PRD.md
+  // §30's error-state table, which this makes actually reachable rather than dictionary-only copy.
+  const [errorKind, setErrorKind] = useState<ApiErrorKind>("generic");
 
   // A promise-chain (not async/await) body deliberately keeps every setState call inside a .then/
   // .catch/.finally callback rather than synchronously in this function's immediate execution —
@@ -24,13 +29,13 @@ export function useDiscovery(organizationId: string | undefined, projectId: stri
     if (!organizationId || !projectId) return undefined;
     return api<DiscoveryState>(`/projects/${projectId}/discovery?organizationId=${encodeURIComponent(organizationId)}`)
       .then(result => { setState(result); setError(""); })
-      .catch((failure: unknown) => setError(failure instanceof Error ? failure.message : "load_failed"))
+      .catch((failure: unknown) => { setError(failure instanceof Error ? failure.message : "load_failed"); setErrorKind(classifyApiErrorKind(failure)); })
       .finally(() => setLoading(false));
   }, [organizationId, projectId]);
 
   useEffect(() => { void reload(); }, [reload]);
 
-  return { state, loading, error, reload };
+  return { state, loading, error, errorKind, reload };
 }
 
 export type SaveStatus = "idle" | "saving" | "saved" | "error";

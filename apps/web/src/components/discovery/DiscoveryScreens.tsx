@@ -49,8 +49,8 @@ export function ReviewScreen({ organizationId, projectId, state, onEdit, onBack,
     {outstanding.length > 0 && <p className="mt-4 rounded-lg bg-[var(--warn-bg)] p-3 text-xs text-[var(--warn-text)]">{s.missingRequiredTitle(outstanding.length)}</p>}
     {error && <p className="mt-4 rounded-lg bg-[var(--danger-bg)] p-3 text-xs text-[var(--danger-text)]" role="alert">{error}</p>}
     <div className="mt-6 flex flex-wrap gap-2">
-      <Button variant="secondary" onClick={onBack}><ArrowRight className="h-4 w-4" />{s.previous}</Button>
-      <Button disabled={busy || outstanding.length > 0} onClick={() => void submit()}>{busy ? s.submitting : s.submitDiscovery}</Button>
+      <Button className="min-h-11" variant="secondary" onClick={onBack}><ArrowRight className="h-4 w-4" />{s.previous}</Button>
+      <Button className="min-h-11" disabled={busy || outstanding.length > 0} onClick={() => void submit()}>{busy ? s.submitting : s.submitDiscovery}</Button>
     </div>
   </Card>;
 }
@@ -71,7 +71,7 @@ export function CompletionScreen() {
         </div>)}
       </div>
     </div>
-    <Link href="/portal"><Button className="mt-6">{s.completionBackCta}</Button></Link>
+    <Link href="/portal"><Button className="mt-6 min-h-11">{s.completionBackCta}</Button></Link>
   </Card>;
 }
 

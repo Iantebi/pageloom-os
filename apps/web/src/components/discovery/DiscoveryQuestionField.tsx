@@ -41,7 +41,7 @@ export function DiscoveryQuestionField({ question, value, organizationId, projec
     case "url":
     case "date":
       return <input
-        id={question.id} className="input" type={question.type === "email" ? "email" : question.type === "url" ? "url" : question.type === "phone" ? "tel" : question.type === "date" ? "date" : "text"}
+        id={question.id} className="input min-h-11" type={question.type === "email" ? "email" : question.type === "url" ? "url" : question.type === "phone" ? "tel" : question.type === "date" ? "date" : "text"}
         value={String(value ?? "")} placeholder={copy?.placeholder} maxLength={question.maxLength ?? 300}
         onChange={event => onChange(event.target.value)} />;
 
@@ -50,12 +50,12 @@ export function DiscoveryQuestionField({ question, value, organizationId, projec
 
     case "boolean":
       return <div className="flex gap-2">
-        <button type="button" className={`button ${value === true ? "button-primary" : "button-secondary"}`} onClick={() => onChange(true)}>{s.yesLabel}</button>
-        <button type="button" className={`button ${value === false ? "button-primary" : "button-secondary"}`} onClick={() => onChange(false)}>{s.noLabel}</button>
+        <button type="button" className={`button min-h-11 min-w-11 ${value === true ? "button-primary" : "button-secondary"}`} onClick={() => onChange(true)}>{s.yesLabel}</button>
+        <button type="button" className={`button min-h-11 min-w-11 ${value === false ? "button-primary" : "button-secondary"}`} onClick={() => onChange(false)}>{s.noLabel}</button>
       </div>;
 
     case "select":
-      return <select id={question.id} className="input" value={String(value ?? "")} onChange={event => onChange(event.target.value)}>
+      return <select id={question.id} className="input min-h-11" value={String(value ?? "")} onChange={event => onChange(event.target.value)}>
         <option value="" />
         {question.options?.map(option => <option value={option} key={option}>{qc.options[option as keyof typeof qc.options] ?? option}</option>)}
       </select>;
@@ -104,9 +104,9 @@ export function DiscoveryQuestionField({ question, value, organizationId, projec
     case "address": {
       const address = (value ?? {}) as Partial<AddressValue>;
       return <div className="grid gap-2 sm:grid-cols-2">
-        <input className="input" placeholder={s.addressLine1} value={address.line1 ?? ""} onChange={event => onChange({ ...address, line1: event.target.value })} />
-        <input className="input" placeholder={s.addressCity} value={address.city ?? ""} onChange={event => onChange({ ...address, city: event.target.value })} />
-        <input className="input sm:col-span-2" placeholder={s.addressServiceAreas} value={(address.serviceAreas ?? []).join(", ")} onChange={event => onChange({ ...address, serviceAreas: event.target.value.split(",").map(item => item.trim()).filter(Boolean) })} />
+        <input className="input min-h-11" placeholder={s.addressLine1} value={address.line1 ?? ""} onChange={event => onChange({ ...address, line1: event.target.value })} />
+        <input className="input min-h-11" placeholder={s.addressCity} value={address.city ?? ""} onChange={event => onChange({ ...address, city: event.target.value })} />
+        <input className="input min-h-11 sm:col-span-2" placeholder={s.addressServiceAreas} value={(address.serviceAreas ?? []).join(", ")} onChange={event => onChange({ ...address, serviceAreas: event.target.value.split(",").map(item => item.trim()).filter(Boolean) })} />
       </div>;
     }
 
@@ -169,12 +169,12 @@ function UploadSlot({ organizationId, projectId, sectionId, questionId, itemInde
     return <div className="rounded-xl border border-dashed border-[var(--danger-text)]/40 p-3">
       <p className="text-[10px] text-[var(--danger-text)]">{state.message === "too_large" ? s.uploadTooLarge : state.message === "wrong_type" ? s.uploadWrongType : s.uploadFailed}</p>
       {state.message !== "too_large" && state.message !== "wrong_type"
-        ? <button type="button" className="button button-secondary mt-2 w-full justify-center" onClick={() => void retry().then(result => onDone({ path: result.path, fileName: result.fileName, uploadedAt: new Date().toISOString(), sizeBytes: result.sizeBytes, source: "customer" })).catch(() => { /* stays in error state */ })}>{s.uploadRetry}</button>
-        : <label className="button button-secondary mt-2 w-full cursor-pointer justify-center">{s.uploadFile}<input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={event => void handleSelect(event.target.files?.[0])} /></label>}
+        ? <button type="button" className="button min-h-11 button-secondary mt-2 w-full justify-center" onClick={() => void retry().then(result => onDone({ path: result.path, fileName: result.fileName, uploadedAt: new Date().toISOString(), sizeBytes: result.sizeBytes, source: "customer" })).catch(() => { /* stays in error state */ })}>{s.uploadRetry}</button>
+        : <label className="button min-h-11 button-secondary mt-2 w-full cursor-pointer justify-center">{s.uploadFile}<input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={event => void handleSelect(event.target.files?.[0])} /></label>}
     </div>;
   }
   return <div className="rounded-xl border border-dashed border-[var(--border)] p-3">
-    <label className="button button-secondary w-full cursor-pointer justify-center">
+    <label className="button min-h-11 button-secondary w-full cursor-pointer justify-center">
       {state.status === "uploading" ? s.uploading(state.percent) : s.uploadFile}
       <input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" disabled={state.status === "uploading"} onChange={event => void handleSelect(event.target.files?.[0])} />
     </label>
@@ -203,16 +203,16 @@ function ServiceRepeaterField({ value, maxItems, onChange }: { value?: ServiceEn
   return <div className="space-y-3">
     {items.map((item, index) => <div className="rounded-xl border border-[var(--border)] p-3" key={index}>
       <div className="grid gap-2 sm:grid-cols-2">
-        <input className="input" placeholder={qc.questions["services.name"]?.label} value={item.name} onChange={event => update(index, { name: event.target.value })} />
-        <input className="input" placeholder={qc.questions["services.forWhom"]?.label} value={item.forWhom ?? ""} onChange={event => update(index, { forWhom: event.target.value })} />
-        <input className="input" placeholder={qc.questions["services.problem"]?.label} value={item.problem ?? ""} onChange={event => update(index, { problem: event.target.value })} />
-        <input className="input" placeholder={qc.questions["services.outcome"]?.label} value={item.outcome ?? ""} onChange={event => update(index, { outcome: event.target.value })} />
-        <input className="input" placeholder={qc.questions["services.priceLabel"]?.label} value={item.priceLabel ?? ""} onChange={event => update(index, { priceLabel: event.target.value })} />
+        <input className="input min-h-11" placeholder={qc.questions["services.name"]?.label} value={item.name} onChange={event => update(index, { name: event.target.value })} />
+        <input className="input min-h-11" placeholder={qc.questions["services.forWhom"]?.label} value={item.forWhom ?? ""} onChange={event => update(index, { forWhom: event.target.value })} />
+        <input className="input min-h-11" placeholder={qc.questions["services.problem"]?.label} value={item.problem ?? ""} onChange={event => update(index, { problem: event.target.value })} />
+        <input className="input min-h-11" placeholder={qc.questions["services.outcome"]?.label} value={item.outcome ?? ""} onChange={event => update(index, { outcome: event.target.value })} />
+        <input className="input min-h-11" placeholder={qc.questions["services.priceLabel"]?.label} value={item.priceLabel ?? ""} onChange={event => update(index, { priceLabel: event.target.value })} />
         <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={item.promote} onChange={event => update(index, { promote: event.target.checked })} />{qc.questions["services.promote"]?.label}</label>
       </div>
       {items.length > 1 && <button type="button" className="mt-2 text-[10px] text-[var(--danger-text)]" onClick={() => onChange(items.filter((_it, i) => i !== index))}>{qc.questions["services.remove"]?.label}</button>}
     </div>)}
-    {items.length < maxItems && <button type="button" className="button button-secondary" onClick={() => onChange([...items, { name: "", promote: false }])}><Plus className="h-4 w-4" />{qc.questions["services.add"]?.label}</button>}
+    {items.length < maxItems && <button type="button" className="button min-h-11 button-secondary" onClick={() => onChange([...items, { name: "", promote: false }])}><Plus className="h-4 w-4" />{qc.questions["services.add"]?.label}</button>}
   </div>;
 }
 
@@ -223,9 +223,9 @@ function TestimonialRepeaterField({ value, maxItems, onChange }: { value?: Testi
   return <div className="space-y-3">
     {items.map((item, index) => <div className="rounded-xl border border-[var(--border)] p-3" key={index}>
       <textarea className="input min-h-16" value={item.text} onChange={event => update(index, { text: event.target.value })} />
-      <input className="input mt-2" value={item.author ?? ""} onChange={event => update(index, { author: event.target.value })} />
+      <input className="input min-h-11 mt-2" value={item.author ?? ""} onChange={event => update(index, { author: event.target.value })} />
       <button type="button" className="mt-2 text-[10px] text-[var(--danger-text)]" onClick={() => onChange(items.filter((_it, i) => i !== index))}>{s.removeItem}</button>
     </div>)}
-    {items.length < maxItems && <button type="button" className="button button-secondary" onClick={() => onChange([...items, { text: "" }])}><Plus className="h-4 w-4" />{s.addItem}</button>}
+    {items.length < maxItems && <button type="button" className="button min-h-11 button-secondary" onClick={() => onChange([...items, { text: "" }])}><Plus className="h-4 w-4" />{s.addItem}</button>}
   </div>;
 }

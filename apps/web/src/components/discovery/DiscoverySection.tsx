@@ -5,6 +5,7 @@ import { discoverySection, isQuestionVisible, missingRequiredDiscoveryFields, in
 import { Button } from "@/components/product-ui";
 import { DiscoveryQuestionField } from "./DiscoveryQuestionField";
 import { saveDiscoverySection, completeDiscoverySection, type SaveStatus } from "@/lib/discovery";
+import { classifyApiErrorKind } from "@/lib/api";
 import { t } from "@/lib/i18n";
 
 const AUTOSAVE_DEBOUNCE_MS = 1500;
@@ -19,6 +20,10 @@ export function DiscoverySection({ organizationId, projectId, sectionId, initial
 }) {
   const [responses, setResponses] = useState<DiscoveryResponses>(initialResponses);
   const [status, setStatus] = useState<SaveStatus>("idle");
+  // Distinguishes a save failure caused by being offline from any other cause, so the retry
+  // banner can say something more accurate than a generic "save failed" when that's not why it
+  // failed — see docs/customer-discovery-onboarding/PRD.md §30's error-state table.
+  const [saveErrorIsOffline, setSaveErrorIsOffline] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showMissing, setShowMissing] = useState(false);
@@ -58,7 +63,7 @@ export function DiscoverySection({ organizationId, projectId, sectionId, initial
     try {
       await saveDiscoverySection(organizationId, projectId, sectionId, next);
       setStatus("saved");
-    } catch { setStatus("error"); }
+    } catch (failure) { setStatus("error"); setSaveErrorIsOffline(classifyApiErrorKind(failure) === "network"); }
   }
 
   function update(questionId: string, value: unknown) {
@@ -128,18 +133,21 @@ export function DiscoverySection({ organizationId, projectId, sectionId, initial
     </fieldset>
 
     <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-      <SaveStatusIndicator status={status} onRetry={() => void flush(responses)} />
-      {!readOnly && <Button disabled={completing} onClick={() => void complete()}>
+      <SaveStatusIndicator status={status} offline={saveErrorIsOffline} onRetry={() => void flush(responses)} />
+      {!readOnly && <Button className="min-h-11" disabled={completing} onClick={() => void complete()}>
         {completing ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}{s.finishSection}
       </Button>}
     </div>
   </div>;
 }
 
-function SaveStatusIndicator({ status, onRetry }: { status: SaveStatus; onRetry: () => void }) {
+function SaveStatusIndicator({ status, offline, onRetry }: { status: SaveStatus; offline: boolean; onRetry: () => void }) {
   const s = t("discoveryShell");
   if (status === "idle") return <span />;
   if (status === "saving") return <span className="flex items-center gap-1.5 text-[10px] text-[var(--muted)]"><LoaderCircle className="h-3 w-3 animate-spin" />{s.savingStatus}</span>;
-  if (status === "error") return <button type="button" onClick={onRetry} className="text-[10px] text-[var(--danger-text)] underline">{s.saveErrorStatus}</button>;
+  // A network-caused failure gets the more accurate, reassuring message ("your answer is kept
+  // with you until the connection returns") instead of a generic "save failed" — the typed text
+  // is never lost either way (pendingRef/local state keep it), but the message should say so.
+  if (status === "error") return <button type="button" onClick={onRetry} className="text-[10px] text-[var(--danger-text)] underline">{offline ? s.networkOffline : s.saveErrorStatus}</button>;
   return <span className="flex items-center gap-1.5 text-[10px] text-[var(--success-text)]"><CheckCircle2 className="h-3 w-3" />{s.savedStatus}</span>;
 }
