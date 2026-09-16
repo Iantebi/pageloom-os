@@ -37,7 +37,7 @@ export function DiscoveryStagesMenu({ currentSectionId, completedSectionIds, onS
   const qc = t("discoveryQuestions"), s = t("discoveryShell");
   return <label className="field sm:hidden">
     <span>{s.stagesMenuLabel}</span>
-    <select className="input" value={currentSectionId} onChange={event => onSelect(event.target.value as DiscoverySectionId)}>
+    <select className="input min-h-11" value={currentSectionId} onChange={event => onSelect(event.target.value as DiscoverySectionId)}>
       {discoverySectionOrder.map((sectionId, index) => <option value={sectionId} key={sectionId}>
         {index + 1}. {qc.sections[sectionId].title} {completedSectionIds.includes(sectionId) ? "✓" : ""}
       </option>)}

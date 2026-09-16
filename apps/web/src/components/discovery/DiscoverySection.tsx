@@ -134,7 +134,7 @@ export function DiscoverySection({ organizationId, projectId, sectionId, initial
 
     <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
       <SaveStatusIndicator status={status} offline={saveErrorIsOffline} onRetry={() => void flush(responses)} />
-      {!readOnly && <Button disabled={completing} onClick={() => void complete()}>
+      {!readOnly && <Button className="min-h-11" disabled={completing} onClick={() => void complete()}>
         {completing ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}{s.finishSection}
       </Button>}
     </div>

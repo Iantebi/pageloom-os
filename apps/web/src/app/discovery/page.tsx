@@ -44,7 +44,7 @@ function DiscoveryScreen() {
         : errorKind === "permission_denied" ? s.permissionDenied
         : s.loadError}
     </p>
-    {errorKind === "session_expired" && <Button className="mt-4" onClick={() => void signOut()}>{s.signInAgain}</Button>}
+    {errorKind === "session_expired" && <Button className="mt-4 min-h-11" onClick={() => void signOut()}>{s.signInAgain}</Button>}
   </Card></DiscoveryShell>;
   if (!state) return <DiscoveryShell><Loading /></DiscoveryShell>;
 
@@ -119,10 +119,10 @@ function DiscoveryScreen() {
       </div>
 
       <div className="mt-8 flex items-center justify-between border-t border-[var(--border)] pt-5">
-        <Button variant="secondary" disabled={index === 0} onClick={() => setCurrentSectionId(discoverySectionOrder[index - 1])}><ArrowRight className="h-4 w-4" />{s.previous}</Button>
+        <Button className="min-h-11" variant="secondary" disabled={index === 0} onClick={() => setCurrentSectionId(discoverySectionOrder[index - 1])}><ArrowRight className="h-4 w-4" />{s.previous}</Button>
         {isLast
-          ? <Button variant="secondary" onClick={() => setReviewing(true)}>{s.reviewAndSubmit}</Button>
-          : <Button variant="secondary" onClick={() => setCurrentSectionId(discoverySectionOrder[index + 1])}>{s.next}<ArrowLeft className="h-4 w-4" /></Button>}
+          ? <Button className="min-h-11" variant="secondary" onClick={() => setReviewing(true)}>{s.reviewAndSubmit}</Button>
+          : <Button className="min-h-11" variant="secondary" onClick={() => setCurrentSectionId(discoverySectionOrder[index + 1])}>{s.next}<ArrowLeft className="h-4 w-4" /></Button>}
       </div>
     </Card>
   </DiscoveryShell>;
