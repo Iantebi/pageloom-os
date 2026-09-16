@@ -23,6 +23,10 @@ export function DiscoverySection({ organizationId, projectId, sectionId, initial
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showMissing, setShowMissing] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // The latest edit not yet sent to the server. Set by update(), cleared once flush() actually
+  // starts sending it. Exists so the unmount cleanup below can send a still-pending edit instead of
+  // just discarding it — see that effect's comment.
+  const pendingRef = useRef<DiscoveryResponses | undefined>(undefined);
   const s = t("discoveryShell"), qc = t("discoveryQuestions");
   const section = discoverySection(sectionId);
   const visibleQuestions = section.questions.filter(question => isQuestionVisible(question, responses));
@@ -31,10 +35,23 @@ export function DiscoverySection({ organizationId, projectId, sectionId, initial
   // No reset-on-sectionId-change effect here by design: the parent renders this component with
   // key={sectionId} (see app/discovery/page.tsx), so React remounts it fresh for every section —
   // the React-recommended alternative to "adjusting state in response to a prop change" via effect.
-  useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
+  //
+  // Bug fix (2026-09-16): clicking "Next"/"Previous" within the 1.5s debounce window used to unmount
+  // this component (new key on the incoming section) while an edit was still only sitting in the
+  // debounce timer, never sent — clearTimeout silently discarded it with no error, no retry, and no
+  // way for the customer to know. This is exactly the data loss PRD.md §12 says autosave must never
+  // cause. Fixed by sending any still-pending edit directly (bypassing flush()'s setState calls,
+  // which would otherwise warn after this component has already unmounted) before clearing the timer.
+  useEffect(() => () => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      if (pendingRef.current) void saveDiscoverySection(organizationId, projectId, sectionId, pendingRef.current);
+    }
+  }, []);
 
   async function flush(next: DiscoveryResponses) {
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    pendingRef.current = undefined;
     setStatus("saving");
     try {
       await saveDiscoverySection(organizationId, projectId, sectionId, next);
@@ -45,6 +62,7 @@ export function DiscoverySection({ organizationId, projectId, sectionId, initial
   function update(questionId: string, value: unknown) {
     const next = { ...responses, [questionId]: value };
     setResponses(next);
+    pendingRef.current = next;
     setStatus("saving");
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => void flush(next), AUTOSAVE_DEBOUNCE_MS);
