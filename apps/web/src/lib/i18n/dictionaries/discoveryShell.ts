@@ -59,6 +59,7 @@ const he = {
 
   // Errors
   loadError: "לא הצלחנו לטעון את אפיון העסק. רעננו את הדף ונסו שוב.",
+  noProjectSelected: "לא נבחר פרויקט. יש לפתוח את אפיון העסק דרך הקישור בפרויקט שלכם.",
   networkOffline: "אין חיבור לאינטרנט כרגע. התשובות שלכם נשמרות איתכם ברגע שהחיבור יחזור.",
   sessionExpired: "החיבור פג. יש להתחבר מחדש כדי להמשיך.",
   permissionDenied: "אין לכם גישה לפרויקט הזה.",
@@ -119,6 +120,7 @@ const en = {
   needsMoreInfoCta: "Go to stage",
 
   loadError: "We couldn't load Business Discovery. Refresh the page and try again.",
+  noProjectSelected: "No project was selected. Open Business Discovery from the link in your project.",
   networkOffline: "No internet connection right now. Your answers are kept locally until the connection returns.",
   sessionExpired: "Your session expired. Please sign in again to continue.",
   permissionDenied: "You don't have access to this project.",
