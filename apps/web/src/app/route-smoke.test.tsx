@@ -141,9 +141,9 @@ const routes: [name: string, load: () => Promise<{ default: () => React.ReactEle
   ["/portal", () => import("./(product)/portal/page")],
   ["/settings", () => import("./(product)/settings/page")],
   ["/discovery", () => import("./discovery/page")],
-  ["/master", () => import("./(product)/master/page")],
-  ["/master/content", () => import("./(product)/master/content/page")],
-  ["/master/customer", () => import("./(product)/master/customer/page")],
+  ["/master", () => import("./(master)/master/page")],
+  ["/master/content", () => import("./(master)/master/content/page")],
+  ["/master/customer", () => import("./(master)/master/customer/page")],
 ];
 
 describe("authenticated route smoke test", () => {

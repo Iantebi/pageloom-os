@@ -28,6 +28,7 @@ export const common = {
     closeNavigation: "סגירת ניווט",
     adminRequiredTitle: "נדרשת הרשאת מנהל/ת מערכת",
     adminRequiredDescription: "אזור זה זמין רק לבעלים ולמנהלי/ות מערכת מורשים של PageLoom.",
+    exitToOwnerWorkspace: "חזרה לחלל העבודה",
   },
   en: {
     save: "Save",
@@ -58,6 +59,7 @@ export const common = {
     closeNavigation: "Close navigation",
     adminRequiredTitle: "Administrator access required",
     adminRequiredDescription: "This area is restricted to PageLoom Owner and authorized Admin roles.",
+    exitToOwnerWorkspace: "Back to Owner Workspace",
   },
 } as const;
 
