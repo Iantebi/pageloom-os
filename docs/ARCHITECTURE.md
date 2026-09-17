@@ -111,7 +111,7 @@ served by Firebase Hosting.
 | `/builder` | Staff | Pre-sale intake → schedule a call; separate closed-won recorder enforcing the human-close requirement; production pipeline view. |
 | `/crm` | Staff | Lead kanban (new→won/lost) and customer records with contacts/documents. |
 | `/portal` | Customer + staff preview | Journey timeline, discovery or legacy questionnaire, file upload, live-site preview, handover, content review, revisions, support tickets. |
-| `/discovery` | Customer | Standalone (no sidebar) 9-section Business Discovery wizard — deliberately separate UX context. |
+| `/discovery` | Customer | Standalone (no sidebar) 9-section Business Discovery wizard — deliberately separate UX context. Since 2026-09-17, the UI is the imported AI Studio frontend (`apps/web/src/ai-studio/App.tsx`); see §10's amendment. |
 | `/settings` | Any signed-in user | MFA enrollment, appearance/theme settings. |
 | `/master`, `/master/content`, `/master/customer` | Owner / Admin only | Master Control Center, cross-project content editor, full admin customer profile with portal-user management. |
 
@@ -610,6 +610,25 @@ unaffected by which one ran.
 > unaffected. Discovery status is now also visible in the Master Panel's top-level customer
 > table, not only per-project. See `docs/customer-discovery-onboarding/ARCHITECTURE.md`'s own
 > amendment note for the full detail.
+
+> **Amendment (2026-09-17): the customer-facing `/discovery` UI is now the Google AI Studio
+> frontend** (`apps/web/src/ai-studio/**`, imported from `Iantebi/pageloom-discovery-ai`),
+> replacing the previous hand-built stepper UI — the backend, Firestore structure, security
+> rules, and authentication are unchanged; there is exactly one Discovery data path. The AI
+> Studio app's own data layer (`services/firebaseDiscoveryService.ts`) no longer talks to
+> Firestore/Storage directly — it calls the same real backend every other client does
+> (`apps/web/src/lib/discovery.ts`), through a field-level bridge
+> (`services/discoveryMapping.ts`) that translates its flat `DiscoveryData` shape to/from the
+> real per-section `discoveryTemplate` schema. `discovery-template.ts` gained a small set of
+> additive optional questions (fields AI Studio collects with no prior home) and several
+> required→optional loosenings for questions no AI Studio step asks (they would otherwise
+> permanently block `/submit` for this frontend) — nothing existing was removed or renamed.
+> A new staff-only endpoint, `GET /discovery/management/sessions`, lists every project's
+> Discovery progress for an org; it backs a new Owner Dashboard/Master Panel Discovery list
+> (`dashboard-discovery-slot.tsx`, `discovery-management-list.tsx`) that links into the
+> existing per-project `DiscoveryPanel`. AI Studio's own `AdminMaster`/`ClientWorkspace`
+> views were imported but are not mounted — the real Master Panel and Portal already cover
+> that role.
 
 ### Delivery, review & handoff
 
