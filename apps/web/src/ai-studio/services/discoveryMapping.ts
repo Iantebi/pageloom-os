@@ -44,12 +44,15 @@ const FILE_CATEGORY_TO_QUESTION: Record<UploadedFile["category"], { sectionId: D
 };
 
 function toRealFile(file: UploadedFile): RealFileRecord | undefined {
-  // Only a file that has actually gone through the real upload path (discoveryBridge.uploadFile)
-  // carries a Storage `path` — a file still mid-upload, or one that failed and never got a real
-  // path, is deliberately not persisted to the real backend yet (nothing to point at).
-  const path = (file as UploadedFile & { realPath?: string }).realPath;
-  if (!path || file.isDeleted) return undefined;
-  return { path, fileName: file.name, uploadedAt: file.uploadedAt, sizeBytes: file.size, source: "customer" };
+  // Only a file that has actually gone through the real upload path
+  // (firebaseDiscoveryService.uploadClientFile) carries a Storage `path` and a real ISO
+  // timestamp — a file still mid-upload, or one that failed and never got either, is
+  // deliberately not persisted to the real backend yet (nothing valid to point at).
+  // realUploadedAtIso (not the display-only file.uploadedAt, a localized Hebrew string) is
+  // what satisfies discoveryFileRecordSchema's `.datetime()` requirement.
+  const typed = file as UploadedFile & { realPath?: string; realUploadedAtIso?: string };
+  if (!typed.realPath || !typed.realUploadedAtIso || file.isDeleted) return undefined;
+  return { path: typed.realPath, fileName: file.name, uploadedAt: typed.realUploadedAtIso, sizeBytes: file.size, source: "customer" };
 }
 
 function joinNonEmpty(...parts: (string | undefined)[]): string | undefined {
@@ -83,8 +86,11 @@ export function toRealSectionResponses(data: DiscoveryData): SectionResponsesMap
       promote: false,
     }));
 
+  // discoveryAddressSchema requires city to be non-empty (min(1)) — AI Studio has no separate
+  // city field, only one combined address string, so there is no real value to put there. A
+  // placeholder is honest about that rather than duplicating line1 into it.
   const address: RealAddress | undefined = (data.physicalAddress || data.location)
-    ? { line1: data.physicalAddress || data.location, city: "" }
+    ? { line1: data.physicalAddress || data.location, city: "לא צוין" }
     : undefined;
 
   const socialLinks = [data.facebookUrl, data.instagramUrl, data.tiktokOrLinkedIn].filter((url): url is string => Boolean(url?.trim()));

@@ -1,12 +1,13 @@
 "use client";
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useOrganization } from '@/lib/organization';
 import { useAuth } from '@/lib/auth';
 import { classifyApiErrorKind, type ApiErrorKind } from '@/lib/api';
 import { t } from '@/lib/i18n';
 import { Button, Card, Empty, Loading } from '@/components/product-ui';
+import { AdminMaster } from './components/AdminMaster';
 import { Header } from './components/Header';
 import { ProgressBar } from './components/ProgressBar';
 import { LandingView } from './components/LandingView';
@@ -29,16 +30,23 @@ import { INITIAL_DISCOVERY_DATA } from './data/initialData';
 // Real integration entry point (2026-09-17 Discovery unification): mounted directly by
 // apps/web/src/app/discovery/page.tsx inside the existing AuthenticatedOrganization gate, so
 // organizationId/projectId come from the same real routing every other pageloom-os route uses —
-// never a self-generated project ID, never a bare-metal window.location admin/workspace toggle.
-// AI Studio's own AdminMaster/ClientWorkspace views are deliberately not mounted here: the real
-// Master Panel (DiscoveryPanel + DiscoveryManagementList in /master) and the real customer Portal
-// already cover that, on the real backend.
+// never a self-generated project ID.
+//
+// AdminMaster (re-enabled 2026-09-17 at Isaac's explicit request — "use the existing /admin page,
+// don't create another one") is reached via ?view=admin on this same route, exactly like the
+// original AI Studio app's own admin toggle, but role-gated: only owner/admin ever see it, since
+// AuthenticatedOrganization's gate here checks authentication only, not role. A client (customer)
+// must never be able to reach it, even by guessing the query param.
 
 export default function App() {
-  const projectId = useSearchParams().get("projectId") ?? "";
-  const { organizationId, loading: orgLoading } = useOrganization();
+  const params = useSearchParams();
+  const router = useRouter();
+  const projectId = params.get("projectId") ?? "";
+  const isAdminRequested = params.get("view") === "admin";
+  const { organizationId, membership, loading: orgLoading } = useOrganization();
   const { signOut } = useAuth();
   const s = t("discoveryShell");
+  const isStaff = membership?.role === "owner" || membership?.role === "admin";
 
   const [data, setData] = useState<DiscoveryData>();
   const [loadErrorKind, setLoadErrorKind] = useState<ApiErrorKind>();
@@ -71,6 +79,15 @@ export default function App() {
     });
   }, []);
 
+  if (orgLoading) return <Loading />;
+  if (isAdminRequested) {
+    if (!isStaff) return <Card><Empty title={s.permissionDenied} description="" /></Card>;
+    return <AdminMaster
+      currentProject={{ ...INITIAL_DISCOVERY_DATA }}
+      onSelectProjectToEdit={() => { /* staff editing a customer's own answers is out of scope */ }}
+      onCloseAdmin={() => router.push("/portal")}
+    />;
+  }
   if (!projectId) return <Card><Empty title={s.noProjectSelected} description="" /></Card>;
   // Distinct, accurate messages per failure cause (docs/customer-discovery-onboarding/PRD.md §30),
   // matching the pre-unification page.tsx's own error handling — a customer who was denied access
@@ -115,6 +132,7 @@ export default function App() {
         saveStatus={saveStatus}
         onOpenAiSummary={() => setIsAiModalOpen(true)}
         onOpenHelp={() => setIsHelpOpen(!isHelpOpen)}
+        {...(isStaff ? { isAdminView: false, onToggleAdmin: () => router.push(`/discovery?view=admin`) } : {})}
       />
 
       {data.currentStep > 0 && (

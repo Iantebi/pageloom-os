@@ -64,13 +64,19 @@ discoveryRouter.get("/discovery/management/sessions", async (req: AuthenticatedR
     const organizationId = z.string().min(1).parse(req.query.organizationId);
     if (await requireRole(req, res, organizationId, staff) === undefined) return;
     const projectsSnap = await db.collection(`organizations/${organizationId}/projects`).get();
-    const progressSnaps = await db.getAll(...projectsSnap.docs.map(project => progressRef(organizationId, project.id)));
+    const [progressSnaps, businessSnaps] = await Promise.all([
+      db.getAll(...projectsSnap.docs.map(project => progressRef(organizationId, project.id))),
+      db.getAll(...projectsSnap.docs.map(project => sectionRef(organizationId, project.id, "business"))),
+    ]);
     const sessions = projectsSnap.docs.flatMap((project, index) => {
       const snap = progressSnaps[index];
       if (!snap?.exists) return [];
       const progress = snap.data() as DiscoveryProgressDocument;
+      const business = businessSnaps[index]?.exists ? (businessSnaps[index]!.data()?.responses as Record<string, unknown> | undefined) : undefined;
       return [{
         id: project.id, customerId: project.data().customerId ?? null, projectName: project.data().name ?? project.id,
+        businessName: (business?.["business.publicName"] as string | undefined) || project.data().name || project.id,
+        ownerName: (business?.["business.ownerName"] as string | undefined) || null,
         status: progress.status, percentComplete: progress.percentComplete, currentSectionId: progress.currentSectionId ?? null,
         startedAt: progress.startedAt ?? null, submittedAt: progress.submittedAt ?? null, lastActivityAt: progress.lastActivityAt,
       }];

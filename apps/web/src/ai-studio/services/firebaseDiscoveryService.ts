@@ -67,22 +67,38 @@ class FirebaseDiscoveryService {
     };
   }
 
+  // PATCH /discovery/sections/:id is rate-limited (180 requests / 5 minutes per user —
+  // discovery-api.ts's autosaveLimit). Sending all 7-9 sections on every debounced keystroke
+  // burns through that budget in well under a minute of normal typing, surfacing as a false
+  // "Synchronization Error" that has nothing to do with the actual data. lastSent caches each
+  // section's last-sent JSON so only sections whose content actually changed get PATCHed.
+  private lastSent = new Map<DiscoverySectionId, string>();
+
   saveDiscovery(data: DiscoveryData, immediate = false, _timelineEvent?: TimelineEntry): void {
     if (this.saveTimer) clearTimeout(this.saveTimer);
     const doSave = async () => {
       if (!this.isOnline) { this.notify("offline"); return; }
       if (!this.organizationId || !data.projectId) return;
+      const bySection = toRealSectionResponses(data);
+      const changed = (Object.entries(bySection) as [DiscoverySectionId, Record<string, unknown>][])
+        .filter(([sectionId, responses]) => {
+          const serialized = JSON.stringify(responses);
+          if (this.lastSent.get(sectionId) === serialized) return false;
+          this.lastSent.set(sectionId, serialized);
+          return true;
+        });
+      if (changed.length === 0) return;
       this.notify("saving");
       try {
-        const bySection = toRealSectionResponses(data);
-        await Promise.all(
-          (Object.entries(bySection) as [DiscoverySectionId, Record<string, unknown>][])
-            .map(([sectionId, responses]) => saveDiscoverySection(this.organizationId, data.projectId, sectionId, responses)),
-        );
+        await Promise.all(changed.map(([sectionId, responses]) => saveDiscoverySection(this.organizationId, data.projectId, sectionId, responses)));
         this.notify("saved");
         setTimeout(() => this.notify("idle"), 1800);
       } catch (err) {
         console.warn("[Discovery] save error:", err);
+        // Let a failed section be retried on the next save attempt instead of being considered
+        // "sent" — otherwise a transient failure would silently stop that section from ever
+        // being retried until its content changes again.
+        for (const [sectionId] of changed) this.lastSent.delete(sectionId);
         this.notify("error");
       }
     };
@@ -131,20 +147,67 @@ class FirebaseDiscoveryService {
     await new Promise<void>((resolve, reject) => task.on("state_changed", undefined, reject, () => resolve()));
     const downloadUrl = await getDownloadURL(task.snapshot.ref);
     const isImage = file.type?.startsWith("image/");
+    const now = new Date();
     return {
       id: crypto.randomUUID(), name: file.name, size: file.size, type: file.type || "application/octet-stream",
       category, categoryLabelHebrew, downloadUrl, previewUrl: isImage ? downloadUrl : undefined, thumbnailUrl: isImage ? downloadUrl : undefined,
-      uploadedAt: new Date().toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" }), progress: 100, isDeleted: false,
-      ...({ realPath: path } as Record<string, unknown>),
+      // uploadedAt stays a localized display string (Step6Uploads.tsx renders it directly) —
+      // discoveryMapping.ts's toRealFile() needs a real ISO 8601 datetime for the backend's
+      // discoveryFileRecordSchema (`.datetime()`), which a "17.9.2026, 18:53"-style string
+      // fails, so that value travels separately in realUploadedAtIso instead of overloading
+      // the display field.
+      uploadedAt: now.toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" }), progress: 100, isDeleted: false,
+      ...({ realPath: path, realUploadedAtIso: now.toISOString() } as Record<string, unknown>),
     } as UploadedFile;
   }
 
-  // The methods below back AI Studio's own AdminMaster/ClientWorkspace views, which read/write a
-  // flat `clients`/`customers` collection tree that has no real counterpart in pageloom-os. Those
-  // views are intentionally not mounted from apps/web/src/app/discovery/page.tsx — the real Master
-  // Panel (DiscoveryPanel, embedded in /master/customer, plus DiscoveryManagementList) and the real
-  // customer Portal already cover this, on the real backend. These stay as harmless no-ops only so
-  // the AdminMaster/ClientWorkspace component files still compile if ever imported directly.
+  // AdminMaster (the AI Studio admin console, re-enabled 2026-09-17 at Isaac's explicit request —
+  // "use the existing /admin page, don't create another one") needs a list of every Discovery and,
+  // per project, its full answer set. Both now come from the real backend
+  // (/discovery/management/sessions and /projects/:id/discovery) reshaped into the
+  // ClientFirestoreDoc shape AdminMaster/AdminClientTable/AdminProjectView already expect — no
+  // flat `clients`/`customers` collection, no second Firestore database.
+  private toProjectStatus(status: string): ProjectStatus {
+    if (status === "submitted" || status === "reviewed") return "discovery_completed";
+    return "in_discovery"; // not_started | in_progress | reopened
+  }
+
+  subscribeAllClients(callback: (clients: ClientFirestoreDoc[]) => void) {
+    if (!this.organizationId) { callback([]); return () => undefined; }
+    type ManagementSession = { id: string; customerId: string | null; projectName: string; businessName: string; ownerName: string | null; status: string; percentComplete: number; submittedAt: string | null; lastActivityAt: string };
+    api<ManagementSession[]>(`/discovery/management/sessions?organizationId=${encodeURIComponent(this.organizationId)}`)
+      .then(sessions => callback(sessions.map((session): ClientFirestoreDoc => ({
+        id: session.id, projectId: session.id, userId: "", customerName: session.ownerName || "", businessName: session.businessName,
+        phone: "", email: "", status: this.toProjectStatus(session.status), currentStep: 0, completedSteps: [],
+        progressPercentage: session.percentComplete, missingAnswersCount: 0, missingFilesCount: 0,
+        uploadedFiles: [], storageFolder: `organizations/${this.organizationId}/discovery/${session.id}/`, timeline: [],
+        data: { ...INITIAL_DISCOVERY_DATA, projectId: session.id, customerId: session.customerId ?? session.id, businessName: session.businessName, ownerName: session.ownerName ?? "" },
+        lastActive: session.lastActivityAt, createdAt: session.lastActivityAt, updatedAt: session.lastActivityAt,
+      }))))
+      .catch(err => { console.warn("[Discovery] admin list error:", err); callback([]); });
+    return () => undefined;
+  }
+
+  subscribeClientDoc(projectId: string, callback: (data: ClientFirestoreDoc | null) => void) {
+    if (!this.organizationId) { callback(null); return () => undefined; }
+    this.loadClientDiscovery(projectId)
+      .then(data => callback({
+        id: projectId, projectId, userId: "", customerName: data.ownerName || "", businessName: data.businessName,
+        phone: data.phone || "", email: data.email || "", status: data.isCompleted ? "discovery_completed" : "in_discovery",
+        currentStep: data.currentStep, completedSteps: data.completedSteps, progressPercentage: data.completionPercentage ?? 0,
+        missingAnswersCount: 0, missingFilesCount: 0, isLocked: data.isLocked, uploadedFiles: data.uploadedFiles ?? [],
+        storageFolder: `organizations/${this.organizationId}/discovery/${projectId}/`, timeline: [],
+        data, lastActive: data.lastUpdated ?? "", createdAt: data.lastUpdated ?? "", updatedAt: data.lastUpdated ?? "",
+      }))
+      .catch(err => { console.warn("[Discovery] admin detail error:", err); callback(null); });
+    return () => undefined;
+  }
+
+  // Status workflow, file trash, timeline, and audit-log management below are AI Studio's own
+  // concepts with no real backend counterpart (pageloom-os's actual workflow engine, in
+  // packages/core/src/workflow.ts, is a separate, CRM-adjacent system Discovery deliberately does
+  // not depend on). They stay inert no-ops rather than silently pretending to do something real —
+  // AdminProjectView's discovery-answers tab (the part backed by real data) is what matters here.
   async recordAuditLog(..._args: unknown[]) { return undefined; }
   async softDeleteFile(..._args: unknown[]) { return undefined; }
   async restoreFile(..._args: unknown[]) { return undefined; }
@@ -152,8 +215,6 @@ class FirebaseDiscoveryService {
   async updateProjectStatus(..._args: [string, ProjectStatus, ...unknown[]]) { return undefined; }
   async setProjectLock(..._args: unknown[]) { return undefined; }
   async publishProjectUpdate(..._args: unknown[]) { return undefined; }
-  subscribeAllClients(callback: (clients: ClientFirestoreDoc[]) => void) { callback([]); return () => undefined; }
-  subscribeClientDoc(_projectId: string, callback: (data: ClientFirestoreDoc | null) => void) { callback(null); return () => undefined; }
 }
 
 export const firebaseDiscoveryService = new FirebaseDiscoveryService();
