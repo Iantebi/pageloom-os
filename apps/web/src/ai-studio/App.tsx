@@ -48,6 +48,12 @@ export default function App() {
   const s = t("discoveryShell");
   const isStaff = membership?.role === "owner" || membership?.role === "admin";
 
+  // Called synchronously during render, not inside an effect: AdminMaster is a child
+  // of this component and its own mount effect (subscribeAllClients) fires before this
+  // component's effects, so setting organizationId on the singleton here — instead of
+  // inside the load() effect below — is what makes it available in time.
+  if (organizationId) firebaseDiscoveryService.configure(organizationId);
+
   const [data, setData] = useState<DiscoveryData>();
   const [loadErrorKind, setLoadErrorKind] = useState<ApiErrorKind>();
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
@@ -55,11 +61,7 @@ export default function App() {
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
 
   const load = useCallback(() => {
-    if (!organizationId) return;
-    // Admin view (?view=admin) has no projectId — it still needs configure() so
-    // AdminMaster's subscribeAllClients/subscribeClientDoc calls know which org to query.
-    firebaseDiscoveryService.configure(organizationId);
-    if (!projectId) return;
+    if (!organizationId || !projectId) return;
     setLoadErrorKind(undefined);
     firebaseDiscoveryService.loadClientDiscovery(projectId)
       .then(setData)
