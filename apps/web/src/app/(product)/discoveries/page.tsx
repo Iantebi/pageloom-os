@@ -37,9 +37,8 @@ export default function DiscoveriesPage() {
 
   const load = useCallback(() => {
     if (!organizationId) return;
-    setError("");
     api<ManagementSession[]>(`/discovery/management/sessions?organizationId=${encodeURIComponent(organizationId)}`)
-      .then(setSessions)
+      .then(result => { setError(""); setSessions(result); })
       .catch(failure => setError(failure instanceof Error ? failure.message : s.loadErrorFallback));
   }, [organizationId, s.loadErrorFallback]);
 

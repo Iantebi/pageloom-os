@@ -13,6 +13,7 @@ import { db } from "./firebase.js";
 import { WorkflowEngine } from "./workflow-engine.js";
 import { rateLimit, uidKey } from "./rate-limit.js";
 import { operationalLog, safeErrorName } from "./observability.js";
+import { notify } from "./notifications.js";
 
 // Business Discovery ("אפיון העסק") — see docs/customer-discovery-onboarding/{ARCHITECTURE,SECURITY,DATA-MODEL}.md.
 // This router does NOT change which questionnaire mechanism gets auto-created when Owner confirms
@@ -34,7 +35,6 @@ export const discoveryRouter = Router();
 
 const staff = ["owner", "admin", "operator"];
 const activity = (organizationId: string, type: string, actorId: string, payload: Record<string, unknown>) => db.collection(`organizations/${organizationId}/activity`).add({ type, actorId, payload, createdAt: new Date().toISOString() });
-const notify = (organizationId: string, doc: Record<string, unknown>) => db.collection(`organizations/${organizationId}/notifications`).add({ read: false, createdAt: new Date().toISOString(), ...doc });
 
 function fail(res: import("express").Response, error: unknown, code: string, event: string, fallback: string) {
   if (error instanceof z.ZodError) return res.status(400).json({ error: { code, message: error.issues.map(issue => issue.message).join(", ") } });
@@ -124,6 +124,13 @@ discoveryRouter.patch("/projects/:projectId/discovery/sections/:sectionId", auto
       if (!question) return res.status(400).json({ error: { code: "UNKNOWN_DISCOVERY_QUESTION", message: `"${key}" is not a question in section "${sectionId}"` } });
     }
     const now = new Date().toISOString(), secRef = sectionRef(input.organizationId, projectId, sectionId), progRef = progressRef(input.organizationId, projectId);
+    // Owner notifications ("Discovery started", "Draft saved") must fire once per real event, not
+    // once per autosave call — this endpoint is hit on every debounced keystroke while a customer
+    // types. "Started" is naturally once-only (progSnap only ever fails to exist on the very first
+    // save). "Draft saved" is throttled to once per SECTION the customer moves into, by comparing
+    // against the progress doc's previous currentSectionId, rather than firing on every field-level
+    // PATCH within the same section.
+    let justStarted = false, enteredNewSection = false;
     await db.runTransaction(async tx => {
       const [secSnap, progSnap] = await Promise.all([tx.get(secRef), tx.get(progRef)]);
       const existingResponses = secSnap.exists ? (secSnap.data()!.responses as DiscoveryResponses) : {};
@@ -132,13 +139,26 @@ discoveryRouter.patch("/projects/:projectId/discovery/sections/:sectionId", auto
         : { id: sectionId, projectId, templateVersion: DISCOVERY_TEMPLATE_VERSION, status: "draft", responses: input.responses, updatedAt: now, updatedBy: req.user!.uid };
       tx.set(secRef, nextDoc);
       if (!progSnap.exists) {
+        justStarted = true; enteredNewSection = true;
         const fresh: DiscoveryProgressDocument = { id: "current", projectId, templateVersion: DISCOVERY_TEMPLATE_VERSION, status: "in_progress", startedAt: now, currentSectionId: sectionId, completedSectionIds: [], percentComplete: 0, lastActivityAt: now };
         tx.set(progRef, fresh);
       } else {
         const current = progSnap.data() as DiscoveryProgressDocument;
+        enteredNewSection = current.currentSectionId !== sectionId;
         tx.update(progRef, { status: current.status === "not_started" ? "in_progress" : current.status, currentSectionId: sectionId, lastActivityAt: now });
       }
     });
+    const uploadedFilesNow = Object.entries(input.responses).some(([key, value]) => {
+      const question = section.questions.find(candidate => candidate.id === key);
+      return question && (question.type === "file" || question.type === "file_repeater") && Array.isArray(value) && value.length > 0;
+    });
+    if (justStarted || enteredNewSection || uploadedFilesNow) {
+      const project = await db.doc(`organizations/${input.organizationId}/projects/${projectId}`).get();
+      const projectName = project.data()?.name ?? projectId, customerId = project.data()?.customerId ?? null;
+      if (justStarted) await notify(input.organizationId, { audience: "owner", customerId, projectId, title: "Business Discovery started", body: `${projectName} started their Business Discovery`, type: "discovery_started", params: { projectName } });
+      else if (enteredNewSection) await notify(input.organizationId, { audience: "owner", customerId, projectId, title: "Discovery draft saved", body: `${projectName} saved progress on the "${sectionId}" section`, type: "discovery_draft_saved", params: { projectName, sectionId } });
+      if (uploadedFilesNow) await notify(input.organizationId, { audience: "owner", customerId, projectId, title: "Discovery files uploaded", body: `${projectName} uploaded files to their Business Discovery`, type: "discovery_files_uploaded", params: { projectName } });
+    }
     return res.json({ data: { id: sectionId, status: "draft", updatedAt: now } });
   } catch (error) { return fail(res, error, "DISCOVERY_SAVE_FAILED", "discovery.section_save_failed", "Could not save Discovery answers"); }
 });

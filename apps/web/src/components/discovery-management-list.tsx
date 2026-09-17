@@ -22,22 +22,25 @@ export function DiscoveryManagementList({ compact = false }: { compact?: boolean
   const [error, setError] = useState("");
   const { organizationId } = useOrganization();
 
+  // No synchronous setState here — only inside .then()/.catch()/.finally() — so the mount effect
+  // below can call this directly. The refresh button's onClick (a real event handler, not an
+  // effect) is what sets `loading` synchronously before calling this.
   const load = useCallback(() => {
     if (!organizationId) return;
-    setLoading(true); setError("");
-    void api<DiscoverySession[]>(`/discovery/management/sessions?organizationId=${encodeURIComponent(organizationId)}`)
-      .then(setSessions)
+    return api<DiscoverySession[]>(`/discovery/management/sessions?organizationId=${encodeURIComponent(organizationId)}`)
+      .then(result => { setError(""); setSessions(result); })
       .catch(failure => setError(failure instanceof Error ? failure.message : "Could not load Discovery sessions"))
       .finally(() => setLoading(false));
   }, [organizationId]);
 
   useEffect(() => { load(); }, [load]);
+  const refresh = () => { setLoading(true); void load(); };
 
   const rows = (sessions ?? []).slice(0, compact ? 5 : 50);
   return <Card>
     <CardHeader
       icon={Sparkles} title="Business Discovery" subtitle="Every project's Discovery progress, most recently active first"
-      action={<Button variant="secondary" className="min-h-9" onClick={load} disabled={loading} aria-label="Refresh Discovery list"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></Button>}
+      action={<Button variant="secondary" className="min-h-9" onClick={refresh} disabled={loading} aria-label="Refresh Discovery list"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></Button>}
     />
     {error ? <p className="mt-4 rounded-lg bg-[var(--danger-bg)] p-3 text-xs text-[var(--danger-text)]">{error}</p>
       : loading && !sessions ? <p className="mt-4 text-xs text-[var(--muted)]">Loading…</p>

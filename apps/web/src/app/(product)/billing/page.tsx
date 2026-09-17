@@ -22,7 +22,7 @@ type Overview = { customers: Customer[]; invoices: Invoice[]; payments: Payment[
 
 const documentTypes = ["transaction_invoice", "tax_invoice", "receipt", "tax_invoice_receipt", "credit_note"] as const;
 const paymentMethods = ["bank_transfer", "credit_card", "cash", "cheque", "other"] as const;
-const tabs = ["invoices", "customers", "payments", "subscriptions"] as const;
+type Tab = "invoices" | "customers" | "payments" | "subscriptions";
 
 function customerName(customer?: Customer) { return customer?.businessName ?? customer?.name ?? "—"; }
 
@@ -33,14 +33,13 @@ export default function BillingPage() {
   const [data, setData] = useState<Overview>();
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [tab, setTab] = useState<typeof tabs[number]>("invoices");
+  const [tab, setTab] = useState<Tab>("invoices");
   const [invoiceModal, setInvoiceModal] = useState(false);
   const [paymentModal, setPaymentModal] = useState<Invoice>();
 
   const load = useCallback(() => {
     if (!organizationId) return;
-    setError("");
-    api<Overview>(`/billing/overview?organizationId=${encodeURIComponent(organizationId)}`).then(setData).catch(failure => setError(failure instanceof Error ? failure.message : s.loadErrorFallback));
+    api<Overview>(`/billing/overview?organizationId=${encodeURIComponent(organizationId)}`).then(result => { setError(""); setData(result); }).catch(failure => setError(failure instanceof Error ? failure.message : s.loadErrorFallback));
   }, [organizationId, s.loadErrorFallback]);
 
   useEffect(() => { load(); }, [load]);
