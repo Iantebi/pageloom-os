@@ -7,6 +7,7 @@ import { saveDiscoverySection, submitDiscovery, type DiscoveryState } from "@/li
 import type { ClientFirestoreDoc, DiscoveryData, ProjectStatus, TimelineEntry, UploadedFile } from "../types";
 import { INITIAL_DISCOVERY_DATA } from "../data/initialData";
 import { applyRealSectionResponses, toRealSectionResponses } from "./discoveryMapping";
+import { allMissingWithSteps } from "../utils/discoveryValidation";
 
 // Real backend, real Firestore, real security — this file used to talk to Firestore directly
 // (a separate `customers`/`clients` collection tree, a separate Firestore database, anonymous
@@ -131,7 +132,13 @@ class FirebaseDiscoveryService {
     const answered = fields.filter(value => String(value ?? "").trim()).length + (data.services ?? []).filter(service => service.name).length + ((data.brandColors?.primary && data.brandColors?.secondary) ? 1 : 0);
     const totalKeyChecks = fields.length + 2;
     const progressPercentage = Math.max(0, Math.min(100, Math.round((answered / totalKeyChecks) * 100)));
-    return { progressPercentage, missingAnswers: [] as { step: number; labelHebrew: string }[], missingFiles: [] as string[], isReadyForReview: answered >= totalKeyChecks - 2 };
+    // missingAnswers now reflects the REAL, non-bypassable required-field rules from
+    // packages/core (via utils/discoveryValidation.ts) — every required question, regardless of
+    // which step answers it. Consumed both here (Step8Review's summary/final-submit gate) and by
+    // the Admin console (AdminProjectView's "missing questions" panel), which was previously
+    // always empty for the same reason (this used to be a hardcoded []).
+    const missingAnswers = allMissingWithSteps(data).map(({ step, labelHebrew }) => ({ step, labelHebrew }));
+    return { progressPercentage, missingAnswers, missingFiles: [] as string[], isReadyForReview: answered >= totalKeyChecks - 2 };
   }
 
   /** Uploads through the same real Storage path convention and security rules every other

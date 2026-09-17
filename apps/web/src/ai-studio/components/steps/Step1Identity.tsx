@@ -2,13 +2,17 @@ import React from 'react';
 import { Building2, User, Mail, Phone, MessageSquare, MapPin, Calendar, Sparkles, BookOpen } from 'lucide-react';
 import { DiscoveryData } from '../../types';
 import { BUSINESS_CATEGORIES } from '../../data/initialData';
+import { RequiredMark, fieldClass, FieldError } from '../common/FieldValidation';
 
 interface Step1Props {
   data: DiscoveryData;
   onChange: (updates: Partial<DiscoveryData>) => void;
+  missingFields?: Set<keyof DiscoveryData>;
+  showErrors?: boolean;
 }
 
-export const Step1Identity: React.FC<Step1Props> = ({ data, onChange }) => {
+export const Step1Identity: React.FC<Step1Props> = ({ data, onChange, missingFields, showErrors = false }) => {
+  const isMissing = (field: keyof DiscoveryData) => showErrors && (missingFields?.has(field) ?? false);
   return (
     <div className="space-y-8 text-right">
       
@@ -32,7 +36,7 @@ export const Step1Identity: React.FC<Step1Props> = ({ data, onChange }) => {
         {/* Business Name */}
         <div className="space-y-1.5">
           <label className="block text-sm font-bold text-slate-900">
-            שם העסק <span className="text-rose-500">*</span>
+            שם העסק <RequiredMark />
           </label>
           <div className="relative">
             <input
@@ -40,16 +44,17 @@ export const Step1Identity: React.FC<Step1Props> = ({ data, onChange }) => {
               value={data.businessName}
               onChange={(e) => onChange({ businessName: e.target.value })}
               placeholder="לדוגמה: יוסף שירותי אינסטלציה ושיפוצים"
-              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition shadow-xs"
+              className={fieldClass('w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition shadow-xs', isMissing('businessName'))}
             />
           </div>
+          <FieldError show={isMissing('businessName')} />
           <span className="text-[11px] text-slate-500">השם המוכר שיופיע בכותרת הראשית ובלוגו.</span>
         </div>
 
         {/* Owner Name */}
         <div className="space-y-1.5">
           <label className="block text-sm font-bold text-slate-900">
-            שם בעל/ת העסק <span className="text-rose-500">*</span>
+            שם בעל/ת העסק
           </label>
           <div className="relative">
             <input
@@ -66,7 +71,7 @@ export const Step1Identity: React.FC<Step1Props> = ({ data, onChange }) => {
         {/* Email */}
         <div className="space-y-1.5">
           <label className="block text-sm font-bold text-slate-900">
-            אימייל ליצירת קשר <span className="text-rose-500">*</span>
+            אימייל ליצירת קשר <RequiredMark />
           </label>
           <div className="relative">
             <input
@@ -75,16 +80,17 @@ export const Step1Identity: React.FC<Step1Props> = ({ data, onChange }) => {
               value={data.email}
               onChange={(e) => onChange({ email: e.target.value })}
               placeholder="name@business.co.il"
-              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition shadow-xs text-left"
+              className={fieldClass('w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition shadow-xs text-left', isMissing('email'))}
             />
           </div>
+          <FieldError show={isMissing('email')} />
         </div>
 
         {/* Phone & WhatsApp */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <label className="block text-sm font-bold text-slate-900">
-              טלפון ראשי <span className="text-rose-500">*</span>
+              טלפון ראשי <RequiredMark />
             </label>
             <input
               type="tel"
@@ -92,8 +98,9 @@ export const Step1Identity: React.FC<Step1Props> = ({ data, onChange }) => {
               value={data.phone}
               onChange={(e) => onChange({ phone: e.target.value })}
               placeholder="050-1234567"
-              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition shadow-xs text-left"
+              className={fieldClass('w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition shadow-xs text-left', isMissing('phone'))}
             />
+            <FieldError show={isMissing('phone')} />
           </div>
 
           <div className="space-y-1.5">
@@ -114,7 +121,7 @@ export const Step1Identity: React.FC<Step1Props> = ({ data, onChange }) => {
         {/* Business Category */}
         <div className="space-y-1.5 md:col-span-2">
           <label className="block text-sm font-bold text-slate-900">
-            תחום עיסוק וקטגוריה <span className="text-rose-500">*</span>
+            תחום עיסוק וקטגוריה
           </label>
           <select
             value={data.businessCategory}
@@ -161,7 +168,7 @@ export const Step1Identity: React.FC<Step1Props> = ({ data, onChange }) => {
         <div className="space-y-1.5 md:col-span-2">
           <div className="flex items-center justify-between">
             <label className="block text-sm font-bold text-slate-900">
-              הסיפור של העסק והחזון שלכם <span className="text-rose-500">*</span>
+              הסיפור של העסק והחזון שלכם
             </label>
             <span className="text-xs text-indigo-600 font-medium">מה הוביל אתכם להקים את העסק?</span>
           </div>

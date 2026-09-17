@@ -1,13 +1,19 @@
 import React from 'react';
 import { Sparkles, Award, ShieldCheck, Trophy, CheckCircle, ThumbsUp, Star } from 'lucide-react';
 import { DiscoveryData } from '../../types';
+import { fieldClass, FieldError } from '../common/FieldValidation';
 
 interface Step4Props {
   data: DiscoveryData;
   onChange: (updates: Partial<DiscoveryData>) => void;
+  missingFields?: Set<keyof DiscoveryData>;
+  showErrors?: boolean;
 }
 
-export const Step4Advantage: React.FC<Step4Props> = ({ data, onChange }) => {
+export const Step4Advantage: React.FC<Step4Props> = ({ data, onChange, missingFields, showErrors = false }) => {
+  // Either field satisfies the real requirement (discoveryMapping.ts joins them into one answer)
+  // — highlight both only while both are actually empty; filling either clears both immediately.
+  const bothMissing = showErrors && (missingFields?.has('whyChooseYou') ?? false) && (missingFields?.has('uniqueDifferentiator') ?? false);
   return (
     <div className="space-y-8 text-right">
       
@@ -30,7 +36,7 @@ export const Step4Advantage: React.FC<Step4Props> = ({ data, onChange }) => {
         {/* Why Choose You */}
         <div className="space-y-1.5">
           <label htmlFor="whyChooseYou" className="block text-sm font-bold text-slate-900 cursor-pointer">
-            1. למה שלקוחות יבחרו דווקא בכם? <span className="text-rose-500">*</span>
+            1. למה שלקוחות יבחרו דווקא בכם? <span className="text-rose-500" aria-hidden="true">*</span>
           </label>
           <textarea
             id="whyChooseYou"
@@ -39,14 +45,15 @@ export const Step4Advantage: React.FC<Step4Props> = ({ data, onChange }) => {
             value={data.whyChooseYou || ''}
             onChange={(e) => onChange({ whyChooseYou: e.target.value })}
             placeholder="מה הדבר הראשון שלקוח מרוצה אומר עליכם? (לדוגמה: יחס אישי וזמינות שיא, מקצועיות בלי פשרות, ציוד ייחודי שאין לאחרים...)"
-            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition shadow-xs leading-relaxed"
+            className={fieldClass('w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition shadow-xs leading-relaxed', bothMissing)}
           />
+          <FieldError show={bothMissing} message="יש למלא שדה זה או את השדה הבא" />
         </div>
 
         {/* Unique Differentiator */}
         <div className="space-y-1.5">
           <label htmlFor="uniqueDifferentiator" className="block text-sm font-bold text-slate-900 cursor-pointer">
-            2. מה הדבר שמבדל אתכם מהמתחרים בענף? <span className="text-rose-500">*</span>
+            2. מה הדבר שמבדל אתכם מהמתחרים בענף? <span className="text-xs font-normal text-slate-400">(או השדה הקודם)</span>
           </label>
           <textarea
             id="uniqueDifferentiator"
@@ -55,14 +62,15 @@ export const Step4Advantage: React.FC<Step4Props> = ({ data, onChange }) => {
             value={data.uniqueDifferentiator || ''}
             onChange={(e) => onChange({ uniqueDifferentiator: e.target.value })}
             placeholder="במה שיטת העבודה, השירות או הגישה שלכם שונה מכל שאר בעלי המקצוע בתחום?"
-            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition shadow-xs leading-relaxed"
+            className={fieldClass('w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition shadow-xs leading-relaxed', bothMissing)}
           />
+          <FieldError show={bothMissing} message="יש למלא שדה זה או את השדה הקודם" />
         </div>
 
         {/* Core Promises */}
         <div className="space-y-1.5">
           <label htmlFor="corePromises" className="block text-sm font-bold text-slate-900 cursor-pointer">
-            3. מהן ההבטחות שלכם ללקוח? <span className="text-rose-500">*</span>
+            3. מהן ההבטחות שלכם ללקוח?
           </label>
           <textarea
             id="corePromises"

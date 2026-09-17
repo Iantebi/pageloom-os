@@ -22,7 +22,10 @@ export const NavigationControls: React.FC<NavigationControlsProps> = ({
   }
 
   return (
-    <div className="bg-white/95 backdrop-blur-md border-t border-slate-100 sticky bottom-0 z-30 py-4 px-4 sm:px-6 shadow-xl shadow-slate-200/40">
+    // pb-[max(1rem,env(safe-area-inset-bottom))] keeps the bar (and its buttons) clear of the
+    // home-indicator gesture area on notched iPhones — without it, the bottom padding here is
+    // literally behind that OS chrome, and the whole bar sits closer to the edge than it looks.
+    <div className="bg-white/95 backdrop-blur-md border-t border-slate-100 sticky bottom-0 z-30 pt-4 px-4 sm:px-6 shadow-xl shadow-slate-200/40" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
       <div className="max-w-4xl mx-auto flex items-center justify-between">
         
         {/* Previous Button */}
@@ -47,19 +50,23 @@ export const NavigationControls: React.FC<NavigationControlsProps> = ({
           <span>השינויים נשמרים בענן אוטומטית</span>
         </div>
 
-        {/* Next / Proceed Button */}
+        {/* Next / Proceed Button — deliberately NOT given a native `disabled` attribute even
+            when canProceed is false: a truly disabled button can't be clicked at all, which on
+            mobile especially gives no feedback about why. It stays clickable and looks
+            "disabled" only visually; onNext itself (see App.tsx's handleNext/attemptFinish)
+            decides whether to advance or reveal the missing-field highlighting instead. */}
         <button
           type="button"
           onClick={onNext}
-          disabled={!canProceed}
+          aria-disabled={!canProceed}
           className={`inline-flex items-center gap-2 px-7 py-3 font-extrabold text-sm sm:text-base rounded-xl shadow-md transition-all cursor-pointer ${
             canProceed
               ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 hover:-translate-y-0.5'
-              : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+              : 'bg-slate-200 text-slate-500 border border-slate-300 hover:bg-slate-300'
           }`}
         >
           <span>
-            {currentStep === 8 ? 'מעבר לסיום ואישור' : 'שמור והמשך לשלב הבא'}
+            {currentStep === 8 ? 'מעבר לסיום ואישור' : canProceed ? 'שמור והמשך לשלב הבא' : 'השלימו את השדות החובה'}
           </span>
           <ArrowLeft className="w-4 h-4" />
         </button>

@@ -117,10 +117,11 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="hidden sm:inline font-semibold">סיוע PageLoom</span>
           </button>
 
-          {/* Staff-only "Backend Master" switcher removed for the real pageloom-os integration —
-              staff already reach Discovery through the real Master Panel (/master/customer),
-              which is role-gated server-side; a customer's own page must never offer a path into
-              it, even a currently-inert one. */}
+          {/* Opens THIS route's own ?view=admin toggle (AI Studio's AdminMaster, a
+              Discovery-specific console) — never the real Backend Master Control Center
+              (/master), which is a deliberately separate application with its own shell
+              (see docs/ARCHITECTURE.md's 2026-09-18 amendment). Labeled accordingly so staff
+              never confuse the two. */}
           {onToggleAdmin && (
             <button
               onClick={onToggleAdmin}
@@ -131,7 +132,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <LayoutDashboard className="w-3.5 h-3.5" />
-              <span>{isAdminView ? 'חזרה לפורטל לקוח' : 'Backend Master'}</span>
+              <span>{isAdminView ? 'חזרה לפורטל לקוח' : 'מסוף ניהול אפיונים'}</span>
             </button>
           )}
         </div>

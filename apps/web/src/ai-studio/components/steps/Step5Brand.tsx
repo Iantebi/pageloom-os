@@ -2,13 +2,17 @@ import React from 'react';
 import { Palette, Check, Sparkles, Image, ExternalLink } from 'lucide-react';
 import { DiscoveryData } from '../../types';
 import { BRAND_STYLE_PRESETS, COLOR_PALETTES, PERSONALITY_TRAITS } from '../../data/initialData';
+import { FieldError } from '../common/FieldValidation';
 
 interface Step5Props {
   data: DiscoveryData;
   onChange: (updates: Partial<DiscoveryData>) => void;
+  missingFields?: Set<keyof DiscoveryData>;
+  showErrors?: boolean;
 }
 
-export const Step5Brand: React.FC<Step5Props> = ({ data, onChange }) => {
+export const Step5Brand: React.FC<Step5Props> = ({ data, onChange, missingFields, showErrors = false }) => {
+  const isMissing = (field: keyof DiscoveryData) => showErrors && (missingFields?.has(field) ?? false);
   const togglePersonality = (trait: string) => {
     const current = data.brandPersonality || [];
     if (current.includes(trait)) {
@@ -48,10 +52,11 @@ export const Step5Brand: React.FC<Step5Props> = ({ data, onChange }) => {
       </div>
 
       {/* 1. Preferred Style Cards */}
-      <div className="space-y-3.5">
+      <div className={`space-y-3.5 ${isMissing('brandStyle') ? 'rounded-2xl ring-2 ring-rose-400/60 p-3 -m-3' : ''}`}>
         <label className="block text-sm font-bold text-slate-900">
-          1. איזה סגנון עיצובי מייצג את העסק שלכם בצורה הטובה ביותר? <span className="text-rose-500">*</span>
+          1. איזה סגנון עיצובי מייצג את העסק שלכם בצורה הטובה ביותר? <span className="text-rose-500" aria-hidden="true">*</span>
         </label>
+        <FieldError show={isMissing('brandStyle')} message="בחרו סגנון עיצובי אחד לפחות" />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
           {BRAND_STYLE_PRESETS.map((preset) => {
@@ -117,11 +122,11 @@ export const Step5Brand: React.FC<Step5Props> = ({ data, onChange }) => {
       </div>
 
       {/* 2. Choose EXACTLY TWO Brand Colors */}
-      <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-5 sm:p-6 space-y-4">
+      <div className={`bg-slate-50/70 border rounded-2xl p-5 sm:p-6 space-y-4 ${isMissing('brandColors') ? 'border-rose-400 ring-2 ring-rose-400/40' : 'border-slate-200/80'}`}>
         <div>
           <div className="flex items-center justify-between">
             <label className="block text-sm font-bold text-slate-900">
-              2. בחירת 2 צבעי מותג מובילים <span className="text-rose-500">*</span>
+              2. בחירת 2 צבעי מותג מובילים <span className="text-rose-500" aria-hidden="true">*</span>
             </label>
             <span className="text-xs text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full font-bold border border-indigo-100">
               בדיוק 2 צבעים להרמוניה מושלמת
@@ -130,6 +135,7 @@ export const Step5Brand: React.FC<Step5Props> = ({ data, onChange }) => {
           <p className="text-xs text-slate-500 mt-1">
             בחרו פלטה מוכנה מהרשימה או הגדירו צבעים מותאמים אישית (ראשי ומשני).
           </p>
+          <FieldError show={isMissing('brandColors')} message="בחרו פלטת צבעים או הגדירו צבע אחד לפחות" />
         </div>
 
         {/* Preset Palettes */}
@@ -218,11 +224,12 @@ export const Step5Brand: React.FC<Step5Props> = ({ data, onChange }) => {
       </div>
 
       {/* 3. Logo Status */}
-      <div className="space-y-3">
+      <div className={`space-y-3 ${isMissing('logoStatus') ? 'rounded-2xl ring-2 ring-rose-400/60 p-3 -m-3' : ''}`}>
         <label className="block text-sm font-bold text-slate-900">
-          3. מה המצב הנוכחי של לוגו העסק שלכם? <span className="text-rose-500">*</span>
+          3. מה המצב הנוכחי של לוגו העסק שלכם? <span className="text-rose-500" aria-hidden="true">*</span>
         </label>
-        
+        <FieldError show={isMissing('logoStatus')} message="בחרו את המצב המתאים" />
+
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[
             { id: 'has_logo', label: 'יש לי לוגו קיים', desc: 'אעלה אותו בשלב הקבצים הבא' },
@@ -232,7 +239,7 @@ export const Step5Brand: React.FC<Step5Props> = ({ data, onChange }) => {
             <button
               key={item.id}
               type="button"
-              onClick={() => onChange({ logoStatus: item.id as any })}
+              onClick={() => onChange({ logoStatus: item.id as DiscoveryData['logoStatus'] })}
               className={`p-3.5 rounded-xl border text-right transition cursor-pointer ${
                 data.logoStatus === item.id
                   ? 'bg-indigo-50/70 border-indigo-600 ring-2 ring-indigo-500/20'

@@ -47,11 +47,13 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
                   key={step.number}
                   disabled={!isAccessible}
                   onClick={() => onSelectStep(step.number as StepKey)}
-                  className={`group relative z-10 flex flex-col items-center focus:outline-hidden transition-all ${
+                  className={`group relative z-10 flex min-h-11 min-w-11 flex-col items-center justify-center focus:outline-hidden transition-all ${
                     !isAccessible ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
                   }`}
                 >
-                  {/* Step Bubble */}
+                  {/* Step Bubble — the button's own min-h/w-11 (44px) above is the real touch
+                      target; this inner circle stays visually 36px so the row doesn't look
+                      oversized. */}
                   <div
                     className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 ${
                       isCompleted && !isCurrent

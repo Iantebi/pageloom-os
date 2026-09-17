@@ -1,13 +1,17 @@
 import React from 'react';
 import { Globe, Clock, MapPin, Mail, Instagram, Facebook, HelpCircle, CheckCircle2 } from 'lucide-react';
 import { DiscoveryData } from '../../types';
+import { FieldError } from '../common/FieldValidation';
 
 interface Step7Props {
   data: DiscoveryData;
   onChange: (updates: Partial<DiscoveryData>) => void;
+  missingFields?: Set<keyof DiscoveryData>;
+  showErrors?: boolean;
 }
 
-export const Step7Technical: React.FC<Step7Props> = ({ data, onChange }) => {
+export const Step7Technical: React.FC<Step7Props> = ({ data, onChange, missingFields, showErrors = false }) => {
+  const domainMissing = showErrors && (missingFields?.has('hasExistingDomain') ?? false);
   return (
     <div className="space-y-8 text-right">
       
@@ -28,10 +32,11 @@ export const Step7Technical: React.FC<Step7Props> = ({ data, onChange }) => {
       <div className="space-y-6">
         
         {/* Domain Section */}
-        <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-5 sm:p-6 space-y-4">
+        <div className={`bg-slate-50/70 border rounded-2xl p-5 sm:p-6 space-y-4 ${domainMissing ? 'border-rose-400 ring-2 ring-rose-400/40' : 'border-slate-200/80'}`}>
           <label className="block text-sm font-bold text-slate-900">
-            1. האם יש לכם כבר כתובת אתר (דומיין)? <span className="text-rose-500">*</span>
+            1. האם יש לכם כבר כתובת אתר (דומיין)? <span className="text-rose-500" aria-hidden="true">*</span>
           </label>
+          <FieldError show={domainMissing} message="בחרו אחת מהאפשרויות" />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button

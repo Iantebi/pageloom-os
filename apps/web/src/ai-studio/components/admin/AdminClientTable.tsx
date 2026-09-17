@@ -331,7 +331,7 @@ export const AdminClientTable: React.FC<AdminClientTableProps> = ({
                       לא נמצאו לקוחות התואמים לחיפוש
                     </div>
                     <p className="text-xs text-slate-400">
-                      נסה לשנות את מונח החיפוש או לבחור בסינון "כל הלקוחות".
+                      נסה לשנות את מונח החיפוש או לבחור בסינון &quot;כל הלקוחות&quot;.
                     </p>
                     {searchQuery && (
                       <button

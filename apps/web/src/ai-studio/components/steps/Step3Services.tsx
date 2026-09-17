@@ -1,13 +1,17 @@
 import React from 'react';
-import { Layers, Plus, Trash2, HelpCircle } from 'lucide-react';
+import { Layers, Plus, Trash2, HelpCircle, AlertCircle } from 'lucide-react';
 import { DiscoveryData, ServiceItem } from '../../types';
+import { fieldClass } from '../common/FieldValidation';
 
 interface Step3Props {
   data: DiscoveryData;
   onChange: (updates: Partial<DiscoveryData>) => void;
+  missingFields?: Set<keyof DiscoveryData>;
+  showErrors?: boolean;
 }
 
-export const Step3Services: React.FC<Step3Props> = ({ data, onChange }) => {
+export const Step3Services: React.FC<Step3Props> = ({ data, onChange, missingFields, showErrors = false }) => {
+  const servicesMissing = showErrors && (missingFields?.has('services') ?? false);
   const services: ServiceItem[] =
     Array.isArray(data.services) && data.services.length > 0
       ? data.services
@@ -94,6 +98,13 @@ export const Step3Services: React.FC<Step3Props> = ({ data, onChange }) => {
         </button>
       </div>
 
+      {servicesMissing && (
+        <div className="bg-rose-50 border border-rose-300 rounded-2xl p-4 flex items-start gap-3" role="alert">
+          <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+          <p className="text-sm font-semibold text-rose-900">יש להוסיף שם לפחות לשירות אחד לפני שממשיכים.</p>
+        </div>
+      )}
+
       {/* Services List */}
       <div className="space-y-6">
         {services.map((service, index) => {
@@ -141,7 +152,7 @@ export const Step3Services: React.FC<Step3Props> = ({ data, onChange }) => {
                 {/* Service Name */}
                 <div className="space-y-1.5 md:col-span-2">
                   <label htmlFor={nameInputId} className="block text-sm font-bold text-slate-900 cursor-pointer">
-                    שם השירות / החבילה <span className="text-rose-500">*</span>
+                    שם השירות / החבילה {index === 0 && <span className="text-rose-500" aria-hidden="true"> *</span>}
                   </label>
                   <input
                     id={nameInputId}
@@ -150,14 +161,14 @@ export const Step3Services: React.FC<Step3Props> = ({ data, onChange }) => {
                     value={service.name || ''}
                     onChange={(e) => handleUpdateService(service.id, 'name', e.target.value)}
                     placeholder="לדוגמה: איתור נזילות במצלמה תרמית / ייעוץ משפטי להסכמי ממון / חבילת עיצוב פנים מלאה"
-                    className="w-full px-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-900 text-sm placeholder:text-slate-400 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition"
+                    className={fieldClass('w-full px-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-900 text-sm placeholder:text-slate-400 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition', servicesMissing && !service.name?.trim())}
                   />
                 </div>
 
                 {/* Problem Solved */}
                 <div className="space-y-1.5">
                   <label htmlFor={problemInputId} className="block text-sm font-bold text-slate-900 cursor-pointer">
-                    איזו בעיה השירות פותר? <span className="text-rose-500">*</span>
+                    איזו בעיה השירות פותר?
                   </label>
                   <textarea
                     id={problemInputId}
@@ -173,7 +184,7 @@ export const Step3Services: React.FC<Step3Props> = ({ data, onChange }) => {
                 {/* Result Received */}
                 <div className="space-y-1.5">
                   <label htmlFor={resultInputId} className="block text-sm font-bold text-slate-900 cursor-pointer">
-                    איזו תוצאה הלקוח מקבל בסיום? <span className="text-rose-500">*</span>
+                    איזו תוצאה הלקוח מקבל בסיום?
                   </label>
                   <textarea
                     id={resultInputId}
@@ -189,7 +200,7 @@ export const Step3Services: React.FC<Step3Props> = ({ data, onChange }) => {
                 {/* Why Valuable */}
                 <div className="space-y-1.5">
                   <label htmlFor={valueInputId} className="block text-sm font-bold text-slate-900 cursor-pointer">
-                    למה השירות הזה בעל ערך משמעותי? <span className="text-rose-500">*</span>
+                    למה השירות הזה בעל ערך משמעותי?
                   </label>
                   <textarea
                     id={valueInputId}

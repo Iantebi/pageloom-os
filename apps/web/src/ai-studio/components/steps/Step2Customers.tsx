@@ -1,13 +1,17 @@
 import React from 'react';
 import { Users, HelpCircle, Heart, ShieldAlert, AlertTriangle, Target, Lightbulb } from 'lucide-react';
 import { DiscoveryData } from '../../types';
+import { RequiredMark, fieldClass, FieldError } from '../common/FieldValidation';
 
 interface Step2Props {
   data: DiscoveryData;
   onChange: (updates: Partial<DiscoveryData>) => void;
+  missingFields?: Set<keyof DiscoveryData>;
+  showErrors?: boolean;
 }
 
-export const Step2Customers: React.FC<Step2Props> = ({ data, onChange }) => {
+export const Step2Customers: React.FC<Step2Props> = ({ data, onChange, missingFields, showErrors = false }) => {
+  const isMissing = (field: keyof DiscoveryData) => showErrors && (missingFields?.has(field) ?? false);
   return (
     <div className="space-y-8 text-right">
       
@@ -32,7 +36,7 @@ export const Step2Customers: React.FC<Step2Props> = ({ data, onChange }) => {
           <div className="flex items-start justify-between gap-3">
             <div>
               <label htmlFor="idealCustomer" className="block text-base font-bold text-slate-900 cursor-pointer">
-                1. מי הלקוח האידיאלי שלכם? <span className="text-rose-500">*</span>
+                1. מי הלקוח האידיאלי שלכם? <RequiredMark />
               </label>
               <p className="text-xs text-slate-500 mt-0.5">
                 איזה סוג לקוח אתם הכי נהנים לשרת? (לדוגמה: בעלי בתים פרטיים, מנהלי רכש, זוגות צעירים, נשים בגילאי 30-50...)
@@ -50,8 +54,9 @@ export const Step2Customers: React.FC<Step2Props> = ({ data, onChange }) => {
             value={data.idealCustomer || ''}
             onChange={(e) => onChange({ idealCustomer: e.target.value })}
             placeholder="תארו את הלקוח: מיהו, מה המאפיינים שלו, מה רמת התקציב או הסיטואציה שבה הוא פונה אליכם..."
-            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition shadow-xs leading-relaxed"
+            className={fieldClass('w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition shadow-xs leading-relaxed', isMissing('idealCustomer'))}
           />
+          <FieldError show={isMissing('idealCustomer')} />
         </div>
 
         {/* The Problem */}
@@ -59,7 +64,7 @@ export const Step2Customers: React.FC<Step2Props> = ({ data, onChange }) => {
           <div className="flex items-start justify-between gap-3">
             <div>
               <label htmlFor="customerProblem" className="block text-base font-bold text-slate-900 cursor-pointer">
-                2. איזו בעיה או כאב דחוף יש ללקוחות כשהם פונים אליכם? <span className="text-rose-500">*</span>
+                2. איזו בעיה או כאב דחוף יש ללקוחות כשהם פונים אליכם? <RequiredMark />
               </label>
               <p className="text-xs text-slate-500 mt-0.5">
                 מה קרה אצלם שהכריח אותם לחפש פתרון? (למשל: תקלה דחופה, חוסר זמן, תסכול מספקים קודמים, חוסר ידע מקצועי)
@@ -77,8 +82,9 @@ export const Step2Customers: React.FC<Step2Props> = ({ data, onChange }) => {
             value={data.customerProblem || ''}
             onChange={(e) => onChange({ customerProblem: e.target.value })}
             placeholder="מה האתגר שמטריד אותם ומדיר שינה מעיניהם..."
-            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition shadow-xs leading-relaxed"
+            className={fieldClass('w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition shadow-xs leading-relaxed', isMissing('customerProblem'))}
           />
+          <FieldError show={isMissing('customerProblem')} />
         </div>
 
         {/* The Desire / Dream Outcome */}
@@ -86,7 +92,7 @@ export const Step2Customers: React.FC<Step2Props> = ({ data, onChange }) => {
           <div className="flex items-start justify-between gap-3">
             <div>
               <label htmlFor="customerDesire" className="block text-base font-bold text-slate-900 cursor-pointer">
-                3. מה התוצאה המושלמת שהם רוצים להשיג? <span className="text-rose-500">*</span>
+                3. מה התוצאה המושלמת שהם רוצים להשיג? <RequiredMark />
               </label>
               <p className="text-xs text-slate-500 mt-0.5">
                 איך החיים או העסק שלהם ייראו אחרי שתסיימו את העבודה? מה התחושה והתוצאה הסופית?
@@ -104,8 +110,9 @@ export const Step2Customers: React.FC<Step2Props> = ({ data, onChange }) => {
             value={data.customerDesire || ''}
             onChange={(e) => onChange({ customerDesire: e.target.value })}
             placeholder="לדוגמה: בית נקי מנזילות ושקט נפשי, עלייה במכירות, מראה צעיר ורענן, פתרון משפטי מהיר..."
-            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition shadow-xs leading-relaxed"
+            className={fieldClass('w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition shadow-xs leading-relaxed', isMissing('customerDesire'))}
           />
+          <FieldError show={isMissing('customerDesire')} />
         </div>
 
         {/* Customer Fears & Obstacles in 2 Columns */}
@@ -116,7 +123,7 @@ export const Step2Customers: React.FC<Step2Props> = ({ data, onChange }) => {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <label htmlFor="customerFears" className="block text-sm font-bold text-slate-900 cursor-pointer">
-                  4. ממה הם הכי חוששים או נרתעים? <span className="text-rose-500">*</span>
+                  4. ממה הם הכי חוששים או נרתעים?
                 </label>
                 <p className="text-[11px] text-slate-500 mt-0.5">
                   פחד מ״עקיצות״, מחירים מנופחים, עבודה מרושלת, חוסר מענה...
@@ -141,7 +148,7 @@ export const Step2Customers: React.FC<Step2Props> = ({ data, onChange }) => {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <label htmlFor="customerObstacles" className="block text-sm font-bold text-slate-900 cursor-pointer">
-                  5. מה בדרך כלל עוצר אותם מלקנות? <span className="text-rose-500">*</span>
+                  5. מה בדרך כלל עוצר אותם מלקנות?
                 </label>
                 <p className="text-[11px] text-slate-500 mt-0.5">
                   מחיר? התלבטות בין מתחרים? חוסר הבנה של התהליך?

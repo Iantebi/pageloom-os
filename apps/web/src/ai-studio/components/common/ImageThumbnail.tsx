@@ -31,10 +31,11 @@ export const ImageThumbnail: React.FC<ImageThumbnailProps> = ({
   const [triedLocal, setTriedLocal] = useState(false);
 
   useEffect(() => {
+    // Deferred via .then() rather than called directly — this only needs to catch the case where
+    // React reuses this component instance for a different `file` (e.g. list reordering); the
+    // initial render already has the right value via useState's own initializer above.
     const initialSrc = file.previewUrl || file.thumbnailUrl || file.downloadUrl || '';
-    setSrc(initialSrc);
-    setHasError(false);
-    setTriedLocal(false);
+    Promise.resolve().then(() => { setSrc(initialSrc); setHasError(false); setTriedLocal(false); });
   }, [file.id, file.previewUrl, file.thumbnailUrl, file.downloadUrl]);
 
   const handleError = async () => {

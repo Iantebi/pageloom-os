@@ -8,14 +8,20 @@ interface Step8Props {
   data: DiscoveryData;
   onEditStep: (step: StepKey) => void;
   onProceedToCompletion: () => void;
+  /** True once the customer has actually clicked the final-submit CTA while required fields
+   *  were still missing — turns the amber banner from calm to alarmed and reveals the blocking
+   *  message. Never true on first render of a still-incomplete Discovery. */
+  showValidation?: boolean;
 }
 
 export const Step8Review: React.FC<Step8Props> = ({
   data,
   onEditStep,
   onProceedToCompletion,
+  showValidation = false,
 }) => {
   const stats = storageService.calculateDiscoveryStats(data);
+  const hasMissingRequired = stats.missingAnswers.length > 0;
 
   return (
     <div className="space-y-8 text-right">
@@ -42,20 +48,23 @@ export const Step8Review: React.FC<Step8Props> = ({
         </div>
       </div>
 
-      {/* Missing Items Alert if any */}
-      {stats.missingAnswers.length > 0 && (
-        <div className="bg-amber-50/80 border border-amber-200/90 rounded-2xl p-4 sm:p-5 text-right flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+      {/* Missing required fields — this list is now the real, non-bypassable required-field set
+          (see utils/discoveryValidation.ts), not an advisory suggestion, so it says so plainly. */}
+      {hasMissingRequired && (
+        <div className={`rounded-2xl p-4 sm:p-5 text-right flex items-start gap-3 border ${showValidation ? 'bg-rose-50 border-rose-300' : 'bg-amber-50/80 border-amber-200/90'}`} role={showValidation ? 'alert' : undefined}>
+          <AlertTriangle className={`w-5 h-5 shrink-0 mt-0.5 ${showValidation ? 'text-rose-600' : 'text-amber-600'}`} />
           <div className="space-y-1">
-            <h4 className="text-sm font-bold text-amber-900">
-              ישנם כמה פרטים מומלצים שטרם מולאו ({stats.missingAnswers.length}):
+            <h4 className={`text-sm font-bold ${showValidation ? 'text-rose-900' : 'text-amber-900'}`}>
+              {showValidation
+                ? `לא ניתן לסיים: יש להשלים ${stats.missingAnswers.length} שדות חובה לפני האישור הסופי`
+                : `נותרו ${stats.missingAnswers.length} שדות חובה שטרם מולאו`}
             </h4>
             <div className="flex flex-wrap gap-1.5 pt-1">
               {stats.missingAnswers.map((item, i) => (
                 <button
                   key={i}
                   onClick={() => onEditStep(item.step as StepKey)}
-                  className="text-xs bg-white text-amber-800 border border-amber-300 px-2.5 py-1 rounded-lg font-medium hover:bg-amber-100 transition cursor-pointer"
+                  className={`text-xs border px-2.5 py-1 rounded-lg font-medium transition cursor-pointer ${showValidation ? 'bg-white text-rose-800 border-rose-300 hover:bg-rose-100' : 'bg-white text-amber-800 border-amber-300 hover:bg-amber-100'}`}
                 >
                   שלב {item.step}: {item.labelHebrew} ✎
                 </button>
@@ -79,7 +88,7 @@ export const Step8Review: React.FC<Step8Props> = ({
               <button
                 type="button"
                 onClick={() => onEditStep(1)}
-                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer bg-indigo-50 px-2.5 py-1 rounded-lg"
+                className="min-h-11 text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer bg-indigo-50 px-3 py-1 rounded-lg"
               >
                 <Edit3 className="w-3.5 h-3.5" />
                 <span>ערוך</span>
@@ -122,7 +131,7 @@ export const Step8Review: React.FC<Step8Props> = ({
               <button
                 type="button"
                 onClick={() => onEditStep(2)}
-                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer bg-indigo-50 px-2.5 py-1 rounded-lg"
+                className="min-h-11 text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer bg-indigo-50 px-3 py-1 rounded-lg"
               >
                 <Edit3 className="w-3.5 h-3.5" />
                 <span>ערוך</span>
@@ -157,7 +166,7 @@ export const Step8Review: React.FC<Step8Props> = ({
               <button
                 type="button"
                 onClick={() => onEditStep(3)}
-                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer bg-indigo-50 px-2.5 py-1 rounded-lg"
+                className="min-h-11 text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer bg-indigo-50 px-3 py-1 rounded-lg"
               >
                 <Edit3 className="w-3.5 h-3.5" />
                 <span>ערוך</span>
@@ -186,7 +195,7 @@ export const Step8Review: React.FC<Step8Props> = ({
               <button
                 type="button"
                 onClick={() => onEditStep(4)}
-                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer bg-indigo-50 px-2.5 py-1 rounded-lg"
+                className="min-h-11 text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer bg-indigo-50 px-3 py-1 rounded-lg"
               >
                 <Edit3 className="w-3.5 h-3.5" />
                 <span>ערוך</span>
@@ -221,7 +230,7 @@ export const Step8Review: React.FC<Step8Props> = ({
               <button
                 type="button"
                 onClick={() => onEditStep(5)}
-                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer bg-indigo-50 px-2.5 py-1 rounded-lg"
+                className="min-h-11 text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer bg-indigo-50 px-3 py-1 rounded-lg"
               >
                 <Edit3 className="w-3.5 h-3.5" />
                 <span>ערוך</span>
@@ -265,7 +274,7 @@ export const Step8Review: React.FC<Step8Props> = ({
               <button
                 type="button"
                 onClick={() => onEditStep(6)}
-                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer bg-indigo-50 px-2.5 py-1 rounded-lg"
+                className="min-h-11 text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer bg-indigo-50 px-3 py-1 rounded-lg"
               >
                 <Edit3 className="w-3.5 h-3.5" />
                 <span>ערוך</span>
@@ -322,10 +331,11 @@ export const Step8Review: React.FC<Step8Props> = ({
         <button
           type="button"
           onClick={onProceedToCompletion}
-          className="w-full sm:w-auto px-8 py-4 bg-white hover:bg-slate-50 text-indigo-900 font-extrabold text-base rounded-2xl shadow-lg transition-all transform hover:-translate-y-0.5 cursor-pointer flex items-center justify-center gap-2 shrink-0"
+          aria-disabled={hasMissingRequired}
+          className={`w-full sm:w-auto px-8 py-4 font-extrabold text-base rounded-2xl shadow-lg transition-all transform hover:-translate-y-0.5 cursor-pointer flex items-center justify-center gap-2 shrink-0 ${hasMissingRequired ? 'bg-white/80 hover:bg-white text-indigo-400' : 'bg-white hover:bg-slate-50 text-indigo-900'}`}
         >
-          <span>אישור סופי וסיום האפיון 🎉</span>
-          <ArrowLeft className="w-5 h-5 text-indigo-600" />
+          <span>{hasMissingRequired ? 'השלימו את השדות החובה כדי לסיים' : 'אישור סופי וסיום האפיון 🎉'}</span>
+          <ArrowLeft className={`w-5 h-5 ${hasMissingRequired ? 'text-indigo-300' : 'text-indigo-600'}`} />
         </button>
       </div>
 

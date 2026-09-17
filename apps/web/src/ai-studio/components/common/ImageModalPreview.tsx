@@ -18,14 +18,15 @@ export const ImageModalPreview: React.FC<ImageModalPreviewProps> = ({ file, onCl
   const fileDownload = file?.downloadUrl;
 
   useEffect(() => {
+    // Deferred (via .then()) rather than a direct synchronous call, so resetting local state to
+    // match the new `file` prop happens as a reaction to it, not as a side effect the render
+    // itself triggers — same reasoning as App.tsx's data-loading effects.
     if (!file) {
-      setSrc('');
-      setHasError(false);
+      Promise.resolve().then(() => { setSrc(''); setHasError(false); });
       return;
     }
     const initialSrc = file.previewUrl || file.thumbnailUrl || file.downloadUrl || '';
-    setSrc(initialSrc);
-    setHasError(false);
+    Promise.resolve().then(() => { setSrc(initialSrc); setHasError(false); });
 
     // Also check local IndexedDB for full-res version
     fileStorageService.getFileLocally(file.id).then((rec) => {

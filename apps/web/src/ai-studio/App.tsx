@@ -26,6 +26,7 @@ import { AiSummaryModal } from './components/AiSummaryModal';
 import { DiscoveryData, StepKey } from './types';
 import { firebaseDiscoveryService, SaveStatus } from './services/firebaseDiscoveryService';
 import { INITIAL_DISCOVERY_DATA } from './data/initialData';
+import { canProceedFromStep, hasAnyMissingRequiredField, missingFieldsForStep } from './utils/discoveryValidation';
 
 // Real integration entry point (2026-09-17 Discovery unification): mounted directly by
 // apps/web/src/app/discovery/page.tsx inside the existing AuthenticatedOrganization gate, so
@@ -59,12 +60,15 @@ export default function App() {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  // Reveals per-field "required" highlighting/messages only after the customer actually tries to
+  // move on from an incomplete step — never on a still-blank step's first render. Reset on every
+  // step change so leftover errors from a previous attempt don't bleed into the next step.
+  const [showValidation, setShowValidation] = useState(false);
 
   const load = useCallback(() => {
     if (!organizationId || !projectId) return;
-    setLoadErrorKind(undefined);
     firebaseDiscoveryService.loadClientDiscovery(projectId)
-      .then(setData)
+      .then(result => { setLoadErrorKind(undefined); setData(result); })
       .catch(failure => setLoadErrorKind(classifyApiErrorKind(failure)));
   }, [organizationId, projectId]);
 
@@ -109,8 +113,20 @@ export default function App() {
   if (orgLoading || !data) return <Loading />;
 
   const handleSelectStep = (step: StepKey | 0) => {
+    // Reset here (an event handler), not in a useEffect keyed on the step — leftover
+    // missing-field highlighting from a previous attempt must never bleed into the next step,
+    // but resetting it is a direct consequence of navigating, not a value derived from watching
+    // data.currentStep change after the fact.
+    setShowValidation(false);
     const completedSet = new Set(data.completedSteps);
-    if (data.currentStep >= 1 && data.currentStep <= 9) completedSet.add(data.currentStep);
+    // Only credit the step being left as "completed" when actually moving forward past it with
+    // its required fields satisfied — going back (onPrev) or jumping to an earlier step to edit
+    // must never falsely mark an incomplete step as done (that green checkmark on the progress
+    // bar would otherwise lie).
+    const isAdvancing = typeof step === 'number' && step > data.currentStep;
+    if (isAdvancing && data.currentStep >= 1 && data.currentStep <= 9 && canProceedFromStep(data.currentStep, data)) {
+      completedSet.add(data.currentStep);
+    }
     const isFinished = step === 9;
     const nowIso = new Date().toISOString();
     const next: DiscoveryData = {
@@ -124,8 +140,24 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleNext = () => { if (data.currentStep < 9) handleSelectStep((data.currentStep + 1) as StepKey); };
+  // The Next button stays visually enabled/disabled based on canProceed but is never given a
+  // native `disabled` attribute (see NavigationControls) — a hard-disabled button can't be
+  // clicked at all, which on mobile especially gives no feedback about *why*. Clicking it while
+  // invalid instead reveals the highlighting/messages and scrolls to the first missing field.
+  const handleNext = () => {
+    if (data.currentStep >= 9) return;
+    if (!canProceedFromStep(data.currentStep, data)) { setShowValidation(true); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+    handleSelectStep((data.currentStep + 1) as StepKey);
+  };
   const handlePrev = () => { if (data.currentStep <= 1) handleSelectStep(0); else handleSelectStep((data.currentStep - 1) as StepKey); };
+  // Shared gate for both places that can finish the Discovery: NavigationControls' own "step
+  // 8 -> 9" Next button and Step8Review's separate final-submit CTA. Blocks on EVERY required
+  // question across the whole flow, not just step 8's (which has none of its own — it's a
+  // read-only summary).
+  const attemptFinish = () => {
+    if (hasAnyMissingRequiredField(data)) { setShowValidation(true); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+    handleSelectStep(9);
+  };
   const stats = firebaseDiscoveryService.calculateDiscoveryStats(data);
 
   return (
@@ -149,7 +181,11 @@ export default function App() {
         />
       )}
 
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-10">
+      {/* pb-28 (vs. the sticky NavigationControls bar's ~80-100px height) keeps a step's last
+          field from sitting right behind that bar — most noticeable on a long step like
+          Step2Customers/Step4Advantage where the final textarea would otherwise end flush
+          against it. */}
+      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 pt-6 sm:pt-10 pb-28 sm:pb-10">
         {data.isLocked && data.currentStep > 0 && (
           <div className="mb-6 bg-gradient-to-r from-indigo-50 via-purple-50/60 to-white border border-indigo-200/80 rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
             <div className="flex items-center gap-3 text-right">
@@ -181,14 +217,14 @@ export default function App() {
 
           {data.currentStep > 0 && (
             <motion.div key={`step-${data.currentStep}`} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.25 }} className="bg-white rounded-3xl border border-slate-200/80 shadow-xl shadow-indigo-100/30 p-6 sm:p-10">
-              {data.currentStep === 1 && <Step1Identity data={data} onChange={updateDiscovery} />}
-              {data.currentStep === 2 && <Step2Customers data={data} onChange={updateDiscovery} />}
-              {data.currentStep === 3 && <Step3Services data={data} onChange={updateDiscovery} />}
-              {data.currentStep === 4 && <Step4Advantage data={data} onChange={updateDiscovery} />}
-              {data.currentStep === 5 && <Step5Brand data={data} onChange={updateDiscovery} />}
+              {data.currentStep === 1 && <Step1Identity data={data} onChange={updateDiscovery} missingFields={missingFieldsForStep(1, data)} showErrors={showValidation} />}
+              {data.currentStep === 2 && <Step2Customers data={data} onChange={updateDiscovery} missingFields={missingFieldsForStep(2, data)} showErrors={showValidation} />}
+              {data.currentStep === 3 && <Step3Services data={data} onChange={updateDiscovery} missingFields={missingFieldsForStep(3, data)} showErrors={showValidation} />}
+              {data.currentStep === 4 && <Step4Advantage data={data} onChange={updateDiscovery} missingFields={missingFieldsForStep(4, data)} showErrors={showValidation} />}
+              {data.currentStep === 5 && <Step5Brand data={data} onChange={updateDiscovery} missingFields={missingFieldsForStep(5, data)} showErrors={showValidation} />}
               {data.currentStep === 6 && <Step6Uploads data={data} onChange={updateDiscovery} />}
-              {data.currentStep === 7 && <Step7Technical data={data} onChange={updateDiscovery} />}
-              {data.currentStep === 8 && <Step8Review data={data} onEditStep={s2 => handleSelectStep(s2)} onProceedToCompletion={() => handleSelectStep(9)} />}
+              {data.currentStep === 7 && <Step7Technical data={data} onChange={updateDiscovery} missingFields={missingFieldsForStep(7, data)} showErrors={showValidation} />}
+              {data.currentStep === 8 && <Step8Review data={data} onEditStep={s2 => handleSelectStep(s2)} onProceedToCompletion={attemptFinish} showValidation={showValidation} />}
               {data.currentStep === 9 && <Step9Completion data={data} onNavigateToStep={s2 => handleSelectStep(s2)} onOpenAiSummary={() => setIsAiModalOpen(true)} />}
             </motion.div>
           )}
@@ -196,7 +232,13 @@ export default function App() {
       </main>
 
       {data.currentStep > 0 && data.currentStep < 9 && (
-        <NavigationControls currentStep={data.currentStep as StepKey} totalSteps={9} onPrev={handlePrev} onNext={handleNext} canProceed={true} />
+        <NavigationControls
+          currentStep={data.currentStep as StepKey}
+          totalSteps={9}
+          onPrev={handlePrev}
+          onNext={data.currentStep === 8 ? attemptFinish : handleNext}
+          canProceed={canProceedFromStep(data.currentStep, data)}
+        />
       )}
 
       <WhatsAppHelpButton projectId={data.projectId} businessName={data.businessName} isOpen={isHelpOpen} onToggle={() => setIsHelpOpen(!isHelpOpen)} />
