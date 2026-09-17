@@ -44,6 +44,8 @@ import { workflowTimeline } from "./dictionaries/workflowTimeline";
 import { appearanceSettings } from "./dictionaries/appearanceSettings";
 import { customerJourney } from "./dictionaries/customerJourney";
 import { onboardingJourneyPanel } from "./dictionaries/onboardingJourneyPanel";
+import { discoveriesPage } from "./dictionaries/discoveriesPage";
+import { billingPage } from "./dictionaries/billingPage";
 import { discoveryQuestions } from "./dictionaries/discoveryQuestions";
 import { discoveryShell } from "./dictionaries/discoveryShell";
 import { discoveryPanel } from "./dictionaries/discoveryPanel";
@@ -99,6 +101,8 @@ const dictionaries = {
   appearanceSettings,
   customerJourney,
   onboardingJourneyPanel,
+  discoveriesPage,
+  billingPage,
   discoveryQuestions,
   discoveryShell,
   discoveryPanel,

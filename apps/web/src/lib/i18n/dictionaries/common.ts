@@ -135,6 +135,8 @@ export const statusLabels = {
     submitted: "הוגש",
     reviewed: "נבדק",
     reopened: "הוחזר לעריכה",
+    paid: "שולם",
+    partial: "שולם חלקית",
   },
   en: {
     completed: "Completed",
@@ -209,5 +211,7 @@ export const statusLabels = {
     submitted: "Submitted",
     reviewed: "Reviewed",
     reopened: "Reopened",
+    paid: "Paid",
+    partial: "Partially paid",
   },
 } as const;
