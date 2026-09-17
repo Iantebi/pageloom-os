@@ -52,6 +52,34 @@ function progressRef(organizationId: string, projectId: string) { return db.doc(
 function sectionRef(organizationId: string, projectId: string, sectionId: DiscoverySectionId) { return db.doc(`organizations/${organizationId}/projects/${projectId}/discovery/${sectionId}`); }
 
 // =================================================================================================
+// GET every project's Discovery progress for the Owner Dashboard / Master Panel's Discovery list
+// (2026-09-17 unification) — staff-only, matching every other org-wide management listing in this
+// codebase. Fans out one read per project rather than a Firestore collectionGroup query: the org's
+// own project list is already the correctly tenant-scoped source of truth, so this can never leak
+// another organization's discoveryProgress documents the way an unscoped collectionGroup query
+// could. Fine at this codebase's project-count scale (matches /api/dashboard/:organizationId's own
+// existing fan-out pattern over the same collection).
+discoveryRouter.get("/discovery/management/sessions", async (req: AuthenticatedRequest, res) => {
+  try {
+    const organizationId = z.string().min(1).parse(req.query.organizationId);
+    if (await requireRole(req, res, organizationId, staff) === undefined) return;
+    const projectsSnap = await db.collection(`organizations/${organizationId}/projects`).get();
+    const progressSnaps = await db.getAll(...projectsSnap.docs.map(project => progressRef(organizationId, project.id)));
+    const sessions = projectsSnap.docs.flatMap((project, index) => {
+      const snap = progressSnaps[index];
+      if (!snap?.exists) return [];
+      const progress = snap.data() as DiscoveryProgressDocument;
+      return [{
+        id: project.id, customerId: project.data().customerId ?? null, projectName: project.data().name ?? project.id,
+        status: progress.status, percentComplete: progress.percentComplete, currentSectionId: progress.currentSectionId ?? null,
+        startedAt: progress.startedAt ?? null, submittedAt: progress.submittedAt ?? null, lastActivityAt: progress.lastActivityAt,
+      }];
+    }).sort((a, b) => (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? ""));
+    return res.json({ data: sessions });
+  } catch (error) { return fail(res, error, "DISCOVERY_MANAGEMENT_LIST_FAILED", "discovery.management_list_failed", "Could not load Discovery sessions"); }
+});
+
+// =================================================================================================
 // GET the full Discovery state for a project — every existing section document plus the progress
 // rollup. The question *structure* (labels, types, conditional rules) is never serialized over this
 // endpoint: both apps/web and functions already depend on @pageloom/core directly, so the client
