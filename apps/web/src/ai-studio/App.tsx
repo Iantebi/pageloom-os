@@ -55,8 +55,11 @@ export default function App() {
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
 
   const load = useCallback(() => {
-    if (!organizationId || !projectId) return;
+    if (!organizationId) return;
+    // Admin view (?view=admin) has no projectId — it still needs configure() so
+    // AdminMaster's subscribeAllClients/subscribeClientDoc calls know which org to query.
     firebaseDiscoveryService.configure(organizationId);
+    if (!projectId) return;
     setLoadErrorKind(undefined);
     firebaseDiscoveryService.loadClientDiscovery(projectId)
       .then(setData)
