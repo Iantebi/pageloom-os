@@ -166,7 +166,13 @@ export function toRealSectionResponses(data: DiscoveryData): SectionResponsesMap
 
   const nonEmpty: SectionResponsesMap = {};
   for (const [sectionId, responses] of Object.entries(bySection) as [DiscoverySectionId, Record<string, unknown>][]) {
-    const cleaned = Object.fromEntries(Object.entries(responses).filter(([, value]) => value !== undefined && value !== "" && !(Array.isArray(value) && value.length === 0)));
+    // `!= null` (not `!== undefined`) deliberately covers both undefined AND null in one check —
+    // data.hasExistingDomain is typed `boolean | null` (unanswered = null, not undefined), and
+    // discoveryResponseValueSchema has no null variant, so a literal null here 400'd on every
+    // autosave for as long as that question was unanswered (visible as a permanent "sync error"
+    // pill — found 2026-09-18 while verifying Phase 1's required-field validation, which correctly
+    // blocked step 7 but didn't stop this background save failure from happening on every step).
+    const cleaned = Object.fromEntries(Object.entries(responses).filter(([, value]) => value != null && value !== "" && !(Array.isArray(value) && value.length === 0)));
     if (Object.keys(cleaned).length > 0) nonEmpty[sectionId] = cleaned;
   }
   return nonEmpty;
