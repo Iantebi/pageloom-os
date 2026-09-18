@@ -837,6 +837,20 @@ backlog by design.
 
 ---
 
+## Releases
+
+**`v1.0.0` (2026-09-18): the Discovery system, frozen.** Everything described in §3's
+Discovery/Owner-Workspace/PWA/notifications coverage above, plus the critical
+production bug fixes from that day (a Firestore transaction read-after-write in
+`/submit`, and the frontend showing success without checking the server's actual
+result) — see [`docs/releases/v1.0.0.md`](./releases/v1.0.0.md) for the full list.
+**Versioning policy going forward:** `main` moves on as `1.1` — new Discovery/Owner-
+Workspace/PWA/notification work builds on top of this release, never inside it. A
+change to anything `v1.0.0` covers happens only as a deliberate bug fix, tagged
+`v1.0.x`.
+
+---
+
 ## See also
 
 - [`docs/MULTI-AGENT-DEV-TEAM.md`](./MULTI-AGENT-DEV-TEAM.md) — a proposed blueprint
