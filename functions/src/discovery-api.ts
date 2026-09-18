@@ -261,7 +261,15 @@ discoveryRouter.post("/projects/:projectId/discovery/submit", async (req: Authen
     await notify(input.organizationId, { audience: "owner", customerId: project.data()?.customerId ?? null, projectId, title: "Business Discovery submitted", body: `${project.data()?.name ?? "A project"}'s Business Discovery was submitted`, type: "discovery_submitted", params: { projectName: project.data()?.name ?? "" } });
     await activity(input.organizationId, "discovery.submitted", req.user!.uid, { projectId, workflowEventId: idempotencyKey });
     return res.status(202).json({ data: { projectId, status: "submitted", workflowEventId: idempotencyKey } });
-  } catch (error) { return fail(res, error, "DISCOVERY_SUBMIT_FAILED", "discovery.submit_failed", "Could not submit Discovery"); }
+  } catch (error) {
+    // Temporary diagnostic (2026-09-18): safeErrorName() alone (just "Error"/"TypeError") gave no
+    // way to tell this apart from any other failure in this handler while chasing a real
+    // production bug (a clean, CRM-decoupled test project's /submit call failing) — the message
+    // itself is a fixed, code-controlled workflow/validation string here, not user-entered text,
+    // so logging it is safe. Remove once the underlying issue (if any remains) is understood.
+    operationalLog("error", "discovery.submit_failed.detail", { errorType: safeErrorName(error), errorMessage: error instanceof Error ? error.message : String(error) });
+    return fail(res, error, "DISCOVERY_SUBMIT_FAILED", "discovery.submit_failed", "Could not submit Discovery");
+  }
 });
 
 // =================================================================================================
