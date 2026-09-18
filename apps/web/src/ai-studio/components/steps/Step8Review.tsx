@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, Edit3, Building2, Users, Layers, Sparkles, Palette, UploadCloud, Globe, AlertTriangle, ArrowLeft, FileText } from 'lucide-react';
+import { CheckCircle2, Edit3, Building2, Users, Layers, Sparkles, Palette, UploadCloud, Globe, AlertTriangle, ArrowLeft, FileText, LoaderCircle } from 'lucide-react';
 import { DiscoveryData, StepKey } from '../../types';
 import { storageService } from '../../services/storageService';
 import { ImageThumbnail } from '../common/ImageThumbnail';
@@ -12,6 +12,11 @@ interface Step8Props {
    *  were still missing — turns the amber banner from calm to alarmed and reveals the blocking
    *  message. Never true on first render of a still-incomplete Discovery. */
   showValidation?: boolean;
+  /** True while the real POST /submit request to the server is in flight. */
+  submitting?: boolean;
+  /** Set only when the server actually rejected the submission (never shown just because
+   *  required fields are missing — that's the amber/rose banner above, a different case). */
+  submitError?: string;
 }
 
 export const Step8Review: React.FC<Step8Props> = ({
@@ -19,6 +24,8 @@ export const Step8Review: React.FC<Step8Props> = ({
   onEditStep,
   onProceedToCompletion,
   showValidation = false,
+  submitting = false,
+  submitError,
 }) => {
   const stats = storageService.calculateDiscoveryStats(data);
   const hasMissingRequired = stats.missingAnswers.length > 0;
@@ -71,6 +78,16 @@ export const Step8Review: React.FC<Step8Props> = ({
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Server actually rejected the submission — distinct from the missing-fields banner above,
+          which is a client-side pre-check. This only ever appears after a real failed POST
+          /submit (see App.tsx's submitForReal), never merely because required fields are blank. */}
+      {submitError && (
+        <div className="bg-rose-50 border border-rose-300 rounded-2xl p-4 sm:p-5 flex items-start gap-3" role="alert">
+          <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+          <p className="text-sm font-bold text-rose-900">{submitError}</p>
         </div>
       )}
 
@@ -331,11 +348,13 @@ export const Step8Review: React.FC<Step8Props> = ({
         <button
           type="button"
           onClick={onProceedToCompletion}
-          aria-disabled={hasMissingRequired}
-          className={`w-full sm:w-auto px-8 py-4 font-extrabold text-base rounded-2xl shadow-lg transition-all transform hover:-translate-y-0.5 cursor-pointer flex items-center justify-center gap-2 shrink-0 ${hasMissingRequired ? 'bg-white/80 hover:bg-white text-indigo-400' : 'bg-white hover:bg-slate-50 text-indigo-900'}`}
+          disabled={submitting}
+          aria-disabled={hasMissingRequired || submitting}
+          className={`w-full sm:w-auto px-8 py-4 font-extrabold text-base rounded-2xl shadow-lg transition-all transform hover:-translate-y-0.5 cursor-pointer flex items-center justify-center gap-2 shrink-0 disabled:cursor-not-allowed disabled:hover:-translate-y-0 ${hasMissingRequired ? 'bg-white/80 hover:bg-white text-indigo-400' : 'bg-white hover:bg-slate-50 text-indigo-900'}`}
         >
-          <span>{hasMissingRequired ? 'השלימו את השדות החובה כדי לסיים' : 'אישור סופי וסיום האפיון 🎉'}</span>
-          <ArrowLeft className={`w-5 h-5 ${hasMissingRequired ? 'text-indigo-300' : 'text-indigo-600'}`} />
+          {submitting && <LoaderCircle className="w-5 h-5 animate-spin text-indigo-600" />}
+          <span>{submitting ? 'שולח אפיון לצוות PageLoom…' : hasMissingRequired ? 'השלימו את השדות החובה כדי לסיים' : 'אישור סופי וסיום האפיון 🎉'}</span>
+          {!submitting && <ArrowLeft className={`w-5 h-5 ${hasMissingRequired ? 'text-indigo-300' : 'text-indigo-600'}`} />}
         </button>
       </div>
 

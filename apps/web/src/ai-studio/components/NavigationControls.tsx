@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, ArrowRight, ShieldCheck, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ShieldCheck, Check, LoaderCircle } from 'lucide-react';
 import { StepKey } from '../types';
 
 interface NavigationControlsProps {
@@ -8,6 +8,11 @@ interface NavigationControlsProps {
   onPrev: () => void;
   onNext: () => void;
   canProceed?: boolean;
+  /** True only while step 8's final submit is actually in flight — unlike canProceed=false
+   *  (a validation state, deliberately still clickable so it can reveal what's missing), this
+   *  is a real network request; the button gets a real `disabled` here to prevent a double
+   *  submit, not just a visual style. */
+  submitting?: boolean;
 }
 
 export const NavigationControls: React.FC<NavigationControlsProps> = ({
@@ -16,6 +21,7 @@ export const NavigationControls: React.FC<NavigationControlsProps> = ({
   onPrev,
   onNext,
   canProceed = true,
+  submitting = false,
 }) => {
   if (currentStep === 9) {
     return null; // Step 9 has its own completion actions
@@ -58,17 +64,19 @@ export const NavigationControls: React.FC<NavigationControlsProps> = ({
         <button
           type="button"
           onClick={onNext}
-          aria-disabled={!canProceed}
-          className={`inline-flex items-center gap-2 px-7 py-3 font-extrabold text-sm sm:text-base rounded-xl shadow-md transition-all cursor-pointer ${
+          disabled={submitting}
+          aria-disabled={!canProceed || submitting}
+          className={`inline-flex items-center gap-2 px-7 py-3 font-extrabold text-sm sm:text-base rounded-xl shadow-md transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-70 ${
             canProceed
               ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 hover:-translate-y-0.5'
               : 'bg-slate-200 text-slate-500 border border-slate-300 hover:bg-slate-300'
           }`}
         >
+          {submitting && <LoaderCircle className="w-4 h-4 animate-spin" />}
           <span>
-            {currentStep === 8 ? 'מעבר לסיום ואישור' : canProceed ? 'שמור והמשך לשלב הבא' : 'השלימו את השדות החובה'}
+            {submitting ? 'שולח…' : currentStep === 8 ? 'מעבר לסיום ואישור' : canProceed ? 'שמור והמשך לשלב הבא' : 'השלימו את השדות החובה'}
           </span>
-          <ArrowLeft className="w-4 h-4" />
+          {!submitting && <ArrowLeft className="w-4 h-4" />}
         </button>
 
       </div>

@@ -238,14 +238,22 @@ discoveryRouter.post("/projects/:projectId/discovery/submit", async (req: Authen
 
     const now = new Date().toISOString();
     await db.runTransaction(async tx => {
-      const snaps = await Promise.all(discoverySectionOrder.map(sectionId => tx.get(sectionRef(input.organizationId, projectId, sectionId))));
+      // Firestore transactions require every tx.get() to happen before any tx.set()/tx.update() —
+      // progRef must be read here, alongside the section reads, NOT after the section writes below
+      // (that ordering is exactly what threw "Firestore transactions require all reads to be
+      // executed before all writes" on every real submit attempt, found 2026-09-18 while verifying
+      // Phase 1 in production — every prior "successful" submission was actually silently failing
+      // here, masked by the frontend's own bug of showing success without checking the result).
+      const [snaps, currentProgress] = await Promise.all([
+        Promise.all(discoverySectionOrder.map(sectionId => tx.get(sectionRef(input.organizationId, projectId, sectionId)))),
+        tx.get(progRef),
+      ]);
       snaps.forEach((snap, index) => {
         const sectionId = discoverySectionOrder[index]!;
         if (snap.exists && snap.data()?.status === "completed") return;
         const responses = snap.exists ? (snap.data()!.responses as DiscoveryResponses) : {};
         tx.set(sectionRef(input.organizationId, projectId, sectionId), { id: sectionId, projectId, templateVersion: DISCOVERY_TEMPLATE_VERSION, responses, updatedAt: now, updatedBy: req.user!.uid, status: "completed", completedAt: now, completedBy: req.user!.uid });
       });
-      const currentProgress = await tx.get(progRef);
       const next: DiscoveryProgressDocument = {
         id: "current", projectId, templateVersion: DISCOVERY_TEMPLATE_VERSION, status: "submitted",
         ...(currentProgress.data()?.startedAt ? { startedAt: currentProgress.data()!.startedAt } : { startedAt: now }),

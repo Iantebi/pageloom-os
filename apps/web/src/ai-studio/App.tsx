@@ -64,6 +64,12 @@ export default function App() {
   // move on from an incomplete step — never on a still-blank step's first render. Reset on every
   // step change so leftover errors from a previous attempt don't bleed into the next step.
   const [showValidation, setShowValidation] = useState(false);
+  // Final submission must never show the success screen (step 9) until the server has actually
+  // confirmed it — see the 2026-09-18 production bug where /submit returned a real 400 (a
+  // Firestore transaction ordering bug, since fixed server-side) while the UI advanced to the
+  // success screen anyway, because completeDiscoveryTransaction's result was never awaited.
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string>();
 
   const load = useCallback(() => {
     if (!organizationId || !projectId) return;
@@ -135,8 +141,11 @@ export default function App() {
       completedAt: isFinished && !data.completedAt ? nowIso : data.completedAt,
     };
     setData(next);
-    if (step === 9) void firebaseDiscoveryService.completeDiscoveryTransaction(next.customerId || next.projectId, next);
-    else firebaseDiscoveryService.saveDiscovery(next, true);
+    // Step 9 is reached ONLY via submitForReal below, after the server has already confirmed
+    // success — by the time handleSelectStep(9) runs, there is nothing left to submit, just the
+    // local "show the success screen" transition (which itself is still autosaved, matching
+    // every other step, so a refresh doesn't lose the isCompleted/isLocked flags).
+    firebaseDiscoveryService.saveDiscovery(next, true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -155,8 +164,20 @@ export default function App() {
   // question across the whole flow, not just step 8's (which has none of its own — it's a
   // read-only summary).
   const attemptFinish = () => {
+    if (submitting) return; // already in flight — ignore a double-click rather than double-submit
     if (hasAnyMissingRequiredField(data)) { setShowValidation(true); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
-    handleSelectStep(9);
+    void submitForReal();
+  };
+  // The only path to the success screen. Awaits the server's actual result — the whole point of
+  // this function existing separately from handleSelectStep(9) — so the customer is never shown
+  // "success" for a submission that the server rejected.
+  const submitForReal = async () => {
+    setSubmitting(true);
+    setSubmitError(undefined);
+    const success = await firebaseDiscoveryService.completeDiscoveryTransaction(data.customerId || data.projectId, data);
+    setSubmitting(false);
+    if (success) handleSelectStep(9);
+    else { setSubmitError(s.submitError); window.scrollTo({ top: 0, behavior: 'smooth' }); }
   };
   const stats = firebaseDiscoveryService.calculateDiscoveryStats(data);
 
@@ -224,7 +245,7 @@ export default function App() {
               {data.currentStep === 5 && <Step5Brand data={data} onChange={updateDiscovery} missingFields={missingFieldsForStep(5, data)} showErrors={showValidation} />}
               {data.currentStep === 6 && <Step6Uploads data={data} onChange={updateDiscovery} />}
               {data.currentStep === 7 && <Step7Technical data={data} onChange={updateDiscovery} missingFields={missingFieldsForStep(7, data)} showErrors={showValidation} />}
-              {data.currentStep === 8 && <Step8Review data={data} onEditStep={s2 => handleSelectStep(s2)} onProceedToCompletion={attemptFinish} showValidation={showValidation} />}
+              {data.currentStep === 8 && <Step8Review data={data} onEditStep={s2 => handleSelectStep(s2)} onProceedToCompletion={attemptFinish} showValidation={showValidation} submitting={submitting} submitError={submitError} />}
               {data.currentStep === 9 && <Step9Completion data={data} onNavigateToStep={s2 => handleSelectStep(s2)} onOpenAiSummary={() => setIsAiModalOpen(true)} />}
             </motion.div>
           )}
@@ -238,6 +259,7 @@ export default function App() {
           onPrev={handlePrev}
           onNext={data.currentStep === 8 ? attemptFinish : handleNext}
           canProceed={canProceedFromStep(data.currentStep, data)}
+          submitting={data.currentStep === 8 && submitting}
         />
       )}
 
