@@ -17,6 +17,7 @@ export const common = {
     settings: "הגדרות",
     signOut: "התנתקות",
     notifications: "התראות",
+    unreadNotifications: (n: number) => `התראות (${n} שלא נקראו)`,
     loading: "טוען…",
     close: "סגירה",
     back: "חזרה",
@@ -28,6 +29,7 @@ export const common = {
     closeNavigation: "סגירת ניווט",
     adminRequiredTitle: "נדרשת הרשאת מנהל/ת מערכת",
     adminRequiredDescription: "אזור זה זמין רק לבעלים ולמנהלי/ות מערכת מורשים של PageLoom.",
+    exitToOwnerWorkspace: "חזרה לחלל העבודה",
   },
   en: {
     save: "Save",
@@ -47,6 +49,7 @@ export const common = {
     settings: "Settings",
     signOut: "Sign out",
     notifications: "Notifications",
+    unreadNotifications: (n: number) => `Notifications (${n} unread)`,
     loading: "Loading…",
     close: "Close",
     back: "Back",
@@ -58,6 +61,7 @@ export const common = {
     closeNavigation: "Close navigation",
     adminRequiredTitle: "Administrator access required",
     adminRequiredDescription: "This area is restricted to PageLoom Owner and authorized Admin roles.",
+    exitToOwnerWorkspace: "Back to Owner Workspace",
   },
 } as const;
 
@@ -135,6 +139,8 @@ export const statusLabels = {
     submitted: "הוגש",
     reviewed: "נבדק",
     reopened: "הוחזר לעריכה",
+    paid: "שולם",
+    partial: "שולם חלקית",
   },
   en: {
     completed: "Completed",
@@ -209,5 +215,7 @@ export const statusLabels = {
     submitted: "Submitted",
     reviewed: "Reviewed",
     reopened: "Reopened",
+    paid: "Paid",
+    partial: "Partially paid",
   },
 } as const;

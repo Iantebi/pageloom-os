@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PageLoom OS — אין חיבור לאינטרנט</title>
+<!-- Deliberately static and free of any app/user data — this is served BY THE SERVICE WORKER
+     as the navigation fallback when a fetch genuinely fails offline (see sw.js), so it must never
+     render anything that looks like real content from an authenticated, multi-tenant app. -->
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #101210; color: #f7f7f5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Heebo, Arial, sans-serif; padding: 24px; text-align: center; }
+  .mark { width: 56px; height: 56px; border-radius: 16px; background: #6d5efc; display: grid; place-items: center; font-weight: 800; font-size: 24px; margin: 0 auto 20px; }
+  h1 { font-size: 18px; margin: 0 0 8px; }
+  p { font-size: 13px; color: #b7bab3; max-width: 320px; margin: 0 auto 20px; line-height: 1.6; }
+  a.retry { display: inline-block; border-radius: 12px; padding: 10px 20px; background: #6d5efc; color: white; font-weight: 700; font-size: 13px; text-decoration: none; }
+</style>
+</head>
+<body>
+  <div>
+    <div class="mark">P</div>
+    <h1>אין כרגע חיבור לאינטרנט</h1>
+    <p>PageLoom OS צריך חיבור פעיל כדי לטעון את הנתונים שלכם. בדקו את החיבור ונסו שוב — כל מה שנשמר בענן ימשיך לחכות לכם.</p>
+    <!-- A plain link (not a button+onclick) deliberately needs no inline script at all — this
+         page is served by the service worker itself when a real navigation fetch fails, and the
+         strict CSP here has no 'unsafe-inline' for script-src-attr, so an onclick handler would
+         silently fail to run. -->
+    <a class="retry" href="/dashboard">ניסיון חדש</a>
+  </div>
+</body>
+</html>

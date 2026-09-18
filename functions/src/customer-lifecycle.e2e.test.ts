@@ -712,6 +712,7 @@ describe("Customer lifecycle (end-to-end, real Functions/Firestore/Auth/Storage 
     });
     expect(created.status).toBe(201);
     expect(created.data.data!.status).toBe("open");
+    expect(created.data.data!.round).toBe(1);
     const requestId = created.data.data!.id as string;
 
     // Security property: a different tenant's owner cannot resolve this org's revision request.
@@ -723,6 +724,35 @@ describe("Customer lifecycle (end-to-end, real Functions/Firestore/Auth/Storage 
     });
     expect(resolved.status).toBe(200);
     expect(resolved.data.data!.status).toBe("resolved");
+
+    // Included rounds: a project includes 2 (launchBusinessRules.project.includedRevisionRounds).
+    // A second client-created request is round 2 and still allowed; a third is refused with a
+    // clear, polite error rather than silently accepted — see the Website Review UX spec's "if a
+    // third revision is requested, explain politely..." requirement.
+    const second = await apiCall(state.clientAlphaToken, "POST", `/api/projects/${state.projectId}/revision-requests`, {
+      organizationId: ORG_ALPHA, description: "Synthetic e2e test: please also update the footer phone number.",
+    });
+    expect(second.status).toBe(201);
+    expect(second.data.data!.round).toBe(2);
+
+    const third = await apiCall(state.clientAlphaToken, "POST", `/api/projects/${state.projectId}/revision-requests`, {
+      organizationId: ORG_ALPHA, description: "Synthetic e2e test: a third round the plan does not include.",
+    });
+    expect(third.status).toBe(409);
+    expect(third.data.error?.code).toBe("REVISION_ROUNDS_EXHAUSTED");
+
+    // Staff are not capped — an extra round "requiring approval" means a human (staff) decided to
+    // grant it by creating the request on the customer's behalf.
+    const staffCreated = await apiCall(state.ownerAlphaToken, "POST", `/api/projects/${state.projectId}/revision-requests`, {
+      organizationId: ORG_ALPHA, description: "Synthetic e2e test: staff-approved extra round.",
+    });
+    expect(staffCreated.status).toBe(201);
+    expect(staffCreated.data.data!.round).toBe(3);
+
+    // GET lists every round in creation order, for the portal's revision-round history badges.
+    const list = await apiCall(state.clientAlphaToken, "GET", withQuery(`/api/projects/${state.projectId}/revision-requests`, { organizationId: ORG_ALPHA }));
+    expect(list.status).toBe(200);
+    expect((list.data.data as { round: number }[]).map(item => item.round)).toEqual([1, 2, 3]);
   });
 
   // ===== 7. PUBLISH — launch readiness checklist (mission section 7). =====
