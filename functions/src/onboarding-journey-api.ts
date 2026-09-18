@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import {
-  createRevisionRequestSchema, launchChecklist, missingRequiredQuestionnaireFields,
+  createRevisionRequestSchema, launchBusinessRules, launchChecklist, missingRequiredQuestionnaireFields,
   recordHandoverSchema, resolveRevisionRequestSchema, DISCOVERY_TEMPLATE_VERSION,
   type LaunchChecklistItem, type RevisionRequest, type DiscoveryProgressDocument,
 } from "@pageloom/core";
@@ -95,14 +95,36 @@ onboardingJourneyRouter.post("/projects/:projectId/payment-confirmed", async (re
 // 6. REVISION REQUESTS — structured, recorded, resolvable. Distinct from (and complementary to) the
 // existing CustomerRequestedRevision workflow event, which still drives the project's overall stage;
 // this is the durable detail of *what* is being asked for, replacing ad-hoc WhatsApp threads.
+//
+// Round cap: a project includes launchBusinessRules.project.includedRevisionRounds (2) rounds. Once
+// a client has used them all, a further client-created request is refused with a clear, polite
+// error rather than silently accepted — see docs/customer-journey/FLOW.md. Staff (owner/admin/
+// operator/member) are never capped here: an extra round already "requiring approval" per the
+// product spec means a human decided to grant it, and that decision is staff creating the request
+// on the customer's behalf, not a system-enforced limit on them.
+onboardingJourneyRouter.get("/projects/:projectId/revision-requests", async (req: AuthenticatedRequest, res) => {
+  try {
+    const organizationId = z.string().min(1).parse(req.query.organizationId), projectId = String(req.params.projectId);
+    if (await requireProjectAccess(req, res, organizationId, projectId) === undefined) return;
+    const snap = await db.collection(`organizations/${organizationId}/projects/${projectId}/revisionRequests`).orderBy("createdAt", "asc").get();
+    return res.json({ data: snap.docs.map(doc => doc.data()) });
+  } catch (error) { return fail(res, error, "REVISION_REQUESTS_LOAD_FAILED", "onboarding.revision_request.load_failed", "Could not load revision requests"); }
+});
+
 onboardingJourneyRouter.post("/projects/:projectId/revision-requests", async (req: AuthenticatedRequest, res) => {
   try {
     const input = createRevisionRequestSchema.parse(req.body), projectId = String(req.params.projectId);
     const member = await requireProjectAccess(req, res, input.organizationId, projectId); if (member === undefined) return;
     const project = await db.doc(`organizations/${input.organizationId}/projects/${projectId}`).get();
     if (!project.exists) return res.status(404).json({ error: { code: "NOT_FOUND", message: "Project not found" } });
-    const ref = db.collection(`organizations/${input.organizationId}/projects/${projectId}/revisionRequests`).doc(), now = new Date().toISOString();
-    const record: RevisionRequest = { id: ref.id, projectId, description: input.description, status: "open", createdBy: req.user!.uid, createdAt: now, ...(input.area ? { area: input.area } : {}) };
+    const collectionRef = db.collection(`organizations/${input.organizationId}/projects/${projectId}/revisionRequests`);
+    const existingCount = (await collectionRef.count().get()).data().count;
+    const includedRounds = launchBusinessRules.project.includedRevisionRounds;
+    if (member.role === "client" && existingCount >= includedRounds) {
+      return res.status(409).json({ error: { code: "REVISION_ROUNDS_EXHAUSTED", message: `This project includes ${includedRounds} revision rounds, and both have been used. Additional revisions need PageLoom's approval — please reach out to your project team.` } });
+    }
+    const ref = collectionRef.doc(), now = new Date().toISOString();
+    const record: RevisionRequest = { id: ref.id, projectId, description: input.description, status: "open", round: existingCount + 1, createdBy: req.user!.uid, createdAt: now, ...(input.area ? { area: input.area } : {}) };
     await ref.set(record);
     await notify(input.organizationId, { audience: "owner", customerId: project.data()?.customerId ?? null, projectId, title: "New revision request", body: input.description.slice(0, 200), type: "revision_received", params: { area: input.area ?? "" } });
     await activity(input.organizationId, "revision_request.created", req.user!.uid, { projectId, revisionRequestId: ref.id });

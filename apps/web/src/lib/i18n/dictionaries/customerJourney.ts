@@ -51,6 +51,6 @@ const enCopy: Record<CustomerJourneyBucketId, BucketCopy> = {
 };
 
 export const customerJourney = {
-  he: { buckets: heCopy, eyebrow: "מסע הלקוח", welcomeTitle: "ברוכים הבאים ל-PageLoom", welcomeBody: "התשלום התקבל והפרויקט שלכם נפתח. נעדכן אתכם בכל שלב — ותמיד תדעו בדיוק מה קורה עם האתר שלכם.", welcomeCta: "למילוי שאלון האתר" },
-  en: { buckets: enCopy, eyebrow: "Your journey", welcomeTitle: "Welcome to PageLoom", welcomeBody: "Payment received and your project is open. We'll keep you updated at every step — you'll always know exactly what's happening with your website.", welcomeCta: "Complete the Website Brief" },
+  he: { buckets: heCopy, eyebrow: "מסע הלקוח", welcomeTitle: "ברוכים הבאים ל-PageLoom", welcomeBody: "נלווה אתכם צעד־צעד — התהליך פשוט וברור. תחילה נכיר את העסק שלכם באפיון קצר, ולאחר סיומו נתחיל לבנות את האתר שלכם.", welcomeCta: "להתחלת אפיון העסק" },
+  en: { buckets: enCopy, eyebrow: "Your journey", welcomeTitle: "Welcome to PageLoom", welcomeBody: "We'll guide you step by step — the process is simple and clear. First, a short Business Discovery to get to know your business; once it's complete, we'll begin building your website.", welcomeCta: "Start Business Discovery" },
 } as const;

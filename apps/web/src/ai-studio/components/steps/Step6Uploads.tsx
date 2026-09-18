@@ -137,7 +137,7 @@ export const Step6Uploads: React.FC<Step6Props> = ({ data, onChange }) => {
             העלאת קבצים וחומרי גלם
           </h2>
           <p className="text-slate-600 text-sm sm:text-base mt-1.5 leading-relaxed">
-            העלו תמונות, לוגו, תעודות, מסמכים או המלצות. כל הקבצים נשמרים בענן מאובטח ב-Firebase Storage ומשולבים ישירות בעיצוב האתר.
+            תמונות אמיתיות מהעסק שלכם הן הבסיס הטוב ביותר לאתר שמרגיש אישי ואמין. העלו כאן לוגו, תמונות, תעודות, מסמכים או המלצות — הכול נשמר בענן מאובטח ומשולב ישירות בעיצוב האתר.
           </p>
         </div>
 
@@ -308,12 +308,19 @@ export const Step6Uploads: React.FC<Step6Props> = ({ data, onChange }) => {
         </div>
       )}
 
-      {/* Helpful reassurance note */}
+      {/* Helpful reassurance note — the customer must never feel blocked from continuing here,
+          whether they simply don't have files ready yet, or they have none at all. */}
       <div className="bg-amber-50/70 border border-amber-200/70 rounded-2xl p-4 flex items-start gap-3 text-xs text-amber-900">
         <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-        <div>
-          <span className="font-bold">אין לכם את כל הקבצים עכשיו? </span>
-          אין שום בעיה! תוכלו להמשיך הלאה, ואנו נבקש מכם תמונות או חומרים משלימים בוואטסאפ בהמשך תהליך הבנייה.
+        <div className="space-y-1.5 leading-relaxed">
+          <p>
+            <span className="font-bold">אין לכם תמונות מתאימות של העסק? </span>
+            אין שום בעיה — תוכלו להמשיך בביטחון. PageLoom יכול להשתמש בתמונות מקצועיות שנוצרו על ידי AI או בתמונות סטוק ברישוי, המתאימות לתחום העסק שלכם.
+          </p>
+          <p>
+            <span className="font-bold">אין לכם את כל הקבצים עכשיו? </span>
+            גם זה בסדר מוחלט. תוכלו להמשיך הלאה, ואנו נבקש מכם תמונות או חומרים משלימים בוואטסאפ בהמשך תהליך הבנייה.
+          </p>
         </div>
       </div>
 
