@@ -25,9 +25,9 @@ describe("Business Discovery isolation",()=>{
 });
 describe("client project list-query safety (clientProjectList)",()=>{
   const clientProjectListSrc=(rules.match(/function clientProjectList\(orgId\) \{[^}]*\}/)??[""])[0];
-  it("defines clientProjectList and wires it into the top-level projects list/query match instead of the get()-based clientProject",()=>{
+  it("defines clientProjectList and wires it into the top-level projects match as the list-only rule, separate from the get-only clientProject",()=>{
     expect(clientProjectListSrc).not.toBe("");
-    expect(rules).toContain("match /projects/{projectId} { allow read: if staff(orgId) || clientProjectList(orgId); allow write: if false; }");
+    expect(rules).toContain("match /projects/{projectId} { allow get: if staff(orgId) || clientProject(orgId, projectId); allow list: if staff(orgId) || clientProjectList(orgId); allow write: if false; }");
   });
   it("a. lets a client list/query only projects bearing its own customerId, using resource.data directly rather than a redundant self-get()",()=>{
     expect(clientProjectListSrc).toContain("client(orgId) && resource.data.get('customerId', null) == clientCustomerId(orgId)");
@@ -39,15 +39,24 @@ describe("client project list-query safety (clientProjectList)",()=>{
   it("b. cannot match another customer's project, since resource.data.customerId is compared against the caller's own clientCustomerId",()=>{
     expect(clientProjectListSrc).toContain("resource.data.get('customerId', null) == clientCustomerId(orgId)");
   });
-  it("c. cannot match an unassigned project, preserving the optional projectIds allow-list keyed by resource.id",()=>{
-    expect(clientProjectListSrc).toContain("'projectIds' in get(");
-    expect(clientProjectListSrc).toContain(".data.projectIds.size() == 0 ||");
-    expect(clientProjectListSrc).toContain("resource.id in get(");
+  // Found live in production 2026-09-20: `resource.id in get(...).data.projectIds` made this rule
+  // unprovable to Firestore's list/query safety analysis, so it rejected the ENTIRE query with
+  // PERMISSION_DENIED for any client member with a non-empty projectIds - not a filtered result,
+  // a fully broken portal ("couldn't load your projects"). clientProjectList deliberately does NOT
+  // enforce projectIds any more; a projectIds-scoped client can see every one of their customer's
+  // projects at the list level (name/stage/progress only). The real projectIds boundary - can they
+  // open a specific unassigned project, or read anything in its subcollections - is enforced by the
+  // `allow get` above and by every subcollection match's clientProject(), tested in "d." below.
+  it("c. no longer references get()-based projectIds membership - list queries only ever check customerId",()=>{
+    expect(clientProjectListSrc).not.toContain("'projectIds' in get(");
+    expect(clientProjectListSrc).not.toContain("resource.id in get(");
   });
-  it("d. leaves staff/owner project read access unchanged and keeps clientProject intact for fixed-path subcollections",()=>{
-    expect(rules).toContain("match /projects/{projectId} { allow read: if staff(orgId) || clientProjectList(orgId); allow write: if false; }");
+  it("d. leaves staff/owner project read access unchanged, and keeps clientProject (with its full projectIds enforcement) as the get-rule and for fixed-path subcollections",()=>{
+    expect(rules).toContain("allow get: if staff(orgId) || clientProject(orgId, projectId);");
     expect(rules).toContain("function staff(orgId) { return platformAdmin() || (member(orgId) && role(orgId) in ['owner','admin','operator','member']); }");
     expect(rules).toContain("function clientProject(orgId, projectId)");
+    expect(rules).toContain("'projectIds' in get(");
+    expect(rules).toContain("projectId in get(");
     expect(rules).toContain("match /projects/{projectId}/comments/{commentId} { allow read: if staff(orgId) || clientProject(orgId, projectId); allow write: if false; }");
   });
 });

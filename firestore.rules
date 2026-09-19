@@ -34,7 +34,18 @@ service cloud.firestore {
     // analysis evaluates this condition against a resource that doesn't reliably carry the field,
     // and bare property access throws "Property customerId is undefined on object" there instead
     // of evaluating false - .get() with a default makes the equality check simply false instead.
-    function clientProjectList(orgId) { return client(orgId) && resource.data.get('customerId', null) == clientCustomerId(orgId) && (!('projectIds' in get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data) || get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.projectIds.size() == 0 || resource.id in get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.projectIds); }
+    //
+    // Deliberately does NOT also check projectIds (unlike clientProject() below) - found live in
+    // production 2026-09-20: `resource.id in get(...).data.projectIds` makes the whole list query
+    // unprovable to Firestore's list/query safety analysis (it can't show every possible result is
+    // bounded by an array fetched via a separate get()), so Firestore rejected the ENTIRE query with
+    // PERMISSION_DENIED rather than filtering per-document - any client member with a non-empty
+    // projectIds (set via the real Portal User Manager UI) saw a fully broken "couldn't load your
+    // projects" portal, not a filtered list. A projectIds-scoped client can therefore see every one
+    // of their customer's projects at this list level (name/stage/progress only); clientProject()
+    // still enforces the real projectIds boundary for every subcollection (discovery, revisionRequests,
+    // comments, questionnaires, documents, handover) reachable from a project shown in that list.
+    function clientProjectList(orgId) { return client(orgId) && resource.data.get('customerId', null) == clientCustomerId(orgId); }
     match /organizations/{orgId} {
       allow read: if staff(orgId); allow write: if false;
       match /members/{uid} { allow read: if staff(orgId); allow write: if false; }
@@ -100,7 +111,11 @@ service cloud.firestore {
       match /customers/{customerId}/documents/{documentId} { allow read: if staff(orgId); allow write: if false; }
       match /chats/{chatId}/messages/{messageId} { allow read: if staff(orgId); allow write: if false; }
       match /projects/{projectId}/artifacts/{artifactId} { allow read: if staff(orgId); allow write: if false; }
-      match /projects/{projectId} { allow read: if staff(orgId) || clientProjectList(orgId); allow write: if false; }
+      // Split get/list (rather than a combined `allow read`) because the projectIds boundary can
+      // only be enforced on a single get() - see clientProjectList()'s comment above for why the
+      // same check breaks list queries outright. A direct get() of a specific project the client
+      // isn't scoped to must still be denied, so `get` uses the stricter clientProject().
+      match /projects/{projectId} { allow get: if staff(orgId) || clientProject(orgId, projectId); allow list: if staff(orgId) || clientProjectList(orgId); allow write: if false; }
       match /projects/{projectId}/comments/{commentId} { allow read: if staff(orgId) || clientProject(orgId, projectId); allow write: if false; }
       match /projects/{projectId}/questionnaires/{questionnaireId} { allow read: if staff(orgId) || clientProject(orgId, projectId); allow write: if false; }
       match /projects/{projectId}/documents/{documentId} { allow read: if staff(orgId) || (clientProject(orgId, projectId) && resource.data.audience == 'customer'); allow write: if false; }
