@@ -22,9 +22,19 @@ describe("New Client onboarding — independent of the CRM and Backend Master", 
     expect(source).toContain('randomBytes(24).toString("base64url")');
   });
 
-  it("scopes a claimed link to exactly one project — never the customer's other projects or another customer's", () => {
-    expect(source).toContain("projectIds: [data.projectId]");
+  it("scopes a claimed link to exactly the invited project — additive (arrayUnion), never a flat overwrite that could drop a previously claimed project", () => {
+    expect(source).toContain("projectIds: FieldValue.arrayUnion(data.projectId)");
     expect(source).toContain('role: "client"');
+  });
+
+  // Found live in production 2026-09-20: a staff member (owner/admin/operator/member) who opens a
+  // Discovery link while already signed in — e.g. to preview it — had their own membership doc
+  // silently overwritten to role "client", locking them out of the Owner Workspace. Staff already
+  // have full read access to any project via staff(orgId) in firestore.rules, so claiming must be a
+  // no-op for them, never a downgrade.
+  it("never downgrades an existing staff member's role when they open a Discovery link", () => {
+    expect(source).toContain('const staffRoles = new Set(["owner", "admin", "operator", "member"]);');
+    expect(source).toContain("if (!existingMember.exists || !staffRoles.has(String(existingMember.data()?.role)))");
   });
 
   it("the claim endpoint is public (mounted before authenticate) and rate-limited by IP, like the one other public route", () => {

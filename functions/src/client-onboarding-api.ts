@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { randomBytes } from "node:crypto";
+import { FieldValue } from "firebase-admin/firestore";
 import { createClientSchema, DISCOVERY_TEMPLATE_VERSION, type DiscoveryInvite, type DiscoveryProgressDocument } from "@pageloom/core";
 import { auth, db } from "./firebase.js";
 import { requireRole, type AuthenticatedRequest } from "./auth.js";
@@ -98,14 +99,24 @@ discoveryLinkRouter.post("/discovery-links/:token/claim", rateLimit("discovery-l
     const inviteRef = db.doc(`discoveryInvites/${token}`), invite = await inviteRef.get();
     if (!invite.exists) return res.status(404).json({ error: { code: "INVITE_NOT_FOUND", message: "This Discovery link is invalid or has expired." } });
     const data = invite.data() as DiscoveryInvite;
-    // Grant (idempotent) the calling uid a membership scoped to exactly this one customer/project —
-    // never the customer's other projects, never any other customer. Re-claiming from a new device
-    // or after clearing storage just grants the new uid the same narrow scope; nothing here widens
-    // access beyond the single project this token was minted for.
-    await db.doc(`organizations/${data.organizationId}/members/${decoded.uid}`).set({
-      uid: decoded.uid, role: "client", customerId: data.customerId, projectIds: [data.projectId], disabled: false, createdAt: new Date().toISOString(),
-    }, { merge: true });
-    if (!data.claimedUid) await inviteRef.update({ claimedUid: decoded.uid, claimedAt: new Date().toISOString() });
+    const memberRef = db.doc(`organizations/${data.organizationId}/members/${decoded.uid}`);
+    const existingMember = await memberRef.get();
+    const staffRoles = new Set(["owner", "admin", "operator", "member"]);
+    // Found live during production verification 2026-09-20: a staff member who opens a Discovery
+    // link while already signed in (e.g. to preview it) must NEVER be silently downgraded to a
+    // "client" role — that would lock them out of the Owner Workspace until someone manually fixed
+    // their membership doc. Staff already have full read access to any project via staff(orgId) in
+    // firestore.rules, so no grant is needed for them at all; only ever grant/extend client scope
+    // for a uid that isn't already staff. projectIds is a union (never a flat overwrite) so a uid
+    // that legitimately claims a second Discovery link doesn't lose access to a first one.
+    if (!existingMember.exists || !staffRoles.has(String(existingMember.data()?.role))) {
+      await memberRef.set({
+        uid: decoded.uid, role: "client", customerId: data.customerId,
+        projectIds: FieldValue.arrayUnion(data.projectId), disabled: false,
+        createdAt: existingMember.exists ? existingMember.data()?.createdAt ?? new Date().toISOString() : new Date().toISOString(),
+      }, { merge: true });
+      if (!data.claimedUid) await inviteRef.update({ claimedUid: decoded.uid, claimedAt: new Date().toISOString() });
+    }
     return res.json({ data: { organizationId: data.organizationId, projectId: data.projectId } });
   } catch (error) { return fail(res, error, "DISCOVERY_LINK_CLAIM_FAILED", "discovery_link.claim_failed", "This Discovery link could not be opened"); }
 });
