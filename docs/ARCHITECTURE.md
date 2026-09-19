@@ -865,6 +865,17 @@ stage-by-stage documentation lives in the standalone
 [Client Playbook](./client-playbook/README.md) (`docs/client-playbook/`) — also
 independent of Backend Master and the CRM, by the same rule as the flow itself.
 
+**Operational note (found live during this feature's own verification):**
+`firebase.json`'s `/api/**` hosting rewrite sets `pinTag: true`, which pins that route to
+whatever Cloud Run revision existed at the **last Hosting deploy** — a
+`firebase deploy --only functions` updates the function itself but never moves this pin,
+so real, Hosting-routed traffic keeps hitting the stale revision (confirmed: a genuine bug
+fix deployed via `--only functions` had zero effect on the public URL, while the same
+request against the function's raw Cloud Run URL already reflected the fix) until Hosting
+is deployed too, even with no file changes. **Always deploy Hosting alongside any
+Functions deploy that needs to take effect immediately** (`firebase deploy --only
+functions,hosting`, or the combined `firebase deploy`).
+
 ---
 
 ## See also
