@@ -13,6 +13,7 @@ import { db } from "./firebase.js";
 import { WorkflowEngine } from "./workflow-engine.js";
 import { rateLimit, uidKey } from "./rate-limit.js";
 import { operationalLog, safeErrorName } from "./observability.js";
+import { notify } from "./notifications.js";
 
 // Business Discovery ("אפיון העסק") — see docs/customer-discovery-onboarding/{ARCHITECTURE,SECURITY,DATA-MODEL}.md.
 // This router does NOT change which questionnaire mechanism gets auto-created when Owner confirms
@@ -34,7 +35,6 @@ export const discoveryRouter = Router();
 
 const staff = ["owner", "admin", "operator"];
 const activity = (organizationId: string, type: string, actorId: string, payload: Record<string, unknown>) => db.collection(`organizations/${organizationId}/activity`).add({ type, actorId, payload, createdAt: new Date().toISOString() });
-const notify = (organizationId: string, doc: Record<string, unknown>) => db.collection(`organizations/${organizationId}/notifications`).add({ read: false, createdAt: new Date().toISOString(), ...doc });
 
 function fail(res: import("express").Response, error: unknown, code: string, event: string, fallback: string) {
   if (error instanceof z.ZodError) return res.status(400).json({ error: { code, message: error.issues.map(issue => issue.message).join(", ") } });
@@ -50,6 +50,40 @@ function parseSectionId(raw: unknown, res: import("express").Response): Discover
 
 function progressRef(organizationId: string, projectId: string) { return db.doc(`organizations/${organizationId}/projects/${projectId}/discoveryProgress/current`); }
 function sectionRef(organizationId: string, projectId: string, sectionId: DiscoverySectionId) { return db.doc(`organizations/${organizationId}/projects/${projectId}/discovery/${sectionId}`); }
+
+// =================================================================================================
+// GET every project's Discovery progress for the Owner Dashboard / Master Panel's Discovery list
+// (2026-09-17 unification) — staff-only, matching every other org-wide management listing in this
+// codebase. Fans out one read per project rather than a Firestore collectionGroup query: the org's
+// own project list is already the correctly tenant-scoped source of truth, so this can never leak
+// another organization's discoveryProgress documents the way an unscoped collectionGroup query
+// could. Fine at this codebase's project-count scale (matches /api/dashboard/:organizationId's own
+// existing fan-out pattern over the same collection).
+discoveryRouter.get("/discovery/management/sessions", async (req: AuthenticatedRequest, res) => {
+  try {
+    const organizationId = z.string().min(1).parse(req.query.organizationId);
+    if (await requireRole(req, res, organizationId, staff) === undefined) return;
+    const projectsSnap = await db.collection(`organizations/${organizationId}/projects`).get();
+    const [progressSnaps, businessSnaps] = await Promise.all([
+      db.getAll(...projectsSnap.docs.map(project => progressRef(organizationId, project.id))),
+      db.getAll(...projectsSnap.docs.map(project => sectionRef(organizationId, project.id, "business"))),
+    ]);
+    const sessions = projectsSnap.docs.flatMap((project, index) => {
+      const snap = progressSnaps[index];
+      if (!snap?.exists) return [];
+      const progress = snap.data() as DiscoveryProgressDocument;
+      const business = businessSnaps[index]?.exists ? (businessSnaps[index]!.data()?.responses as Record<string, unknown> | undefined) : undefined;
+      return [{
+        id: project.id, customerId: project.data().customerId ?? null, projectName: project.data().name ?? project.id,
+        businessName: (business?.["business.publicName"] as string | undefined) || project.data().name || project.id,
+        ownerName: (business?.["business.ownerName"] as string | undefined) || null,
+        status: progress.status, percentComplete: progress.percentComplete, currentSectionId: progress.currentSectionId ?? null,
+        startedAt: progress.startedAt ?? null, submittedAt: progress.submittedAt ?? null, lastActivityAt: progress.lastActivityAt,
+      }];
+    }).sort((a, b) => (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? ""));
+    return res.json({ data: sessions });
+  } catch (error) { return fail(res, error, "DISCOVERY_MANAGEMENT_LIST_FAILED", "discovery.management_list_failed", "Could not load Discovery sessions"); }
+});
 
 // =================================================================================================
 // GET the full Discovery state for a project — every existing section document plus the progress
@@ -90,6 +124,13 @@ discoveryRouter.patch("/projects/:projectId/discovery/sections/:sectionId", auto
       if (!question) return res.status(400).json({ error: { code: "UNKNOWN_DISCOVERY_QUESTION", message: `"${key}" is not a question in section "${sectionId}"` } });
     }
     const now = new Date().toISOString(), secRef = sectionRef(input.organizationId, projectId, sectionId), progRef = progressRef(input.organizationId, projectId);
+    // Owner notifications ("Discovery started", "Draft saved") must fire once per real event, not
+    // once per autosave call — this endpoint is hit on every debounced keystroke while a customer
+    // types. "Started" is naturally once-only (progSnap only ever fails to exist on the very first
+    // save). "Draft saved" is throttled to once per SECTION the customer moves into, by comparing
+    // against the progress doc's previous currentSectionId, rather than firing on every field-level
+    // PATCH within the same section.
+    let justStarted = false, enteredNewSection = false;
     await db.runTransaction(async tx => {
       const [secSnap, progSnap] = await Promise.all([tx.get(secRef), tx.get(progRef)]);
       const existingResponses = secSnap.exists ? (secSnap.data()!.responses as DiscoveryResponses) : {};
@@ -98,13 +139,26 @@ discoveryRouter.patch("/projects/:projectId/discovery/sections/:sectionId", auto
         : { id: sectionId, projectId, templateVersion: DISCOVERY_TEMPLATE_VERSION, status: "draft", responses: input.responses, updatedAt: now, updatedBy: req.user!.uid };
       tx.set(secRef, nextDoc);
       if (!progSnap.exists) {
+        justStarted = true; enteredNewSection = true;
         const fresh: DiscoveryProgressDocument = { id: "current", projectId, templateVersion: DISCOVERY_TEMPLATE_VERSION, status: "in_progress", startedAt: now, currentSectionId: sectionId, completedSectionIds: [], percentComplete: 0, lastActivityAt: now };
         tx.set(progRef, fresh);
       } else {
         const current = progSnap.data() as DiscoveryProgressDocument;
+        enteredNewSection = current.currentSectionId !== sectionId;
         tx.update(progRef, { status: current.status === "not_started" ? "in_progress" : current.status, currentSectionId: sectionId, lastActivityAt: now });
       }
     });
+    const uploadedFilesNow = Object.entries(input.responses).some(([key, value]) => {
+      const question = section.questions.find(candidate => candidate.id === key);
+      return question && (question.type === "file" || question.type === "file_repeater") && Array.isArray(value) && value.length > 0;
+    });
+    if (justStarted || enteredNewSection || uploadedFilesNow) {
+      const project = await db.doc(`organizations/${input.organizationId}/projects/${projectId}`).get();
+      const projectName = project.data()?.name ?? projectId, customerId = project.data()?.customerId ?? null;
+      if (justStarted) await notify(input.organizationId, { audience: "owner", customerId, projectId, title: "Business Discovery started", body: `${projectName} started their Business Discovery`, type: "discovery_started", params: { projectName } });
+      else if (enteredNewSection) await notify(input.organizationId, { audience: "owner", customerId, projectId, title: "Discovery draft saved", body: `${projectName} saved progress on the "${sectionId}" section`, type: "discovery_draft_saved", params: { projectName, sectionId } });
+      if (uploadedFilesNow) await notify(input.organizationId, { audience: "owner", customerId, projectId, title: "Discovery files uploaded", body: `${projectName} uploaded files to their Business Discovery`, type: "discovery_files_uploaded", params: { projectName } });
+    }
     return res.json({ data: { id: sectionId, status: "draft", updatedAt: now } });
   } catch (error) { return fail(res, error, "DISCOVERY_SAVE_FAILED", "discovery.section_save_failed", "Could not save Discovery answers"); }
 });
@@ -184,14 +238,22 @@ discoveryRouter.post("/projects/:projectId/discovery/submit", async (req: Authen
 
     const now = new Date().toISOString();
     await db.runTransaction(async tx => {
-      const snaps = await Promise.all(discoverySectionOrder.map(sectionId => tx.get(sectionRef(input.organizationId, projectId, sectionId))));
+      // Firestore transactions require every tx.get() to happen before any tx.set()/tx.update() —
+      // progRef must be read here, alongside the section reads, NOT after the section writes below
+      // (that ordering is exactly what threw "Firestore transactions require all reads to be
+      // executed before all writes" on every real submit attempt, found 2026-09-18 while verifying
+      // Phase 1 in production — every prior "successful" submission was actually silently failing
+      // here, masked by the frontend's own bug of showing success without checking the result).
+      const [snaps, currentProgress] = await Promise.all([
+        Promise.all(discoverySectionOrder.map(sectionId => tx.get(sectionRef(input.organizationId, projectId, sectionId)))),
+        tx.get(progRef),
+      ]);
       snaps.forEach((snap, index) => {
         const sectionId = discoverySectionOrder[index]!;
         if (snap.exists && snap.data()?.status === "completed") return;
         const responses = snap.exists ? (snap.data()!.responses as DiscoveryResponses) : {};
         tx.set(sectionRef(input.organizationId, projectId, sectionId), { id: sectionId, projectId, templateVersion: DISCOVERY_TEMPLATE_VERSION, responses, updatedAt: now, updatedBy: req.user!.uid, status: "completed", completedAt: now, completedBy: req.user!.uid });
       });
-      const currentProgress = await tx.get(progRef);
       const next: DiscoveryProgressDocument = {
         id: "current", projectId, templateVersion: DISCOVERY_TEMPLATE_VERSION, status: "submitted",
         ...(currentProgress.data()?.startedAt ? { startedAt: currentProgress.data()!.startedAt } : { startedAt: now }),
@@ -207,7 +269,15 @@ discoveryRouter.post("/projects/:projectId/discovery/submit", async (req: Authen
     await notify(input.organizationId, { audience: "owner", customerId: project.data()?.customerId ?? null, projectId, title: "Business Discovery submitted", body: `${project.data()?.name ?? "A project"}'s Business Discovery was submitted`, type: "discovery_submitted", params: { projectName: project.data()?.name ?? "" } });
     await activity(input.organizationId, "discovery.submitted", req.user!.uid, { projectId, workflowEventId: idempotencyKey });
     return res.status(202).json({ data: { projectId, status: "submitted", workflowEventId: idempotencyKey } });
-  } catch (error) { return fail(res, error, "DISCOVERY_SUBMIT_FAILED", "discovery.submit_failed", "Could not submit Discovery"); }
+  } catch (error) {
+    // Temporary diagnostic (2026-09-18): safeErrorName() alone (just "Error"/"TypeError") gave no
+    // way to tell this apart from any other failure in this handler while chasing a real
+    // production bug (a clean, CRM-decoupled test project's /submit call failing) — the message
+    // itself is a fixed, code-controlled workflow/validation string here, not user-entered text,
+    // so logging it is safe. Remove once the underlying issue (if any remains) is understood.
+    operationalLog("error", "discovery.submit_failed.detail", { errorType: safeErrorName(error), errorMessage: error instanceof Error ? error.message : String(error) });
+    return fail(res, error, "DISCOVERY_SUBMIT_FAILED", "discovery.submit_failed", "Could not submit Discovery");
+  }
 });
 
 // =================================================================================================

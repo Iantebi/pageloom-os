@@ -102,18 +102,24 @@ served by Firebase Hosting.
 
 ### Route map
 
+**Two separate applications share this Next.js build, each with its own layout/shell — see
+the 2026-09-18 amendment in §10 for why. The Owner Workspace (`(product)` route group,
+`product-shell.tsx`) is daily business operations; Backend Master (`(master)` route group,
+`master-shell.tsx`) is platform administration only. Neither's nav links to the other.**
+
 | Route | Access | Purpose |
 |---|---|---|
-| `/dashboard` | Staff | Revenue / pipeline / AI-cost tiles (privileged roles), today's activity, pending approvals, deployments, notifications. |
-| `/sales` | Staff | Lead metrics, AI-assisted outreach & proposal drafting, embeds the human-only `ClosingWorkspace`. |
-| `/projects`, `/projects/view` | Staff | Project list and a tabbed workspace: onboarding, questionnaire, website, tasks, approvals, files, history. |
-| `/agents` | Staff | The 22-agent roster — status, assign-a-job, pause/resume, execution log. |
-| `/builder` | Staff | Pre-sale intake → schedule a call; separate closed-won recorder enforcing the human-close requirement; production pipeline view. |
-| `/crm` | Staff | Lead kanban (new→won/lost) and customer records with contacts/documents. |
-| `/portal` | Customer + staff preview | Journey timeline, discovery or legacy questionnaire, file upload, live-site preview, handover, content review, revisions, support tickets. |
-| `/discovery` | Customer | Standalone (no sidebar) 9-section Business Discovery wizard — deliberately separate UX context. |
+| `/dashboard` | Owner Workspace · Staff | Revenue / pipeline / AI-cost tiles (privileged roles), today's activity, pending approvals, deployments, notifications. |
+| `/crm` | Owner Workspace · Staff | "Customers" in the sidebar. Lead kanban (new→won/lost) and customer records with contacts/documents. |
+| `/discoveries` | Owner Workspace · Staff | "Discovery" in the sidebar. Every submitted Discovery org-wide, searchable/filterable, with actions to open the questionnaire or convert an orphan project to a customer. |
+| `/projects`, `/projects/view` | Owner Workspace · Staff | "Websites" in the sidebar. Project list and a tabbed workspace: onboarding (Discovery), questionnaire, website, tasks, approvals, files, history. `/projects/view` reads an initial `?tab=` param. |
+| `/agents` | Owner Workspace · Staff | "AI" in the sidebar. The 22-agent roster — status, assign-a-job, pause/resume, execution log. |
+| `/billing` | Owner Workspace · Staff (owner/admin) | Customers/invoices/payments org-wide; can create invoices and record payments. Subscriptions has no backing concept yet — an honest empty state, not fabricated data. |
 | `/settings` | Any signed-in user | MFA enrollment, appearance/theme settings. |
-| `/master`, `/master/content`, `/master/customer` | Owner / Admin only | Master Control Center, cross-project content editor, full admin customer profile with portal-user management. |
+| `/sales`, `/portal` | Owner Workspace · reachable via a secondary "More" link, not a primary sidebar section | Sales: lead metrics, AI-assisted outreach & proposal drafting, embeds the human-only `ClosingWorkspace`. Portal: the customer's own journey/Discovery/file-upload/handover/support view (staff can preview it). |
+| `/builder` | Owner Workspace · Staff | Pre-sale intake → schedule a call; separate closed-won recorder enforcing the human-close requirement; production pipeline view. |
+| `/discovery` | Customer | Standalone (no sidebar) 9-section Business Discovery wizard — deliberately separate UX context. Since 2026-09-17, the UI is the imported AI Studio frontend (`apps/web/src/ai-studio/App.tsx`); see §10's amendment. |
+| `/master`, `/master/content`, `/master/customer` | **Backend Master** · Owner / Admin only | Its own `(master)` layout/shell (no Owner Workspace sidebar). Master Control Center, cross-project content editor, full admin customer profile with portal-user management. |
 
 ### Data layer
 
@@ -129,9 +135,13 @@ served by Firebase Hosting.
 
 ### Key components
 
-- **Shell/framework:** `product-shell.tsx` (auth gate, org switcher, role-based nav,
-  live health-pill polling), `role-scoped-extras.tsx` (injects role/route-conditional
-  widgets), `route-error-boundary.tsx`, `sign-in.tsx`, `mfa-challenge.tsx`.
+- **Shell/framework:** `product-shell.tsx` — the **Owner Workspace** shell only (auth gate,
+  org switcher, the 7-section role-based nav, live health-pill polling); `master-shell.tsx`
+  — the separate **Backend Master** shell (auth gate + owner/admin gate, minimal distinct
+  chrome, no shared nav with product-shell.tsx — see §10's 2026-09-18 amendment); both reuse
+  `AuthenticatedOrganization` (also in `product-shell.tsx`) for the auth/org context they both
+  still need. Plus `role-scoped-extras.tsx` (injects role/route-conditional widgets, Owner
+  Workspace only), `route-error-boundary.tsx`, `sign-in.tsx`, `mfa-challenge.tsx`.
 - **Dashboard/business widgets:** `business-intelligence-overview.tsx`,
   `enterprise-overview.tsx`, `fleet-overview.tsx`, `reports-overview.tsx`,
   `operational-records.tsx`, `operations-health-card.tsx`, `notification-inbox.tsx`,
@@ -611,6 +621,62 @@ unaffected by which one ran.
 > table, not only per-project. See `docs/customer-discovery-onboarding/ARCHITECTURE.md`'s own
 > amendment note for the full detail.
 
+> **Amendment (2026-09-17): the customer-facing `/discovery` UI is now the Google AI Studio
+> frontend** (`apps/web/src/ai-studio/**`, imported from `Iantebi/pageloom-discovery-ai`),
+> replacing the previous hand-built stepper UI — the backend, Firestore structure, security
+> rules, and authentication are unchanged; there is exactly one Discovery data path. The AI
+> Studio app's own data layer (`services/firebaseDiscoveryService.ts`) no longer talks to
+> Firestore/Storage directly — it calls the same real backend every other client does
+> (`apps/web/src/lib/discovery.ts`), through a field-level bridge
+> (`services/discoveryMapping.ts`) that translates its flat `DiscoveryData` shape to/from the
+> real per-section `discoveryTemplate` schema. `discovery-template.ts` gained a small set of
+> additive optional questions (fields AI Studio collects with no prior home) and several
+> required→optional loosenings for questions no AI Studio step asks (they would otherwise
+> permanently block `/submit` for this frontend) — nothing existing was removed or renamed.
+> A new staff-only endpoint, `GET /discovery/management/sessions`, lists every project's
+> Discovery progress for an org; it backs a new Owner Dashboard/Master Panel Discovery list
+> (`dashboard-discovery-slot.tsx`, `discovery-management-list.tsx`) that links into the
+> existing per-project `DiscoveryPanel`. **Correction (2026-09-17, later same day):** AI
+> Studio's own `AdminMaster` view was in fact re-mounted, reachable at `/discovery?view=admin`
+> (role-gated to owner/admin), wired to real data via `firebaseDiscoveryService`'s
+> `subscribeAllClients`/`subscribeClientDoc` (which call the same management/sessions and
+> per-project endpoints above) — it is a second, AI-Studio-native admin surface for Discovery
+> specifically, distinct from both the Master Panel's `DiscoveryManagementList` and the new
+> `/discoveries` page from the 2026-09-18 amendment below. This duplication (three different
+> "list every Discovery" surfaces) is known and not yet consolidated.
+
+> **Amendment (2026-09-18): the Owner Workspace and Backend Master are two separate
+> applications; do not merge them.** By explicit decision: the Owner Workspace
+> (`(product)` route group, `product-shell.tsx`) is for daily business operations and
+> Backend Master (`(master)` route group, `master-shell.tsx`) is for platform
+> administration only — each has its own navigation, routes, permissions, layout, and
+> responsibilities, and the Owner Workspace must never expose Backend Master controls.
+> Concretely: `product-shell.tsx`'s sidebar no longer has a "Master Control" link at all
+> (previously shown to owner/admin via `canSeeMaster`); `/master`, `/master/content`, and
+> `/master/customer` moved out of the `(product)` route group into their own `(master)`
+> route group with its own `layout.tsx`/`MasterShell` (owner/admin gate, a minimal distinct
+> top bar, and an explicit one-way "back to Owner Workspace" link — the only connection
+> between the two, and it points the allowed direction only). `master-shell.tsx` does not
+> render the Owner Workspace's sidebar, `RoleScopedExtras`, or `DashboardDiscoverySlot`.
+> `MasterPage` also stopped rendering `DiscoveryManagementList` — tracking submitted
+> Discoveries is a daily-operations concern, now served by the Owner Workspace's own
+> `/discoveries` (see the previous amendment), not "platform administration."
+>
+> Same day, separately: the Owner Workspace sidebar itself was unified to exactly the
+> seven sections product now specifies — Dashboard, Customers, Discovery, Websites, AI,
+> Billing, Settings — reusing existing routes under new labels (`/crm`→Customers,
+> `/agents`→AI, `/projects`→Websites) rather than duplicating pages; Sales and the
+> client-portal preview moved to a secondary "More" quick-links block. Two sections had no
+> dedicated page before this: `/discoveries` (search/filter over the existing
+> `GET /discovery/management/sessions`, plus a new
+> `POST /admin/discovery-sessions/:projectId/convert-to-customer` for orphan projects) and
+> `/billing` (customers/invoices/payments were previously read-only display data with no
+> write path at all; new `GET /billing/overview`, `POST /billing/invoices` — finally wiring
+> up the previously-unused Israeli VAT calculator in `packages/core`'s
+> `israel-localization.ts` — and `POST /billing/invoices/:id/payments`). Subscriptions has
+> no backing concept anywhere in this codebase and was deliberately left as an honest
+> "not available yet" state rather than fabricated.
+
 ### Delivery, review & handoff
 
 The 22-agent fleet works stages 5–18 under the Workflow Engine's control.
@@ -768,6 +834,47 @@ consent), plus the standing per-release Owner production-deployment approval. Bo
 human/business gates, not engineering gaps. Payment automation (Stripe/PayPal) and
 Google Workspace/WhatsApp/CRM integrations are explicitly *not* blockers — deferred
 backlog by design.
+
+---
+
+## Releases
+
+**`v1.0.0` (2026-09-18): the Discovery system, frozen.** Everything described in §3's
+Discovery/Owner-Workspace/PWA/notifications coverage above, plus the critical
+production bug fixes from that day (a Firestore transaction read-after-write in
+`/submit`, and the frontend showing success without checking the server's actual
+result) — see [`docs/releases/v1.0.0.md`](./releases/v1.0.0.md) for the full list.
+**Versioning policy going forward:** `main` moves on as `1.1` — new Discovery/Owner-
+Workspace/PWA/notification work builds on top of this release, never inside it. A
+change to anything `v1.0.0` covers happens only as a deliberate bug fix, tagged
+`v1.0.x`.
+
+**New Client onboarding (2026-09-20, part of `1.1`).** A standalone "New Client" flow
+(`/clients/new`, `functions/src/client-onboarding-api.ts`) that creates a customer,
+project, and Discovery session in one action and produces a clean `/d/{token}` Discovery
+link — no CRM lead/deal ceremony, no manual Firestore work, no IDs ever exposed to the
+customer. The token is a 192-bit random secret stored in a top-level, never-client-
+readable `discoveryInvites/{token}` collection; opening the link claims a Firestore
+membership scoped to exactly that one project via a public (pre-authenticate-middleware)
+claim endpoint, the same pattern `published-content-api.ts` already established for the
+one other unauthenticated route. Because `apps/web` is a static export, `/d/{token}`
+is not a real Next.js dynamic route (static export requires every dynamic path to be
+known at build time) — it's served by Firebase Hosting's existing catch-all rewrite to
+the root page, which reads the token from the real browser pathname instead. Full
+stage-by-stage documentation lives in the standalone
+[Client Playbook](./client-playbook/README.md) (`docs/client-playbook/`) — also
+independent of Backend Master and the CRM, by the same rule as the flow itself.
+
+**Operational note (found live during this feature's own verification):**
+`firebase.json`'s `/api/**` hosting rewrite sets `pinTag: true`, which pins that route to
+whatever Cloud Run revision existed at the **last Hosting deploy** — a
+`firebase deploy --only functions` updates the function itself but never moves this pin,
+so real, Hosting-routed traffic keeps hitting the stale revision (confirmed: a genuine bug
+fix deployed via `--only functions` had zero effect on the public URL, while the same
+request against the function's raw Cloud Run URL already reflected the fix) until Hosting
+is deployed too, even with no file changes. **Always deploy Hosting alongside any
+Functions deploy that needs to take effect immediately** (`firebase deploy --only
+functions,hosting`, or the combined `firebase deploy`).
 
 ---
 

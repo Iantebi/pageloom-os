@@ -38,6 +38,9 @@ const questionsHe: Record<string, QuestionCopy> = {
   "business.story": { label: "למה התחלתם את העסק?", helpText: "לא חובה, אבל סיפור טוב בונה אמון." },
   "business.founderPriorities": { label: "מה הכי חשוב לכם בעבודה שלכם?" },
   "business.customerFeeling": { label: "מה תרצו שלקוחות ירגישו כשהם עובדים איתכם?", whyWeAsk: "התחושה שאתם רוצים ליצור עוזרת לנו לבחור את הטון והעיצוב הנכונים." },
+  "business.ownerName": { label: "שם בעל/ת העסק" },
+  "business.category": { label: "תחום העיסוק" },
+  "business.tagline": { label: "משפט תדמית קצר (אם יש)" },
 
   "customers.idealCustomer": { label: "מי הלקוח האידיאלי שלכם?", whyWeAsk: "חשבו על לקוח טוב שהיה לכם בעבר והייתם שמחים לקבל עוד 20 לקוחות כמוהו.", placeholder: "תארו אותו: מי הוא, מה מצבו, מה הוא מחפש." },
   "customers.beforeContact": { label: "מה קורה ללקוח רגע לפני שהוא פונה אליכם?", whyWeAsk: "ככל שנבין טוב יותר את הרגע שבו לקוח מחליט לפנות אליכם, נוכל לבנות דף שמדבר בדיוק אליו." },
@@ -45,6 +48,7 @@ const questionsHe: Record<string, QuestionCopy> = {
   "customers.desiredOutcome": { label: "מה הלקוח רוצה להשיג?" },
   "customers.commonFears": { label: "מה החששות הכי נפוצים של לקוחות לפני שהם פונים אליכם?" },
   "customers.ifUnsolved": { label: "מה קורה ללקוח אם הבעיה שלו לא נפתרת?" },
+  "customers.obstacles": { label: "מה עוצר לקוחות מלפנות אליכם?" },
 
   "services.list": { label: "השירותים או המוצרים שלכם", whyWeAsk: "כל שירות שתוסיפו יכול להפוך לחלק באתר שמושך את הלקוחות הנכונים." },
   "services.name": { label: "שם השירות" },
@@ -60,6 +64,8 @@ const questionsHe: Record<string, QuestionCopy> = {
   "differentiation.whatCustomersSay": { label: "מה לקוחות אומרים עליכם בפועל?" },
   "differentiation.processAdvantages": { label: "מה בדרך שבה אתם עובדים שונה או טוב יותר?" },
   "differentiation.other": { label: "משהו נוסף שחשוב שנדע?" },
+  "differentiation.corePromises": { label: "אילו הבטחות אתם נותנים ללקוחות?" },
+  "differentiation.guarantees": { label: "יש לכם אחריות או הבטחת שירות?" },
 
   "trust.hasTestimonials": { label: "יש לכם המלצות מלקוחות?" },
   "trust.testimonials": { label: "שתפו את ההמלצות שיש לכם", helpText: "אפשר להעלות צילום מסך, או פשוט להעתיק את הטקסט." },
@@ -67,18 +73,24 @@ const questionsHe: Record<string, QuestionCopy> = {
   "trust.yearsExperience": { label: "כמה שנות ניסיון יש לכם?" },
   "trust.clientCount": { label: "כמה לקוחות שירתתם עד היום?" },
   "trust.certifications": { label: "יש לכם הסמכות, תעודות או הישגים שכדאי להציג?" },
+  "trust.certificationFiles": { label: "העלאת תעודות או הסמכות" },
+  "trust.testimonialFiles": { label: "העלאת צילומי המלצות" },
 
   "branding.hasLogo": { label: "יש לכם לוגו קיים?" },
   "branding.logo": { label: "העלאת הלוגו" },
   "branding.colors": { label: "בחרו עד שני צבעים מובילים למותג שלכם", whyWeAsk: "הצבעים שתבחרו ישפיעו על כל העיצוב של האתר." },
   "branding.style": { label: "איזה סגנון הכי מתאים לעסק שלכם?" },
   "branding.avoid": { label: "יש משהו שבטוח לא תרצו?" },
+  "branding.fontStyle": { label: "סגנון גופן מועדף (אם יש)" },
+  "branding.inspirationWebsites": { label: "אתרים שאתם אוהבים ומהם תרצו לקבל השראה" },
+  "branding.personalityTraits": { label: "איך תרצו שהעסק שלכם יתפוס בעיני הלקוחות" },
 
   "materials.ownerPhotos": { label: "תמונות שלכם" },
   "materials.teamPhotos": { label: "תמונות של הצוות" },
   "materials.locationPhotos": { label: "תמונות של המקום" },
   "materials.productPhotos": { label: "תמונות של המוצרים או העבודות שלכם" },
   "materials.priceListOrBrochure": { label: "מחירון או חוברת (אם יש)" },
+  "materials.otherDocuments": { label: "קבצים נוספים" },
 
   "presence.phone": { label: "מספר טלפון" },
   "presence.whatsapp": { label: "מספר וואטסאפ" },
@@ -91,6 +103,7 @@ const questionsHe: Record<string, QuestionCopy> = {
   "presence.hasDomain": { label: "יש לכם כבר דומיין (כתובת אינטרנט)?" },
   "presence.socialLinks": { label: "קישורים לרשתות חברתיות" },
   "presence.googleBusinessUrl": { label: "קישור לעסק שלכם בגוגל" },
+  "presence.needsDomainHelp": { label: "תרצו עזרה ברכישת דומיין?" },
 
   "goals.biggestProblem": { label: "מה הבעיה הגדולה ביותר שתרצו שנפתור?" },
   "goals.sixMonthSuccess": { label: "דמיינו שבעוד חצי שנה הפרויקט הצליח מאוד — מה השתנה בעסק שלכם?", whyWeAsk: "זה עוזר לנו להבין איך נראית הצלחה מבחינתכם, ולא רק מבחינתנו." },
@@ -104,6 +117,9 @@ const questionsEn: Record<string, QuestionCopy> = {
   "business.story": { label: "Why did you start the business?", helpText: "Optional, but a good story builds trust." },
   "business.founderPriorities": { label: "What matters most to you in your work?" },
   "business.customerFeeling": { label: "What should customers feel when working with you?", whyWeAsk: "The feeling you want to create helps us choose the right tone and design." },
+  "business.ownerName": { label: "Owner's name" },
+  "business.category": { label: "Business category" },
+  "business.tagline": { label: "Short tagline (if you have one)" },
 
   "customers.idealCustomer": { label: "Who is your ideal customer?", whyWeAsk: "Think of a great customer you've had and would love 20 more just like them.", placeholder: "Describe them: who they are, their situation, what they're looking for." },
   "customers.beforeContact": { label: "What's happening for a customer right before they contact you?", whyWeAsk: "The better we understand that moment, the better we can speak directly to it." },
@@ -111,6 +127,7 @@ const questionsEn: Record<string, QuestionCopy> = {
   "customers.desiredOutcome": { label: "What does the customer want to achieve?" },
   "customers.commonFears": { label: "What are customers' most common worries before reaching out?" },
   "customers.ifUnsolved": { label: "What happens to the customer if the problem stays unsolved?" },
+  "customers.obstacles": { label: "What stops customers from reaching out?" },
 
   "services.list": { label: "Your services or products", whyWeAsk: "Every service you add can become part of a page that attracts the right customers." },
   "services.name": { label: "Service name" },
@@ -126,6 +143,8 @@ const questionsEn: Record<string, QuestionCopy> = {
   "differentiation.whatCustomersSay": { label: "What do customers actually say about you?" },
   "differentiation.processAdvantages": { label: "What's different or better about how you work?" },
   "differentiation.other": { label: "Anything else we should know?" },
+  "differentiation.corePromises": { label: "What promises do you make to customers?" },
+  "differentiation.guarantees": { label: "Do you offer any guarantees?" },
 
   "trust.hasTestimonials": { label: "Do you have testimonials from customers?" },
   "trust.testimonials": { label: "Share the testimonials you have", helpText: "A screenshot works, or just paste the text." },
@@ -133,18 +152,24 @@ const questionsEn: Record<string, QuestionCopy> = {
   "trust.yearsExperience": { label: "How many years of experience do you have?" },
   "trust.clientCount": { label: "How many customers have you served so far?" },
   "trust.certifications": { label: "Any certifications or achievements worth showing?" },
+  "trust.certificationFiles": { label: "Upload certifications or credentials" },
+  "trust.testimonialFiles": { label: "Upload testimonial screenshots" },
 
   "branding.hasLogo": { label: "Do you already have a logo?" },
   "branding.logo": { label: "Upload your logo" },
   "branding.colors": { label: "Pick up to two main brand colors", whyWeAsk: "The colors you choose shape the entire look of the site." },
   "branding.style": { label: "Which style fits your business best?" },
   "branding.avoid": { label: "Anything you definitely don't want?" },
+  "branding.fontStyle": { label: "Preferred font style (if any)" },
+  "branding.inspirationWebsites": { label: "Websites you like and would draw inspiration from" },
+  "branding.personalityTraits": { label: "How you want your business to come across to customers" },
 
   "materials.ownerPhotos": { label: "Photos of you" },
   "materials.teamPhotos": { label: "Team photos" },
   "materials.locationPhotos": { label: "Photos of your location" },
   "materials.productPhotos": { label: "Photos of your products or work" },
   "materials.priceListOrBrochure": { label: "Price list or brochure (if any)" },
+  "materials.otherDocuments": { label: "Other files" },
 
   "presence.phone": { label: "Phone number" },
   "presence.whatsapp": { label: "WhatsApp number" },
@@ -157,6 +182,7 @@ const questionsEn: Record<string, QuestionCopy> = {
   "presence.hasDomain": { label: "Do you already own a domain?" },
   "presence.socialLinks": { label: "Social media links" },
   "presence.googleBusinessUrl": { label: "Link to your Google Business profile" },
+  "presence.needsDomainHelp": { label: "Would you like help getting a domain?" },
 
   "goals.biggestProblem": { label: "What's the biggest problem you'd like us to solve?" },
   "goals.sixMonthSuccess": { label: "Imagine that six months from now this project succeeded — what changed in your business?", whyWeAsk: "This helps us understand what success looks like to you, not just to us." },
