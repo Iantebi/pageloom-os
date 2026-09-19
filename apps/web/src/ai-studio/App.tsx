@@ -39,10 +39,13 @@ import { canProceedFromStep, hasAnyMissingRequiredField, missingFieldsForStep } 
 // AuthenticatedOrganization's gate here checks authentication only, not role. A client (customer)
 // must never be able to reach it, even by guessing the query param.
 
-export default function App() {
+// projectIdOverride: used by the customer-facing Discovery link (apps/web/src/app/d/[token]/page.tsx)
+// so the URL never has to carry ?projectId= — that page resolves the opaque token to a project
+// server-side and passes the result straight in, instead of round-tripping through the address bar.
+export default function App({ projectIdOverride }: { projectIdOverride?: string } = {}) {
   const params = useSearchParams();
   const router = useRouter();
-  const projectId = params.get("projectId") ?? "";
+  const projectId = projectIdOverride ?? params.get("projectId") ?? "";
   const isAdminRequested = params.get("view") === "admin";
   const { organizationId, membership, loading: orgLoading } = useOrganization();
   const { signOut } = useAuth();

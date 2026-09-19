@@ -138,6 +138,14 @@ service cloud.firestore {
       match /projects/{projectId}/discoveryNotes/{noteId} { allow read: if staff(orgId); allow write: if false; }
       match /projects/{projectId}/businessProfile/{docId} { allow read: if staff(orgId); allow write: if false; }
     }
+    // New Client onboarding (2026-09-20, see docs/client-playbook/03-send-discovery.md) — a
+    // discoveryInvites/{token} document is the ONLY thing a not-yet-signed-in customer's browser
+    // has before it authenticates, and it deliberately lives outside organizations/{orgId} because
+    // resolving a token happens before the caller's organization is known. Never client-readable or
+    // client-writable at any stage of the flow: the public claim endpoint (client-onboarding-api.ts,
+    // mounted before the API's authenticate middleware) and the New Client creation endpoint both
+    // use the Admin SDK exclusively, which is not subject to these rules.
+    match /discoveryInvites/{token} { allow read, write: if false; }
     match /{document=**} { allow read, write: if false; }
   }
 }

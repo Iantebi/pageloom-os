@@ -136,6 +136,7 @@ const routes: [name: string, load: () => Promise<{ default: () => React.ReactEle
   ["/agents", () => import("./(product)/agents/page")],
   ["/builder", () => import("./(product)/builder/page")],
   ["/crm", () => import("./(product)/crm/page")],
+  ["/clients/new", () => import("./(product)/clients/new/page")],
   ["/discoveries", () => import("./(product)/discoveries/page")],
   ["/billing", () => import("./(product)/billing/page")],
   ["/portal", () => import("./(product)/portal/page")],

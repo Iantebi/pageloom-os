@@ -849,6 +849,22 @@ Workspace/PWA/notification work builds on top of this release, never inside it. 
 change to anything `v1.0.0` covers happens only as a deliberate bug fix, tagged
 `v1.0.x`.
 
+**New Client onboarding (2026-09-20, part of `1.1`).** A standalone "New Client" flow
+(`/clients/new`, `functions/src/client-onboarding-api.ts`) that creates a customer,
+project, and Discovery session in one action and produces a clean `/d/{token}` Discovery
+link — no CRM lead/deal ceremony, no manual Firestore work, no IDs ever exposed to the
+customer. The token is a 192-bit random secret stored in a top-level, never-client-
+readable `discoveryInvites/{token}` collection; opening the link claims a Firestore
+membership scoped to exactly that one project via a public (pre-authenticate-middleware)
+claim endpoint, the same pattern `published-content-api.ts` already established for the
+one other unauthenticated route. Because `apps/web` is a static export, `/d/{token}`
+is not a real Next.js dynamic route (static export requires every dynamic path to be
+known at build time) — it's served by Firebase Hosting's existing catch-all rewrite to
+the root page, which reads the token from the real browser pathname instead. Full
+stage-by-stage documentation lives in the standalone
+[Client Playbook](./client-playbook/README.md) (`docs/client-playbook/`) — also
+independent of Backend Master and the CRM, by the same rule as the flow itself.
+
 ---
 
 ## See also
