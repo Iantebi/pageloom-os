@@ -249,18 +249,18 @@ export const INITIAL_DISCOVERY_DATA: DiscoveryData = {
   guarantees: '',
   awardsAndCertifications: '',
 
-  // Step 5: Brand
-  brandStyle: 'modern_minimal',
+  // Step 5: Brand — left unanswered (not a real customer answer) until the customer actually
+  // fills this step. See discoveryValidation.ts's isMissing checks, which rely on these being
+  // falsy to correctly flag the step as incomplete.
+  brandStyle: '',
   brandColors: {
-    primary: '#1E293B',
-    secondary: '#2563EB',
-    primaryName: 'פחם עמוק',
-    secondaryName: 'כחול עמוק',
+    primary: '',
+    secondary: '',
   },
-  logoStatus: 'has_logo',
-  fontStyle: 'נקי וקריא (סנס-סריף מודרני)',
+  logoStatus: '',
+  fontStyle: '',
   inspirationWebsites: '',
-  brandPersonality: ['מקצועי וסמכותי', 'אמין ושקוף ב-100%'],
+  brandPersonality: [],
 
   // Step 6: Uploads
   uploadedFiles: [],
@@ -272,7 +272,7 @@ export const INITIAL_DISCOVERY_DATA: DiscoveryData = {
   facebookUrl: '',
   instagramUrl: '',
   businessEmail: '',
-  openingHours: 'א׳-ה׳: 08:30 - 18:00',
+  openingHours: '',
   physicalAddress: '',
   googleMapsUrl: '',
   tiktokOrLinkedIn: '',

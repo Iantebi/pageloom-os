@@ -104,7 +104,7 @@ export interface DiscoveryData {
   // Step 5: Brand
   brandStyle: string; // e.g., 'modern_clean', 'luxury_elegant', 'warm_friendly', 'bold_tech', 'natural_organic', 'creative_playful'
   brandColors: BrandColors;
-  logoStatus: 'has_logo' | 'needs_refresh' | 'needs_new_logo';
+  logoStatus: '' | 'has_logo' | 'needs_refresh' | 'needs_new_logo';
   fontStyle: string;
   inspirationWebsites: string;
   brandPersonality: string[];

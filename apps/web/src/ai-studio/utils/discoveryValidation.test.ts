@@ -14,7 +14,7 @@ const blank: DiscoveryData = {
   idealCustomer: "", customerProblem: "", customerDesire: "",
   services: [{ id: "srv-1", name: "", problemSolved: "", resultReceived: "", whyValuable: "", priceEstimate: "" }],
   whyChooseYou: "", uniqueDifferentiator: "",
-  brandStyle: "", brandColors: { primary: "", secondary: "" }, logoStatus: "" as unknown as DiscoveryData["logoStatus"],
+  brandStyle: "", brandColors: { primary: "", secondary: "" }, logoStatus: "",
   hasExistingDomain: null,
 };
 
@@ -75,8 +75,9 @@ describe("discoveryValidation — step 5 (Brand)", () => {
     expect(canProceedFromStep(5, blank)).toBe(false);
     expect(missingFieldsForStep(5, blank)).toEqual(new Set(["brandStyle", "brandColors", "logoStatus"]));
   });
-  it("INITIAL_DISCOVERY_DATA's own sensible defaults already satisfy step 5 untouched", () => {
-    expect(canProceedFromStep(5, INITIAL_DISCOVERY_DATA)).toBe(true);
+  it("INITIAL_DISCOVERY_DATA starts step 5 genuinely unanswered, not pre-filled with demo values", () => {
+    expect(canProceedFromStep(5, INITIAL_DISCOVERY_DATA)).toBe(false);
+    expect(missingFieldsForStep(5, INITIAL_DISCOVERY_DATA)).toEqual(new Set(["brandStyle", "brandColors", "logoStatus"]));
   });
   it("a logoStatus of 'needs_new_logo' (a real, meaningful choice) still satisfies branding.hasLogo", () => {
     const filled = { ...blank, brandStyle: "modern_minimal", brandColors: { primary: "#111111", secondary: "#222222" }, logoStatus: "needs_new_logo" as const };
