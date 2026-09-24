@@ -60,6 +60,21 @@ function joinNonEmpty(...parts: (string | undefined)[]): string | undefined {
   return joined || undefined;
 }
 
+// presence.googleBusinessUrl is a "url"-typed real question, but AI Studio's own field for it has
+// no client-side format guard, so it happily accepts plain text like a physical address. Sending
+// that straight through used to permanently block /submit for a real customer once saved (see
+// discovery-api.ts's 2026-09-24 comment on the format-check fix). A bare domain/share-link with no
+// scheme (e.g. a pasted "maps.app.goo.gl/..." link) is auto-prefixed the same way
+// presence.existingWebsiteUrl already is below; anything that isn't URL-shaped at all (contains a
+// space, no dot) is dropped rather than forced into an invalid URL.
+function toUrlOrUndefined(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  if (/^https?:\/\//.test(trimmed)) return trimmed;
+  if (!/\s/.test(trimmed) && trimmed.includes(".")) return `https://${trimmed}`;
+  return undefined;
+}
+
 /** AI Studio DiscoveryData -> the real backend's per-section responses shape. Called on every
  *  autosave; only sections with at least one non-empty answer are returned, so an untouched
  *  section never gets a premature empty document written for it. */
@@ -158,7 +173,7 @@ export function toRealSectionResponses(data: DiscoveryData): SectionResponsesMap
     "presence.existingWebsiteUrl": data.existingDomain ? (/^https?:\/\//.test(data.existingDomain) ? data.existingDomain : `https://${data.existingDomain}`) : undefined,
     "presence.hasDomain": data.hasExistingDomain,
     "presence.socialLinks": socialLinks.length ? socialLinks : undefined,
-    "presence.googleBusinessUrl": data.googleMapsUrl || undefined,
+    "presence.googleBusinessUrl": toUrlOrUndefined(data.googleMapsUrl),
     "presence.needsDomainHelp": data.needsDomainHelp,
   };
 

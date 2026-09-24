@@ -1,7 +1,7 @@
 import type { DiscoverySectionId, DiscoverySectionDocument } from "@pageloom/core";
 import { discoverySectionOrder } from "@pageloom/core";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { firebaseStorage } from "@/lib/firebase";
+import { firebaseAuth, firebaseStorage } from "@/lib/firebase";
 import { api } from "@/lib/api";
 import { saveDiscoverySection, submitDiscovery, type DiscoveryState } from "@/lib/discovery";
 import type { ClientFirestoreDoc, DiscoveryData, ProjectStatus, TimelineEntry, UploadedFile } from "../types";
@@ -22,6 +22,28 @@ import { allMissingWithSteps } from "../utils/discoveryValidation";
 // anonymous auth, and no second Firebase Storage/Firestore init.
 
 export type SaveStatus = "idle" | "saving" | "saved" | "error" | "offline";
+
+// discoveryMapping.ts's applyRealSectionResponses() reconstructs an UploadedFile from the stored
+// FileRecord ({path, fileName, ...}) with downloadUrl left as "" — a real download URL needs a
+// Storage call, which that function can't make (it's a synchronous, pure mapping). Without this,
+// a photo that uploaded and displayed fine loses its thumbnail on the very next page load/refresh
+// (ImageThumbnail falls back to a generic file-type icon once previewUrl/thumbnailUrl/downloadUrl
+// are all empty) — found 2026-09-24 alongside the upload path bug below. A failed resolution
+// (e.g. a stale/deleted object) is left as "" rather than thrown, since a missing thumbnail should
+// never block loading the rest of the Discovery.
+async function resolveUploadedFileUrls(files: UploadedFile[]): Promise<UploadedFile[]> {
+  return Promise.all(files.map(async file => {
+    const realPath = (file as UploadedFile & { realPath?: string }).realPath;
+    if (!realPath || file.downloadUrl) return file;
+    try {
+      const downloadUrl = await getDownloadURL(ref(firebaseStorage, realPath));
+      const isImage = file.type?.startsWith("image/") || /\.(png|jpe?g|webp|gif)$/i.test(file.name);
+      return { ...file, downloadUrl, previewUrl: isImage ? downloadUrl : file.previewUrl, thumbnailUrl: isImage ? downloadUrl : file.thumbnailUrl };
+    } catch {
+      return file;
+    }
+  }));
+}
 
 export function generateUniqueProjectId(): string {
   // Kept only so a stale import doesn't crash at build time; no longer used by App.tsx, which
@@ -55,7 +77,8 @@ class FirebaseDiscoveryService {
     const sections = Object.fromEntries(
       Object.entries(result.sections).map(([sectionId, doc]) => [sectionId, (doc as DiscoverySectionDocument).responses]),
     ) as Partial<Record<DiscoverySectionId, Record<string, unknown>>>;
-    const merged = applyRealSectionResponses(base, sections);
+    const mapped = applyRealSectionResponses(base, sections);
+    const merged = { ...mapped, uploadedFiles: await resolveUploadedFileUrls(mapped.uploadedFiles) };
     const progress = result.progress;
     return {
       ...merged,
@@ -145,11 +168,20 @@ class FirebaseDiscoveryService {
    *  Discovery upload uses (see apps/web/src/components/discovery/DiscoveryQuestionField.tsx's
    *  uploadPath) — never AI Studio's own `clients/{projectId}/...` path. The returned UploadedFile
    *  carries `realPath` (the Storage object path) so discoveryMapping.ts can persist a proper
-   *  FileRecord for it through the real backend on the next save. */
+   *  FileRecord for it through the real backend on the next save.
+   *
+   *  The path MUST include the uploader's own uid as its own segment (matching
+   *  storage.rules' `.../{sectionId}/{fieldId}/{userId}/{allPaths=**}` match) — without it, the
+   *  Storage rule's `safeDiscoveryUpload()` check (`request.auth.uid == userId`) binds `userId` to
+   *  whatever the next path segment happens to be (previously the file name itself), which can
+   *  never equal the real uid, so every real customer upload was rejected by Storage rules and
+   *  silently swallowed by the caller's catch block — found 2026-09-24 while investigating reports
+   *  that uploaded files never appeared. */
   async uploadClientFile(projectId: string, file: File, category: UploadedFile["category"], categoryLabelHebrew: string): Promise<UploadedFile> {
     const target = { logo: "branding", owner_photo: "materials", business_photos: "materials", products: "materials", services: "materials", certificates: "trust", recommendations: "trust", price_list: "materials", docs: "materials" }[category];
     const questionId = { logo: "branding.logo", owner_photo: "materials.ownerPhotos", business_photos: "materials.locationPhotos", products: "materials.productPhotos", services: "materials.productPhotos", certificates: "trust.certificationFiles", recommendations: "trust.testimonialFiles", price_list: "materials.priceListOrBrochure", docs: "materials.otherDocuments" }[category];
-    const path = `organizations/${this.organizationId}/discovery/${projectId}/${target}/${questionId}/${crypto.randomUUID()}-${file.name}`;
+    const uid = firebaseAuth.currentUser?.uid ?? "unknown";
+    const path = `organizations/${this.organizationId}/discovery/${projectId}/${target}/${questionId}/${uid}/${crypto.randomUUID()}-${file.name}`;
     const task = uploadBytesResumable(ref(firebaseStorage, path), file, { contentType: file.type || "application/octet-stream", customMetadata: { projectId, category } });
     await new Promise<void>((resolve, reject) => task.on("state_changed", undefined, reject, () => resolve()));
     const downloadUrl = await getDownloadURL(task.snapshot.ref);

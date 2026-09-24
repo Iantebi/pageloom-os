@@ -29,6 +29,7 @@ export const Step6Uploads: React.FC<Step6Props> = ({ data, onChange }) => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadingFilename, setUploadingFilename] = useState('');
   const [previewModalFile, setPreviewModalFile] = useState<UploadedFile | null>(null);
+  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -41,9 +42,11 @@ export const Step6Uploads: React.FC<Step6Props> = ({ data, onChange }) => {
 
     setIsSimulatingUpload(true);
     setUploadProgress(15);
+    setUploadErrors([]);
 
     const filesToProcess = Array.from(files).slice(0, 10 - data.uploadedFiles.length);
     const newUploadedFiles: UploadedFile[] = [];
+    const failures: string[] = [];
 
     const catObj = CATEGORIES.find((c) => c.id === selectedCategory);
     const categoryLabel = catObj ? catObj.label : 'קובץ כללי';
@@ -52,6 +55,18 @@ export const Step6Uploads: React.FC<Step6Props> = ({ data, onChange }) => {
       const file = filesToProcess[i];
       setUploadingFilename(file.name);
       setUploadProgress(Math.round(((i + 0.3) / filesToProcess.length) * 100));
+
+      // Skip a retry of the same file (same name+size, same category, not deleted) instead of
+      // creating a second copy under a new Storage path — a customer who clicks upload again
+      // after not immediately seeing the file appear (e.g. on a slow connection) would otherwise
+      // end up with duplicates once the upload actually lands.
+      const alreadyUploaded = data.uploadedFiles.some(
+        (existing) => !existing.isDeleted && existing.category === selectedCategory && existing.name === file.name && existing.size === file.size
+      );
+      if (alreadyUploaded) {
+        setUploadProgress(Math.round(((i + 1) / filesToProcess.length) * 100));
+        continue;
+      }
 
       try {
         const uploaded = await firebaseDiscoveryService.uploadClientFile(
@@ -63,31 +78,36 @@ export const Step6Uploads: React.FC<Step6Props> = ({ data, onChange }) => {
         newUploadedFiles.push(uploaded);
       } catch (err) {
         console.warn('Upload error:', err);
+        failures.push(file.name);
       }
 
       setUploadProgress(Math.round(((i + 1) / filesToProcess.length) * 100));
     }
 
-    const updatedFileList = [...data.uploadedFiles, ...newUploadedFiles];
-    onChange({
-      uploadedFiles: updatedFileList,
-    });
+    if (failures.length) setUploadErrors(failures);
 
-    // Add timeline log & save to Firestore
-    firebaseDiscoveryService.saveDiscovery(
-      {
-        ...data,
+    const updatedFileList = [...data.uploadedFiles, ...newUploadedFiles];
+    if (newUploadedFiles.length > 0) {
+      onChange({
         uploadedFiles: updatedFileList,
-      },
-      true,
-      {
-        id: `evt-${Date.now()}`,
-        type: 'file_uploaded',
-        title: `הועלו ${newUploadedFiles.length} קבצים ל-Cloud Storage`,
-        description: `תיקיית אחסון מבודדת: clients/${data.projectId}/`,
-        timestamp: new Date().toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' }),
-      }
-    );
+      });
+
+      // Add timeline log & save to Firestore
+      firebaseDiscoveryService.saveDiscovery(
+        {
+          ...data,
+          uploadedFiles: updatedFileList,
+        },
+        true,
+        {
+          id: `evt-${Date.now()}`,
+          type: 'file_uploaded',
+          title: `הועלו ${newUploadedFiles.length} קבצים ל-Cloud Storage`,
+          description: `תיקיית אחסון מבודדת: clients/${data.projectId}/`,
+          timestamp: new Date().toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' }),
+        }
+      );
+    }
 
     setIsSimulatingUpload(false);
     setUploadProgress(0);
@@ -234,6 +254,19 @@ export const Step6Uploads: React.FC<Step6Props> = ({ data, onChange }) => {
           </div>
         )}
       </div>
+
+      {/* Upload error banner — a customer whose upload was rejected (network, size, or a Storage
+          permission issue) previously saw nothing happen at all, with the error only reaching the
+          browser console; this surfaces it so they know to retry or try a different file. */}
+      {uploadErrors.length > 0 && (
+        <div className="flex items-start gap-2.5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <b>ההעלאה נכשלה עבור: {uploadErrors.join(', ')}</b>
+            <p className="mt-1 text-xs">בדקו את החיבור לאינטרנט ונסו שוב. אם הבעיה נמשכת, ניתן לשלוח את הקובץ בוואטסאפ לצוות PageLoom.</p>
+          </div>
+        </div>
+      )}
 
       {/* Uploaded Files Grid */}
       {data.uploadedFiles.length > 0 && (

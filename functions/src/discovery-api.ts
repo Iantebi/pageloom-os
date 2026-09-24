@@ -226,7 +226,14 @@ discoveryRouter.post("/projects/:projectId/discovery/submit", async (req: Authen
       const responses = snap.exists ? (snap.data()!.responses as DiscoveryResponses) : {};
       const missing = missingRequiredDiscoveryFields(discoverySection(sectionId), responses);
       if (missing.length > 0) missingBySection[sectionId] = missing;
-      const invalid = invalidDiscoveryFieldFormats(discoverySection(sectionId), responses);
+      // Only a REQUIRED question's format issue blocks submission. invalidDiscoveryFieldFormats
+      // itself deliberately flags any malformed email/phone/url regardless of requiredness (see
+      // its own comment: optional-but-filled-with-garbage still isn't fine) - useful as an inline,
+      // non-blocking hint elsewhere, but a hard submission blocker on an OPTIONAL field leaves the
+      // customer permanently stuck with no way to know which field or why: found 2026-09-24 when a
+      // real customer's optional "Google Maps link" answer (a plain address, not a URL) blocked
+      // /submit on every retry with a generic, non-specific error.
+      const invalid = invalidDiscoveryFieldFormats(discoverySection(sectionId), responses).filter(questionId => discoveryQuestion(questionId).required);
       if (invalid.length > 0) invalidBySection[sectionId] = invalid;
     });
     if (Object.keys(missingBySection).length > 0) {
