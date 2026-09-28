@@ -14,7 +14,7 @@ import type { BrandColors, DiscoveryData, ServiceItem, UploadedFile } from "../t
 
 export type SectionResponsesMap = Partial<Record<DiscoverySectionId, Record<string, unknown>>>;
 
-type RealFileRecord = { path: string; fileName: string; uploadedAt: string; sizeBytes: number; source: "customer" | "ai_generated" };
+export type RealFileRecord = { path: string; fileName: string; uploadedAt: string; sizeBytes: number; source: "customer" | "ai_generated" };
 type RealServiceEntry = { name: string; forWhom?: string; problem?: string; outcome?: string; priceLabel?: string; promote: boolean };
 type RealAddress = { line1: string; city: string; serviceAreas?: string[] };
 
@@ -75,12 +75,15 @@ function toUrlOrUndefined(value: string | undefined): string | undefined {
   return undefined;
 }
 
-/** AI Studio DiscoveryData -> the real backend's per-section responses shape. Called on every
- *  autosave; only sections with at least one non-empty answer are returned, so an untouched
- *  section never gets a premature empty document written for it. */
-export function toRealSectionResponses(data: DiscoveryData): SectionResponsesMap {
+/** Groups uploaded files (across however many UploadedFile["category"] values share one real
+ *  question - e.g. "products" and "services" both answer materials.productPhotos) into the real
+ *  file-repeater records keyed by real questionId. Shared by toRealSectionResponses() (the normal
+ *  autosave path) and firebaseDiscoveryService.removeClientFile() (the explicit-delete path
+ *  below), so both ways of reaching the server agree on exactly which files answer which
+ *  question. */
+function filesByRealQuestionId(files: UploadedFile[]): Map<string, RealFileRecord[]> {
   const filesByQuestion = new Map<string, RealFileRecord[]>();
-  for (const file of data.uploadedFiles ?? []) {
+  for (const file of files) {
     const target = FILE_CATEGORY_TO_QUESTION[file.category];
     if (!target) continue;
     const record = toRealFile(file);
@@ -89,6 +92,25 @@ export function toRealSectionResponses(data: DiscoveryData): SectionResponsesMap
     list.push(record);
     filesByQuestion.set(target.questionId, list);
   }
+  return filesByQuestion;
+}
+
+/** The real {sectionId, questionId} a given upload category answers, and every remaining real
+ *  file record for that SAME question (which may span more than one category) after `files`
+ *  reflects a removal. Used to explicitly clear a file-repeater question the instant its last
+ *  file is removed - see removeClientFile()'s comment for why this can't just go through the
+ *  normal autosave path. Returns undefined for a category with no real backend question. */
+export function realFilesForCategory(files: UploadedFile[], category: UploadedFile["category"]): { sectionId: DiscoverySectionId; questionId: string; records: RealFileRecord[] } | undefined {
+  const target = FILE_CATEGORY_TO_QUESTION[category];
+  if (!target) return undefined;
+  return { ...target, records: filesByRealQuestionId(files).get(target.questionId) ?? [] };
+}
+
+/** AI Studio DiscoveryData -> the real backend's per-section responses shape. Called on every
+ *  autosave; only sections with at least one non-empty answer are returned, so an untouched
+ *  section never gets a premature empty document written for it. */
+export function toRealSectionResponses(data: DiscoveryData): SectionResponsesMap {
+  const filesByQuestion = filesByRealQuestionId(data.uploadedFiles ?? []);
 
   const services: RealServiceEntry[] = (data.services ?? [])
     .filter(service => service.name?.trim())

@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { saveDiscoverySection, submitDiscovery, type DiscoveryState } from "@/lib/discovery";
 import type { ClientFirestoreDoc, DiscoveryData, ProjectStatus, TimelineEntry, UploadedFile } from "../types";
 import { INITIAL_DISCOVERY_DATA } from "../data/initialData";
-import { applyRealSectionResponses, toRealSectionResponses } from "./discoveryMapping";
+import { applyRealSectionResponses, realFilesForCategory, toRealSectionResponses } from "./discoveryMapping";
 import { allMissingWithSteps } from "../utils/discoveryValidation";
 
 // Real backend, real Firestore, real security — this file used to talk to Firestore directly
@@ -198,6 +198,31 @@ class FirebaseDiscoveryService {
       uploadedAt: now.toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" }), progress: 100, isDeleted: false,
       ...({ realPath: path, realUploadedAtIso: now.toISOString() } as Record<string, unknown>),
     } as UploadedFile;
+  }
+
+  /** Explicitly clears a file-repeater question the moment its last file is removed, instead of
+   *  relying on the normal debounced saveDiscovery() autosave path to do it.
+   *
+   *  toRealSectionResponses() drops any field whose computed value is empty (undefined/""/[])
+   *  before sending it - correct and necessary for every text field, since AI Studio recomputes
+   *  the WHOLE flattened DiscoveryData on every save and the server does a shallow key-level
+   *  merge: sending an empty value for every field the customer simply hasn't reached yet would
+   *  otherwise overwrite already-saved answers elsewhere in the same section. But that same
+   *  omission is indistinguishable, server-side, from "nothing changed" - so removing the LAST
+   *  file in a category ends up not sending that key at all, and the server's merge keeps the
+   *  stale (now-deleted-in-the-UI) file reference forever. A partial removal (2 files -> 1) never
+   *  hit this, since the key was still present with a shorter array.
+   *
+   *  Fixed by sending this ONE question's current file list explicitly and immediately - even
+   *  when empty - via the same saveDiscoverySection() the rest of the app already uses, exactly
+   *  matching how apps/web/src/components/discovery/DiscoverySection.tsx's update() already
+   *  handles every field correctly (it always sends `{...responses, [questionId]: value}`, never
+   *  omitting a just-cleared key). Found 2026-09-24 after the Storage upload path fix, once files
+   *  could finally be removed at all. */
+  async removeClientFile(projectId: string, remainingFiles: UploadedFile[], removedCategory: UploadedFile["category"]): Promise<void> {
+    const target = realFilesForCategory(remainingFiles, removedCategory);
+    if (!target || !this.organizationId) return;
+    await saveDiscoverySection(this.organizationId, projectId, target.sectionId, { [target.questionId]: target.records });
   }
 
   // AdminMaster (the AI Studio admin console, re-enabled 2026-09-17 at Isaac's explicit request —

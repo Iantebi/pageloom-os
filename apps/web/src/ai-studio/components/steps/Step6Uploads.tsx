@@ -30,6 +30,7 @@ export const Step6Uploads: React.FC<Step6Props> = ({ data, onChange }) => {
   const [uploadingFilename, setUploadingFilename] = useState('');
   const [previewModalFile, setPreviewModalFile] = useState<UploadedFile | null>(null);
   const [uploadErrors, setUploadErrors] = useState<string[]>([]);
+  const [removeError, setRemoveError] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -115,9 +116,21 @@ export const Step6Uploads: React.FC<Step6Props> = ({ data, onChange }) => {
   };
 
   const handleDelete = (id: string) => {
+    const removed = data.uploadedFiles.find((f) => f.id === id);
+    const updatedFileList = data.uploadedFiles.filter((f) => f.id !== id);
+    setRemoveError(false);
     onChange({
-      uploadedFiles: data.uploadedFiles.filter((f) => f.id !== id),
+      uploadedFiles: updatedFileList,
     });
+    // Explicit and immediate rather than left to the next debounced autosave — see
+    // removeClientFile()'s own comment for why the normal save path alone can silently leave a
+    // removed file's reference behind once it was the last one in its category.
+    if (removed) {
+      firebaseDiscoveryService.removeClientFile(data.projectId, updatedFileList, removed.category).catch((err) => {
+        console.warn('Remove file sync error:', err);
+        setRemoveError(true);
+      });
+    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -264,6 +277,19 @@ export const Step6Uploads: React.FC<Step6Props> = ({ data, onChange }) => {
           <div>
             <b>ההעלאה נכשלה עבור: {uploadErrors.join(', ')}</b>
             <p className="mt-1 text-xs">בדקו את החיבור לאינטרנט ונסו שוב. אם הבעיה נמשכת, ניתן לשלוח את הקובץ בוואטסאפ לצוות PageLoom.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Removal-sync error — the file disappears from view immediately either way (it's gone
+          from local state), but if the server sync failed, refreshing would bring it back with no
+          explanation unless we say so here. */}
+      {removeError && (
+        <div className="flex items-start gap-2.5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <b>המחיקה לא נשמרה בשרת</b>
+            <p className="mt-1 text-xs">הקובץ הוסר מהתצוגה אך ייתכן שיחזור לאחר רענון. בדקו את החיבור לאינטרנט ונסו למחוק שוב.</p>
           </div>
         </div>
       )}
