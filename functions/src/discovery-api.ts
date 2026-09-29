@@ -79,6 +79,10 @@ discoveryRouter.get("/discovery/management/sessions", async (req: AuthenticatedR
         ownerName: (business?.["business.ownerName"] as string | undefined) || null,
         status: progress.status, percentComplete: progress.percentComplete, currentSectionId: progress.currentSectionId ?? null,
         startedAt: progress.startedAt ?? null, submittedAt: progress.submittedAt ?? null, lastActivityAt: progress.lastActivityAt,
+        // Additive (2026-09-28) — journeyStage already lives on this same, already-fetched project
+        // doc; surfacing it here lets the Owner Dashboard's "Completed Discoveries" section show
+        // current project stage without a second read per project.
+        journeyStage: project.data().journeyStage ?? null,
       }];
     }).sort((a, b) => (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? ""));
     return res.json({ data: sessions });

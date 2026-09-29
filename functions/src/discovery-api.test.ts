@@ -40,6 +40,11 @@ describe("Business Discovery API authority", () => {
     expect(notesPostBlock).not.toContain("requireProjectAccess");
   });
 
+  it("management/sessions surfaces journeyStage from the already-fetched project doc (no second read per project)", () => {
+    const block = source.slice(source.indexOf('discoveryRouter.get("/discovery/management/sessions"'), source.indexOf('discoveryRouter.get("/discovery/management/sessions"') + 2000);
+    expect(block).toContain("journeyStage: project.data().journeyStage ?? null");
+  });
+
   it("validates every autosaved response key belongs to the target section's own question set (rejects cross-section/unknown keys)", () => {
     expect(source).toContain('UNKNOWN_DISCOVERY_QUESTION');
     expect(source).toContain("section.questions.find(candidate => candidate.id === key)");

@@ -8,9 +8,17 @@ import { Button, Card, CardHeader, Empty, Status, dateTime } from "@/components/
 
 // Owner Dashboard / Master Panel Discovery list (2026-09-17 unification) — every project in the
 // org that has any Discovery progress, most recently active first. Clicking a row opens
-// /master/customer, where the existing DiscoveryPanel (embedded there since 2026-09-16) already
-// shows that project's full, section-by-section answers — this list does not duplicate that view,
-// it's the missing "browse all of them" entry point into it.
+// /projects/view?id={id}&tab=onboarding, where the existing DiscoveryPanel already shows that
+// project's full, section-by-section answers — this list does not duplicate that view, it's the
+// missing "browse all of them" entry point into it.
+//
+// Navigation fix (2026-09-28): this used to route a session WITH a customerId to
+// /master/customer?... — Backend Master — while a session with no customerId went to
+// /projects/view (Owner Workspace). Found while building the Dashboard's "Completed Discoveries"
+// section, which must never send the Owner into Master for ordinary Discovery/customer work (see
+// [[project_owner-workspace-master-separation]]). Both branches now point at the same
+// Owner-Workspace route regardless of customerId — /master/customer's DiscoveryPanel embed is
+// untouched; only where THIS list's rows link to has changed.
 type DiscoverySession = {
   id: string; customerId: string | null; projectName: string; status: string;
   percentComplete: number; submittedAt: string | null; lastActivityAt: string;
@@ -48,7 +56,7 @@ export function DiscoveryManagementList({ compact = false }: { compact?: boolean
       : <div className="mt-4 divide-y divide-[var(--border)]">
         {rows.map(session => <Link
           key={session.id}
-          href={session.customerId ? `/master/customer?organizationId=${encodeURIComponent(organizationId)}&customerId=${encodeURIComponent(session.customerId)}` : `/projects/view?id=${encodeURIComponent(session.id)}`}
+          href={`/projects/view?id=${encodeURIComponent(session.id)}&tab=onboarding`}
           className="flex flex-wrap items-center justify-between gap-3 py-3 hover:bg-[var(--surface-2)]"
         >
           <div className="min-w-0">

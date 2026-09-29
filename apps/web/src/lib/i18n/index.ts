@@ -55,6 +55,7 @@ import { accountSecurity } from "./dictionaries/accountSecurity";
 import { mfaChallenge } from "./dictionaries/mfaChallenge";
 import { discoveryLink } from "./dictionaries/discoveryLink";
 import { newClient } from "./dictionaries/newClient";
+import { completedDiscoveries } from "./dictionaries/completedDiscoveries";
 
 const dictionaries = {
   common,
@@ -115,6 +116,7 @@ const dictionaries = {
   mfaChallenge,
   discoveryLink,
   newClient,
+  completedDiscoveries,
 } as const;
 
 type Dictionaries = typeof dictionaries;
