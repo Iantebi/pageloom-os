@@ -5,6 +5,7 @@
   "description": "AI-native website agency operating system",
   "workspaces": ["apps/*", "functions", "packages/*"],
   "engines": { "node": ">=22" },
+  "overrides": { "@grpc/grpc-js": "$@grpc/grpc-js" },
   "scripts": {
     "dev": "npm run dev --workspace=@pageloom/web",
     "dev:firebase": "firebase emulators:start",
@@ -19,7 +20,8 @@
     "deploy:hosting": "npm run build --workspace=@pageloom/web && firebase deploy --only hosting"
   },
   "devDependencies": {
-    "firebase-tools": "^14.0.0",
+    "@grpc/grpc-js": "^1.14.7",
+    "firebase-tools": "^15.35.0",
     "typescript": "^5.9.0"
   }
 }
