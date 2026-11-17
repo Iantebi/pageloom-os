@@ -6,7 +6,7 @@ describe("Firestore role least-privilege",()=>{
   it("does not use a generic wildcard collection match that would OR-override the privileged tier",()=>expect(rules).not.toContain("match /{collection}/{docId}"));
   it("restricts draft/undecided legal acceptances to privileged staff",()=>expect(rules).toContain("match /projects/{projectId}/legalAcceptances/{acceptanceId} { allow read: if privileged(orgId); allow write: if false; }"));
 });
-describe("website content isolation",()=>{it("allows customers to read only content bearing their own customer id while all writes remain server-authorized",()=>{expect(rules).toContain("match /websites/{websiteId}/content/{contentId}");expect(rules).toContain("resource.data.customerId == clientCustomerId(orgId)");expect(rules).not.toContain("content/{contentId} { allow write")});it("keeps content revision history privileged",()=>expect(rules).toContain("contentRevisions/{revisionId} { allow read: if privileged(orgId); allow write: if false; }"))});
+describe("website content isolation",()=>{it("keeps raw website content staff-only (customers use the /website-content API) and all writes server-authorized",()=>{expect(rules).toContain("match /websites/{websiteId}/content/{contentId} { allow read: if staff(orgId); allow write: if false; }");expect(rules).not.toMatch(/content\/\{contentId\} \{[^}]*client/);expect(rules).not.toContain("content/{contentId} { allow write")});it("keeps content revision history privileged",()=>expect(rules).toContain("contentRevisions/{revisionId} { allow read: if privileged(orgId); allow write: if false; }"))});
 describe("customer access lifecycle",()=>{it("denies disabled members and honors optional project assignments",()=>{expect(rules).toContain("data.disabled != true");expect(rules).toContain("'projectIds' in get(");expect(rules).toContain("projectId in get(")});it("treats an empty projectIds list as unrestricted, not as a deny-all list",()=>expect(rules).toContain(".data.projectIds.size() == 0 ||"))});
 describe("platform administrators",()=>{it("uses an immutable Firebase claim for cross-organization read access, read via get() so a token without the claim evaluates false instead of throwing",()=>{expect(rules).toContain("request.auth.token.get('platformRole', null) in ['owner','admin']");expect(rules).toContain("function staff(orgId) { return platformAdmin()")});it("keeps content submissions server-write-only",()=>expect(rules).toContain("contentSubmissions/{submissionId} { allow read: if privileged(orgId); allow write: if false; }"))});
 describe("staff invitations and support internal notes",()=>{it("restricts pending staff invitations to privileged staff and denies direct writes",()=>{expect(rules).toContain("match /staffInvitations/{docId} { allow read: if privileged(orgId); allow write: if false; }")});it("keeps support ticket internal notes staff-only, never client-readable",()=>{expect(rules).toContain("match /supportTickets/{ticketId}/internalNotes/{noteId} { allow read: if staff(orgId); allow write: if false; }")})});
@@ -23,36 +23,17 @@ describe("Business Discovery isolation",()=>{
     expect(rules).toContain("match /projects/{projectId}/businessProfile/{docId} { allow read: if staff(orgId); allow write: if false; }");
   });
 });
-describe("client project list-query safety (clientProjectList)",()=>{
-  const clientProjectListSrc=(rules.match(/function clientProjectList\(orgId\) \{[^}]*\}/)??[""])[0];
-  it("defines clientProjectList and wires it into the top-level projects match as the list-only rule, separate from the get-only clientProject",()=>{
-    expect(clientProjectListSrc).not.toBe("");
-    expect(rules).toContain("match /projects/{projectId} { allow get: if staff(orgId) || clientProject(orgId, projectId); allow list: if staff(orgId) || clientProjectList(orgId); allow write: if false; }");
+describe("raw project documents are staff-only (H1, 2026-11-16 audit)",()=>{
+  // Raw project documents hold financial and internal fields (budget, revenue, cost, notes).
+  // Customers read a server-projected allow-list of fields via GET /api/portal/projects
+  // (functions/src/portal-projects-api.ts) instead of the raw document.
+  it("removes clientProjectList and any client get/list on the top-level projects match",()=>{
+    expect(rules).not.toContain("function clientProjectList");
+    expect(rules).not.toContain("clientProjectList(orgId)");
+    expect(rules).toContain("match /projects/{projectId} { allow read: if staff(orgId); allow write: if false; }");
+    expect(rules).not.toMatch(/match \/projects\/\{projectId\} \{[^}]*clientProject\(/);
   });
-  it("a. lets a client list/query only projects bearing its own customerId, using resource.data directly rather than a redundant self-get()",()=>{
-    expect(clientProjectListSrc).toContain("client(orgId) && resource.data.get('customerId', null) == clientCustomerId(orgId)");
-    // This redundant get() on the very document being evaluated is the exact bug being fixed: Firestore
-    // cannot prove a list/query rule safe when it depends on an explicit get() of the document under
-    // evaluation, and rejects the whole query with PERMISSION_DENIED regardless of the real data.
-    expect(clientProjectListSrc).not.toContain("get(/databases/$(database)/documents/organizations/$(orgId)/projects/$(projectId))");
-  });
-  it("b. cannot match another customer's project, since resource.data.customerId is compared against the caller's own clientCustomerId",()=>{
-    expect(clientProjectListSrc).toContain("resource.data.get('customerId', null) == clientCustomerId(orgId)");
-  });
-  // Found live in production 2026-09-20: `resource.id in get(...).data.projectIds` made this rule
-  // unprovable to Firestore's list/query safety analysis, so it rejected the ENTIRE query with
-  // PERMISSION_DENIED for any client member with a non-empty projectIds - not a filtered result,
-  // a fully broken portal ("couldn't load your projects"). clientProjectList deliberately does NOT
-  // enforce projectIds any more; a projectIds-scoped client can see every one of their customer's
-  // projects at the list level (name/stage/progress only). The real projectIds boundary - can they
-  // open a specific unassigned project, or read anything in its subcollections - is enforced by the
-  // `allow get` above and by every subcollection match's clientProject(), tested in "d." below.
-  it("c. no longer references get()-based projectIds membership - list queries only ever check customerId",()=>{
-    expect(clientProjectListSrc).not.toContain("'projectIds' in get(");
-    expect(clientProjectListSrc).not.toContain("resource.id in get(");
-  });
-  it("d. leaves staff/owner project read access unchanged, and keeps clientProject (with its full projectIds enforcement) as the get-rule and for fixed-path subcollections",()=>{
-    expect(rules).toContain("allow get: if staff(orgId) || clientProject(orgId, projectId);");
+  it("keeps staff read access, and keeps clientProject (with its full projectIds enforcement) for fixed-path subcollections",()=>{
     expect(rules).toContain("function staff(orgId) { return platformAdmin() || (member(orgId) && role(orgId) in ['owner','admin','operator','member']); }");
     expect(rules).toContain("function clientProject(orgId, projectId)");
     expect(rules).toContain("'projectIds' in get(");

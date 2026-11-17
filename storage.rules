@@ -45,7 +45,7 @@ service firebase.storage {
     match /organizations/{orgId}/website-media/{customerId}/{projectId}/{websiteId}/{userId}/{fileName} {
       allow read: if staff(orgId) || (clientCustomer(orgId,customerId) && clientProject(orgId,projectId));
       allow create, update: if safeWebsiteMedia(orgId,userId,fileName) && (staff(orgId) || (clientCustomer(orgId,customerId) && clientProject(orgId,projectId) && clientPermission(orgId,'contentEdit')));
-      allow delete: if member(orgId) && request.auth.uid == userId && (staff(orgId) || (clientCustomer(orgId,customerId) && clientProject(orgId,projectId)));
+      allow delete: if member(orgId) && request.auth.uid == userId && (staff(orgId) || (clientCustomer(orgId,customerId) && clientProject(orgId,projectId) && clientPermission(orgId,'contentEdit')));
     }
     match /{allPaths=**} { allow read, write: if false; }
   }

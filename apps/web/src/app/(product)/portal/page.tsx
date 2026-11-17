@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import { ref, uploadBytes } from "firebase/storage";
 import { CheckCircle2, Eye, FileText, Headphones, LoaderCircle, RotateCcw, Send, UploadCloud } from "lucide-react";
-import { missingRequiredQuestionnaireFields, type Handover, type Project, type RevisionRequest } from "@pageloom/core";
+import { missingRequiredQuestionnaireFields, type Handover, type RevisionRequest } from "@pageloom/core";
 import { firebaseAuth, firebaseStorage } from "@/lib/firebase";
 import { api } from "@/lib/api";
 import { useOrganization } from "@/lib/organization";
+import { usePortalProjects, type PortalProject } from "@/lib/portal-projects";
 import { useLiveCollection } from "@/lib/live-data";
 import { Button, Card, Empty, PageHeader, Status } from "@/components/product-ui";
 import { WebsiteContentWorkspace } from "@/components/website-content-workspace";
@@ -23,7 +24,7 @@ type SupportTicket = { id: string; projectId: string; subject: string; descripti
 export default function Portal() {
   const { organizationId, membership } = useOrganization();
   const client = membership?.role === "client";
-  const projects = useLiveCollection<Project>(organizationId ? `organizations/${organizationId}/projects` : undefined, "updatedAt", 100, client ? "customerId" : undefined, client ? membership.customerId : undefined);
+  const projects = usePortalProjects(organizationId, `${firebaseAuth.currentUser?.uid ?? ""}:${membership?.customerId ?? ""}:${membership?.projectIds?.join(",") ?? ""}`);
   const tickets = useLiveCollection<SupportTicket>(organizationId ? `organizations/${organizationId}/supportTickets` : undefined, "updatedAt", 100, client ? "customerId" : undefined, client ? membership.customerId : undefined);
   const [id, setId] = useState("");
   const [comment, setComment] = useState("");
@@ -160,7 +161,7 @@ function QuestionnaireForm({ organizationId, projectId, questionnaire }: { organ
 // themselves only appear once a request has actually been recorded (fetched fresh from
 // GET /revision-requests, never inferred client-side). Final Approval requires all three
 // confirmations checked before the button that actually records CustomerApproved becomes clickable.
-function WebsiteReviewCard({ organizationId, project, recordDecision }: { organizationId: string; project: Project; recordDecision: (type: "CustomerApproved" | "CustomerRequestedRevision") => Promise<void> }) {
+function WebsiteReviewCard({ organizationId, project, recordDecision }: { organizationId: string; project: PortalProject; recordDecision: (type: "CustomerApproved" | "CustomerRequestedRevision") => Promise<void> }) {
   const s = t("portal");
   const [mode, setMode] = useState<"idle" | "approve" | "revise">("idle");
   const [checks, setChecks] = useState({ reviewed: false, approved: false, authorize: false });
@@ -242,7 +243,7 @@ function WebsiteReviewCard({ organizationId, project, recordDecision }: { organi
   </Card>;
 }
 
-function HandoverPanel({ organizationId, project }: { organizationId: string; project: Project }) {
+function HandoverPanel({ organizationId, project }: { organizationId: string; project: PortalProject }) {
   const [handover, setHandover] = useState<Handover | null>(null);
   const live = project.workflowStage === "completed";
   const s = t("portal");
