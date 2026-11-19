@@ -17,7 +17,7 @@
 #   APPROVE PRODUCTION: EXPORT OS DATA       (export - creates a backup containing personal data)
 #   APPROVE PRODUCTION DELETE: OS FUNCTIONS AND SITE   (remove)
 #   APPROVE PRODUCTION: OS CLEANUP           (cleanup)
-# Usage: os-retire.sh export|remove|cleanup [--execute]   (dry run by default)
+# Usage: os-retire.sh export|remove|cleanup|purge [--execute]   (dry run by default)
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../iam/h2-common.sh"
 MODE="${1:-}"; [[ "${2:-}" == "--execute" ]] && EXECUTE=true
@@ -87,5 +87,31 @@ case "$MODE" in
     fi
     echo "Next: sec-auth-after-os.sh (domains + anonymous off) and sec-api-keys.sh retire."
     ;;
-  *) echo "usage: $0 export|remove|cleanup [--execute]" >&2; exit 2 ;;
+  purge)
+    # FINAL, IRREVERSIBLE: delete the 19 OS secrets (disabled by `cleanup`) and the anonymous Auth
+    # users the OS Discovery-link flow created. Refuses unless OS functions are gone, every
+    # secret version is already disabled, and anonymous sign-in is already off.
+    if $EXECUTE; then
+      n="$(gcloud functions list --project="$PROJECT" --format='value(name.basename())' | grep -vcE '^(dailyFirestoreBackup|backupFreshnessWatchdog)$' || true)"
+      [[ "$n" == 0 ]] || { echo "ABORT: OS functions still deployed" >&2; exit 1; }
+      for s in "${SECRETS[@]}"; do
+        [[ "$(gcloud secrets versions list "$s" --project="$PROJECT" --filter='state=ENABLED' --format='value(name)' | grep -c . || true)" == 0 ]] \
+          || { echo "ABORT: $s still has an enabled version - run cleanup first" >&2; exit 1; }
+      done
+    fi
+    for s in "${SECRETS[@]}"; do run gcloud secrets delete "$s" --project="$PROJECT" --quiet; done
+    echo "+ delete all anonymous Firebase Auth users (OS Discovery-link sessions); Google users untouched"
+    if $EXECUTE; then
+      TOKEN="$(gcloud auth print-access-token)" PROJECT="$PROJECT" node -e '
+      const P=process.env.PROJECT,H={Authorization:"Bearer "+process.env.TOKEN,"x-goog-user-project":P,"Content-Type":"application/json"};
+      (async()=>{const c=await (await fetch(`https://identitytoolkit.googleapis.com/admin/v2/projects/${P}/config`,{headers:H})).json();
+       if(c.signIn&&c.signIn.anonymous&&c.signIn.anonymous.enabled){console.error("ABORT: anonymous sign-in still enabled - run sec-auth-after-os.sh first");process.exit(1)}
+       const u=(await (await fetch(`https://identitytoolkit.googleapis.com/v1/projects/${P}/accounts:query`,{method:"POST",headers:H,body:JSON.stringify({returnUserInfo:true,limit:500})})).json()).userInfo||[];
+       const anon=u.filter(x=>!(x.providerUserInfo||[]).length&&!x.email);
+       for(const a of anon){const r=await fetch(`https://identitytoolkit.googleapis.com/v1/projects/${P}/accounts:delete`,{method:"POST",headers:H,body:JSON.stringify({localId:a.localId})});if(!r.ok){console.error("delete failed",r.status);process.exit(1)}}
+       console.log("  deleted",anon.length,"anonymous users; kept",u.length-anon.length,"Google users")})()'
+      landing_ok
+    fi
+    ;;
+  *) echo "usage: $0 export|remove|cleanup|purge [--execute]" >&2; exit 2 ;;
 esac
