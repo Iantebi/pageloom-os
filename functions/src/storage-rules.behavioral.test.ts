@@ -133,6 +133,31 @@ describe("Storage rules engine (behavioral, via emulator)", () => {
       );
     });
 
+    // 2026-11-19 hardening: the generic allow-list used to accept image/.*, text/.* and
+    // application/vnd.* - i.e. SVG and HTML (script-capable when opened from a download URL) and
+    // vnd.* executables. Only explicit document/image types are allowed now.
+    it.each([
+      ["image/svg+xml", "logo.svg"],
+      ["text/html", "page.html"],
+      ["text/javascript", "app.js"],
+      ["application/vnd.microsoft.portable-executable", "setup.bin"],
+    ])("rejects script-capable or executable type %s even on the uploader's own path", async (contentType, name) => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      const path = `organizations/${ORG}/uploads/${CLIENT_ALPHA_UID}/${PROJ_ALPHA_1}/${name}`;
+      await assertFails(uploadBytes(ref(client.storage(), path), TEXT_BYTES, { contentType }));
+    });
+
+    it.each([
+      ["application/pdf", "brief.pdf"],
+      ["text/csv", "list.csv"],
+      ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "brief.docx"],
+      ["image/jpeg", "photo.jpg"],
+    ])("still accepts the explicit document/image type %s", async (contentType, name) => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      const path = `organizations/${ORG}/uploads/${CLIENT_ALPHA_UID}/${PROJ_ALPHA_1}/${name}`;
+      await assertSucceeds(uploadBytes(ref(client.storage(), path), TEXT_BYTES, { contentType }));
+    });
+
     it("rejects an upload larger than the declared 25MB safeUpload size limit", async () => {
       const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
       const path = `organizations/${ORG}/uploads/${CLIENT_ALPHA_UID}/${PROJ_ALPHA_1}/big.bin`;
