@@ -97,6 +97,20 @@ describe("scripts/iam/h2-grant.sh stays least-privilege (H2)", () => {
     expect(code).not.toMatch(/firebaseauth\.(users\.delete|configs\.)/);
   });
 
+  it("creates exactly the three H2 accounts, with Hebrew names within GCP limits and English IDs", () => {
+    // create_sa <id> "<displayName>" \  (newline)  "<description>"
+    const accounts = [...script.matchAll(/^create_sa (\S+) "([^"]+)" \\\n\s+"([^"]+)"$/gm)].map(([, id, displayName, description]) => ({ id, displayName, description }));
+    expect(accounts.map((a) => a.id)).toEqual(["pageloom-api", "pageloom-agents", "pageloom-workers"]);
+    for (const { id, displayName, description } of accounts) {
+      expect(id, id).toMatch(/^[a-z][-a-z0-9]{4,28}[a-z0-9]$/); // GCP service-account ID format
+      expect(Buffer.byteLength(displayName, "utf8"), `${id} displayName bytes`).toBeLessThanOrEqual(100);
+      expect(Buffer.byteLength(description, "utf8"), `${id} description bytes`).toBeLessThanOrEqual(256);
+      expect(displayName + description, `${id} has Hebrew text`).toMatch(/[֐-׿]/);
+      // No invisible bidi/control characters - they render unpredictably and hide edits.
+      expect(displayName + description, `${id} bidi/control chars`).not.toMatch(/[\u0000-\u001f‎‏‪-‮⁦-⁩]/);
+    }
+  });
+
   it("grants Cloud Run / Cloud Build to nobody (option A: the agents' gcp tool fails closed)", () => {
     expect(code).not.toMatch(/roles\/(run|cloudbuild)\./);
   });

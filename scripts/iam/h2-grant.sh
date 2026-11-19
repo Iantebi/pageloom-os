@@ -37,20 +37,31 @@ bucket_role() { run gcloud storage buckets add-iam-policy-binding "$1" --member=
 # restore-drill database (the Admin SDK bypasses security rules). Functions only use getFirestore().
 DEFAULT_DB_CONDITION="expression=resource.name==\"projects/${PROJECT}/databases/(default)\",title=default-db-only,description=H2: main Firestore database only"
 firestore_role() { run gcloud projects add-iam-policy-binding "$PROJECT" --member="serviceAccount:$1" --role=roles/datastore.user --condition="$DEFAULT_DB_CONDITION"; }
+# Display names and descriptions are Hebrew (IDs stay English). GCP limits: displayName <= 100
+# UTF-8 bytes, description <= 256 UTF-8 bytes (Hebrew = 2 bytes/letter) - guarded by
+# service-accounts.test.ts. This file must stay UTF-8. gcloud's Python here defaults to cp1252
+# console output, so force UTF-8 to avoid an encoding crash when it echoes Hebrew text.
+export PYTHONIOENCODING=utf-8
 # Idempotent creation, so a re-run after a partial failure does not stop at "already exists".
+# An existing account only gets its display name/description refreshed - never its permissions.
 create_sa() {
   if $EXECUTE && gcloud iam service-accounts describe "$1@${DOMAIN}" --project="$PROJECT" >/dev/null 2>&1; then
-    echo "= $1 already exists, skipping create"; return
+    echo "= $1 already exists - refreshing display name/description only"
+    run gcloud iam service-accounts update "$1@${DOMAIN}" --project="$PROJECT" --display-name="$2" --description="$3"
+    return
   fi
-  run gcloud iam service-accounts create "$1" --project="$PROJECT" --display-name="$2"
+  run gcloud iam service-accounts create "$1" --project="$PROJECT" --display-name="$2" --description="$3"
 }
 
 $EXECUTE || echo "### DRY RUN - nothing is changed. Re-run with --execute after approval. ###"
 
 # 1. Accounts
-create_sa pageloom-api "PageLoom API runtime (H2)"
-create_sa pageloom-agents "PageLoom AI agents runtime (H2)"
-create_sa pageloom-workers "PageLoom workflow/scheduled workers runtime (H2)"
+create_sa pageloom-api "PageLoom · ממשק ה-API הציבורי" \
+  "חשבון ההרצה של פונקציית api. גישה למסד Firestore הראשי בלבד, ניהול משתמשים מצומצם, קבצים בדלי הראשי וסודות ההרצה. ללא Editor. (H2)"
+create_sa pageloom-agents "PageLoom · סוכני AI" \
+  "חשבון ההרצה של executeAgentTask. גישה למסד Firestore הראשי בלבד, קבצים בדלי הראשי וסודות ההרצה. ללא Cloud Run ו-Cloud Build. (H2)"
+create_sa pageloom-workers "PageLoom · תהליכי רקע ותזמונים" \
+  "חשבון ההרצה של טריגרי ה-workflow והמשימות המתוזמנות. גישה למסד Firestore הראשי בלבד וצפייה בגיבויים. ללא סודות. (H2)"
 
 # 1b. Custom Auth role for api - only what the code calls (functions/src, 2026-11-19):
 #   verifyIdToken(checkRevoked) -> users.get ; updateUser, revokeRefreshTokens -> users.update ;
