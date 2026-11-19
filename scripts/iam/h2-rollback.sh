@@ -35,6 +35,8 @@ case "$PHASE" in
     for name in pageloom-api pageloom-agents pageloom-workers; do
       run gcloud iam service-accounts disable "${name}@${DOMAIN}" --project="$PROJECT"
     done
+    # Soft delete (restorable for 7 days with `gcloud iam roles undelete`).
+    run gcloud iam roles delete pageloomApiAuth --project="$PROJECT"
     ;;
   *)
     echo "usage: $0 phase4|phase3|phase2 [--execute]" >&2; exit 2

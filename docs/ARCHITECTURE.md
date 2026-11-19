@@ -203,13 +203,18 @@ source tree.
 
 No function runs as the project's default compute account (which held `roles/editor`). Each
 function's `serviceAccount` comes from a `params.*ServiceAccount` value in `config.ts`;
-`service-accounts.test.ts` fails if any exported function falls back to the default.
+`service-accounts.test.ts` fails if any exported function falls back to the default, and it
+also statically guards `h2-grant.sh` (no broad roles, Firestore always conditioned, LF endings).
+
+Every Firestore grant is `roles/datastore.user` **conditioned to the `(default)` database** — the
+Admin SDK bypasses security rules, so an unconditioned grant would also reach the C1/C2 AI
+Studio databases and the restore-drill database.
 
 | Account | Functions | Grants (see `scripts/iam/h2-grant.sh`) |
 |---|---|---|
-| `pageloom-api@` | `api` | Firestore user, Firebase Auth admin, main-bucket object admin, token creator on itself (signed URLs), the 19 runtime secrets, log writer |
-| `pageloom-agents@` | `executeAgentTask` | Firestore user, main-bucket object admin, the 19 runtime secrets, Eventarc receiver, log writer |
-| `pageloom-workers@` | the 8 workflow triggers and schedules | Firestore user, Eventarc receiver, log writer; read-only backup-bucket listing, Storage Transfer and Service Health for the watchdog. **No secrets.** |
+| `pageloom-api@` | `api` | Firestore (main DB), custom `pageloomApiAuth` (`users.get/update/sendEmail` only — no user delete, no Auth config), main-bucket `objectUser` (no ACL control), token creator on itself (signed URLs), the 19 runtime secrets, log writer |
+| `pageloom-agents@` | `executeAgentTask` | Firestore (main DB), main-bucket `objectUser`, the 19 runtime secrets, Eventarc receiver, log writer |
+| `pageloom-workers@` | the 8 workflow triggers and schedules | Firestore (main DB), Eventarc receiver, log writer; read-only backup-bucket listing, Storage Transfer and Service Health for the watchdog. **No secrets.** |
 | `pageloom-backup@` | `dailyFirestoreBackup` | Unchanged (export-only custom role). |
 
 - The compute account remains only as Cloud Build's identity for function builds

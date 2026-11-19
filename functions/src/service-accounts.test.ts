@@ -2,6 +2,7 @@
 // project's default compute account, which holds roles/editor. This reads the real exported
 // function definitions (their deploy-time __endpoint manifest), so a new function added without a
 // serviceAccount, or an existing one moved to the wrong account, fails here before it can deploy.
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import * as functions from "./index.js";
 import { params } from "./config.js";
@@ -51,5 +52,52 @@ describe("function runtime service accounts (H2)", () => {
     expect(defaultOf(params.apiServiceAccount)).toBe("pageloom-api@pageloom-os-production.iam.gserviceaccount.com");
     expect(defaultOf(params.agentsServiceAccount)).toBe("pageloom-agents@pageloom-os-production.iam.gserviceaccount.com");
     expect(defaultOf(params.workersServiceAccount)).toBe("pageloom-workers@pageloom-os-production.iam.gserviceaccount.com");
+  });
+});
+
+// The grant script is the single source of the accounts' real permissions. Guard it statically -
+// the script itself is never run by tests (it is production-changing and approval-gated).
+describe("scripts/iam/h2-grant.sh stays least-privilege (H2)", () => {
+  const script = readFileSync(new URL("../../scripts/iam/h2-grant.sh", import.meta.url), "utf8");
+  const commands = script.split("\n").filter((line) => !line.trimStart().startsWith("#"));
+  const code = commands.join("\n");
+
+  it("uses LF line endings (a CRLF copy breaks bash on Linux/CI)", () => {
+    expect(script).not.toContain("\r");
+  });
+
+  it("never grants a broad or escalation-capable role", () => {
+    for (const role of [
+      "roles/editor", "roles/owner", "roles/viewer", "roles/storage.admin", "roles/storage.objectAdmin",
+      "roles/datastore.owner", "roles/firebase.admin", "roles/firebaseauth.admin", "roles/secretmanager.admin",
+      "roles/iam.serviceAccountUser", "roles/iam.serviceAccountAdmin", "roles/iam.securityAdmin",
+      "roles/run.admin", "roles/run.developer", "roles/cloudbuild.builds.editor",
+    ]) {
+      expect(code, role).not.toMatch(new RegExp(`${role.replace(/\./g, "\\.")}\\b`));
+    }
+  });
+
+  it("only adds bindings - never removes, deletes or disables anything", () => {
+    expect(code).not.toMatch(/remove-iam-policy-binding|set-iam-policy|\bdelete\b|\bdisable\b/);
+  });
+
+  it("never touches the existing compute, App Engine or backup accounts", () => {
+    expect(code).not.toMatch(/-compute@developer|@appspot\.gserviceaccount\.com|pageloom-backup@/);
+  });
+
+  it("limits every Firestore grant to the main (default) database", () => {
+    expect(code).toContain('resource.name==\\"projects/${PROJECT}/databases/(default)\\"');
+    expect(code).not.toMatch(/--role=roles\/datastore\.user[^\n]*--condition=None/);
+    const unconditioned = commands.filter((line) => line.includes("roles/datastore.user") && !line.includes("DEFAULT_DB_CONDITION"));
+    expect(unconditioned).toEqual([]);
+  });
+
+  it("gives api only the Auth permissions the code calls", () => {
+    expect(code).toContain("--permissions=firebaseauth.users.get,firebaseauth.users.update,firebaseauth.users.sendEmail");
+    expect(code).not.toMatch(/firebaseauth\.(users\.delete|configs\.)/);
+  });
+
+  it("grants Cloud Run / Cloud Build to nobody (option A: the agents' gcp tool fails closed)", () => {
+    expect(code).not.toMatch(/roles\/(run|cloudbuild)\./);
   });
 });
