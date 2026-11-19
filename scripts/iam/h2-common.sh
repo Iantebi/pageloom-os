@@ -98,3 +98,28 @@ h2_bindings() {
     done
   done
 }
+
+# Phase 2b - Cloud Run invoker for the Firestore (Eventarc) triggers. After the phase 3 deploy the
+# 4 triggers deliver as the function's own account (pageloom-agents / pageloom-workers). Today they
+# deliver as the compute account, which has run.invoker PROJECT-wide; the event services have no
+# service-level invoker at all. firebase-tools 15.29 sets run.invoker only for https and scheduled
+# functions on update (release/fabricator.js), never for event triggers - so without these grants
+# every Firestore delivery would get 403 after the deploy.
+# Scoped to each SERVICE (not the project): each account can invoke only its own trigger service(s).
+# Must be applied BEFORE the phase 3 deploy. $1 = add | remove.
+REGION="europe-west1"
+H2_EVENT_INVOKERS=(
+  "executeagenttask:$AGENTS_SA"
+  "processworkflowevent:$WORKERS_SA"
+  "initializeprojectworkflow:$WORKERS_SA"
+  "handleworkflowtaskresult:$WORKERS_SA"
+)
+h2_invokers() {
+  local verb="$1" exec_fn entry service sa
+  case "$verb" in add) exec_fn=run ;; remove) exec_fn=run_tolerant ;; *) echo "h2_invokers: add|remove" >&2; exit 2 ;; esac
+  for entry in "${H2_EVENT_INVOKERS[@]}"; do
+    service="${entry%%:*}"; sa="${entry#*:}"
+    $exec_fn gcloud run services "${verb}-iam-policy-binding" "$service" --region="$REGION" --project="$PROJECT" \
+      --member="serviceAccount:$sa" --role=roles/run.invoker
+  done
+}

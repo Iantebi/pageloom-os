@@ -220,9 +220,14 @@ Studio databases and the restore-drill database.
 
 - The compute account remains only as Cloud Build's identity for function builds
   (`roles/cloudbuild.builds.builder`); never point a function at it.
-- The agents' `gcp` tool (`cloud_run_deploy`, `cloud_build`) is granted **no** Cloud Run /
-  Cloud Build roles by design (decision 2026-11-19): it fails closed. Deploys go through the
-  CLI with explicit human approval only.
+- The agents' `gcp` tool (`cloud_run_deploy`, `cloud_build`) is granted **no** Cloud Run
+  management or Cloud Build roles by design (decision 2026-11-19): it fails closed. Deploys go
+  through the CLI with explicit human approval only.
+- **Firestore-triggered functions need a per-service `roles/run.invoker`** for their own account
+  (`H2_EVENT_INVOKERS` in `h2-common.sh`, applied by `h2-grant-invokers.sh`). Eventarc delivers as
+  the function's service account, and firebase-tools sets `run.invoker` only for HTTPS and
+  scheduled functions — never for event triggers. A new `onDocument*` function must be added to
+  that list **before** its first deploy, or every Firestore delivery to it fails with 403.
 - A new function needs an account chosen from this table (usually `pageloom-workers@`) and an
   entry in `service-accounts.test.ts`; a new Google API it calls needs a matching role added to
   `h2-common.sh` (used by both `h2-grant.sh` and `h2-rollback.sh`) **before** it deploys, or it fails with `PERMISSION_DENIED` in production.

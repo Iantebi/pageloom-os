@@ -63,18 +63,47 @@ describe("scripts/iam H2 grant/rollback stay least-privilege (H2)", () => {
   const script = read("h2-grant.sh");
   const common = read("h2-common.sh");
   const rollback = read("h2-rollback.sh");
+  const invokers = read("h2-grant-invokers.sh");
   const grantCode = stripComments(script).join("\n");
   const commonLines = stripComments(common);
   const commonCode = commonLines.join("\n");
   const rollbackCode = stripComments(rollback).join("\n");
-  // Everything phase 2 can do = the grant script plus the shared binding list it sources.
-  const code = `${grantCode}\n${commonCode}`;
+  const invokersCode = stripComments(invokers).join("\n");
+  // Everything phases 2/2b can do = the grant scripts plus the shared lists they source.
+  const code = `${grantCode}\n${invokersCode}\n${commonCode}`;
   const commands = [...stripComments(script), ...commonLines];
 
   it("uses LF line endings in every script (a CRLF copy breaks bash on Linux/CI)", () => {
-    for (const [name, text] of [["h2-grant.sh", script], ["h2-common.sh", common], ["h2-rollback.sh", rollback]]) {
+    for (const [name, text] of [["h2-grant.sh", script], ["h2-common.sh", common], ["h2-rollback.sh", rollback], ["h2-grant-invokers.sh", invokers]]) {
       expect(text, name).not.toContain("\r");
     }
+  });
+
+  it("phase 2b grants run.invoker only per trigger SERVICE, only to that trigger's own account", () => {
+    // Exactly the 4 Firestore-triggered services, each mapped to the account its function runs as.
+    const list = common.match(/^H2_EVENT_INVOKERS=\(\n([\s\S]*?)\n\)$/m)?.[1] ?? "";
+    const entries = [...list.matchAll(/"([a-z]+):\$([A-Z_]+)"/g)].map(([, service, sa]) => `${service}:${sa}`);
+    expect(entries).toEqual([
+      "executeagenttask:AGENTS_SA",
+      "processworkflowevent:WORKERS_SA",
+      "initializeprojectworkflow:WORKERS_SA",
+      "handleworkflowtaskresult:WORKERS_SA",
+    ]);
+    // run.invoker only ever appears on a `gcloud run services` binding - never project-wide,
+    // and api (public HTTP, invoked by allUsers) never gets it.
+    // Exactly one occurrence in all phase 2/2b code: the per-service command in h2_invokers. Any
+    // other use (e.g. via project_role, which would make it project-wide) is a second occurrence.
+    const invokerLines = code.split("\n").filter((line) => line.includes("roles/run.invoker"));
+    expect(invokerLines).toHaveLength(1);
+    expect(invokerLines[0]).toMatch(/^\s+--member="serviceAccount:\$sa" --role=roles\/run\.invoker$/);
+    expect(commonCode).toMatch(/gcloud run services "\$\{verb\}-iam-policy-binding" "\$service" --region="\$REGION"[^\n]*\\\n\s+--member="serviceAccount:\$sa" --role=roles\/run\.invoker/);
+    expect(list).not.toMatch(/API_SA|api:/);
+  });
+
+  it("phase 2b only adds; the phase 2 rollback also removes the invokers", () => {
+    expect(invokersCode).toMatch(/^h2_invokers add$/m);
+    expect(invokersCode).not.toMatch(/h2_invokers remove|h2_bindings|remove-iam-policy-binding|\bdelete\b|\bdisable\b/);
+    expect(rollbackCode).toMatch(/^\s+h2_invokers remove$/m);
   });
 
   it("never grants a broad or escalation-capable role", () => {
@@ -143,7 +172,11 @@ describe("scripts/iam H2 grant/rollback stay least-privilege (H2)", () => {
     }
   });
 
-  it("grants Cloud Run / Cloud Build to nobody (option A: the agents' gcp tool fails closed)", () => {
-    expect(code).not.toMatch(/roles\/(run|cloudbuild)\./);
+  it("grants no Cloud Run management or Cloud Build role (option A: the agents' gcp tool fails closed)", () => {
+    // The only Cloud Run role anywhere is the per-service invoker above - it lets a trigger call
+    // its own function, nothing more (no deploy, no image change, no traffic change).
+    const runRoles = [...code.matchAll(/roles\/run\.[a-zA-Z]+/g)].map(([role]) => role);
+    expect(new Set(runRoles)).toEqual(new Set(["roles/run.invoker"]));
+    expect(code).not.toMatch(/roles\/cloudbuild\./);
   });
 });
