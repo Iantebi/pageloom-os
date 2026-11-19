@@ -22,15 +22,9 @@
 name: Autonomous Development Manager
 
 on:
-  schedule:
-    # Every 30 minutes. Adjust freely — this only decides *when to check* the backlog,
-    # it does not itself run untrusted code beyond `automation/*.mjs` and `gh`.
-    - cron: "*/30 * * * *"
+  # 2026-11-19: automatic triggers removed (the 30-minute cron and the issue/PR close hooks).
+  # PageLoom OS is being retired, so there is no backlog to drive. Manual runs only.
   workflow_dispatch: {}
-  issues:
-    types: [closed]
-  pull_request:
-    types: [closed]
 
 concurrency:
   # Hard mutual-exclusion: only one manager "pick the next task" run at a time, repo-wide.
@@ -45,7 +39,7 @@ jobs:
     permissions:
       issues: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Ensure required labels exist (idempotent)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -81,8 +75,8 @@ jobs:
       issues: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
       - name: Evaluate readiness and worker health for open SAFE PRs
@@ -106,8 +100,8 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
       - name: Request QA/Safety review on eligible worker PRs
@@ -124,8 +118,8 @@ jobs:
       issues: write
       pull-requests: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
       - name: Select and start the next SAFE approved task(s), up to max concurrency
@@ -155,7 +149,7 @@ jobs:
       issues: write
       pull-requests: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Mark linked issue done and release the in-progress lock
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
