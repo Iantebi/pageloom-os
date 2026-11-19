@@ -57,13 +57,24 @@ describe("function runtime service accounts (H2)", () => {
 
 // The grant script is the single source of the accounts' real permissions. Guard it statically -
 // the script itself is never run by tests (it is production-changing and approval-gated).
-describe("scripts/iam/h2-grant.sh stays least-privilege (H2)", () => {
-  const script = readFileSync(new URL("../../scripts/iam/h2-grant.sh", import.meta.url), "utf8");
-  const commands = script.split("\n").filter((line) => !line.trimStart().startsWith("#"));
-  const code = commands.join("\n");
+describe("scripts/iam H2 grant/rollback stay least-privilege (H2)", () => {
+  const read = (name: string) => readFileSync(new URL(`../../scripts/iam/${name}`, import.meta.url), "utf8");
+  const stripComments = (text: string) => text.split("\n").filter((line) => !line.trimStart().startsWith("#"));
+  const script = read("h2-grant.sh");
+  const common = read("h2-common.sh");
+  const rollback = read("h2-rollback.sh");
+  const grantCode = stripComments(script).join("\n");
+  const commonLines = stripComments(common);
+  const commonCode = commonLines.join("\n");
+  const rollbackCode = stripComments(rollback).join("\n");
+  // Everything phase 2 can do = the grant script plus the shared binding list it sources.
+  const code = `${grantCode}\n${commonCode}`;
+  const commands = [...stripComments(script), ...commonLines];
 
-  it("uses LF line endings (a CRLF copy breaks bash on Linux/CI)", () => {
-    expect(script).not.toContain("\r");
+  it("uses LF line endings in every script (a CRLF copy breaks bash on Linux/CI)", () => {
+    for (const [name, text] of [["h2-grant.sh", script], ["h2-common.sh", common], ["h2-rollback.sh", rollback]]) {
+      expect(text, name).not.toContain("\r");
+    }
   });
 
   it("never grants a broad or escalation-capable role", () => {
@@ -77,8 +88,22 @@ describe("scripts/iam/h2-grant.sh stays least-privilege (H2)", () => {
     }
   });
 
-  it("only adds bindings - never removes, deletes or disables anything", () => {
-    expect(code).not.toMatch(/remove-iam-policy-binding|set-iam-policy|\bdelete\b|\bdisable\b/);
+  it("the grant only adds bindings - never removes, deletes or disables anything", () => {
+    expect(grantCode).toMatch(/^h2_bindings add$/m);
+    expect(grantCode).not.toMatch(/h2_bindings remove|remove-iam-policy-binding|set-iam-policy|\bdelete\b|\bdisable\b/);
+    // The shared list is verb-parameterised; it must only ever accept add|remove, and never
+    // hard-code a removal, a full policy overwrite, or a delete.
+    expect(commonCode).toContain("case \"$verb\" in add) exec_fn=run ;; remove) exec_fn=run_tolerant ;;");
+    expect(commonCode).not.toMatch(/remove-iam-policy-binding|set-iam-policy|\bdelete\b|\bdisable\b/);
+  });
+
+  it("the rollback removes exactly the shared list, and never deletes the custom role or accounts", () => {
+    expect(rollbackCode).toMatch(/^\s+h2_bindings remove$/m);
+    expect(rollbackCode).not.toMatch(/roles delete|service-accounts delete|set-iam-policy/);
+    // Its only grant is restoring Editor on the compute account in the phase4 emergency path.
+    const grants = rollbackCode.split("\n").filter((line) => line.includes("add-iam-policy-binding"));
+    expect(grants).toHaveLength(1);
+    expect(grants[0]).toContain('--member="serviceAccount:$COMPUTE_SA" --role=roles/editor');
   });
 
   it("never touches the existing compute, App Engine or backup accounts", () => {
@@ -86,7 +111,7 @@ describe("scripts/iam/h2-grant.sh stays least-privilege (H2)", () => {
   });
 
   it("limits every Firestore grant to the main (default) database", () => {
-    expect(code).toContain('resource.name==\\"projects/${PROJECT}/databases/(default)\\"');
+    expect(commonCode).toContain('resource.name==\\"projects/${PROJECT}/databases/(default)\\"');
     expect(code).not.toMatch(/--role=roles\/datastore\.user[^\n]*--condition=None/);
     const unconditioned = commands.filter((line) => line.includes("roles/datastore.user") && !line.includes("DEFAULT_DB_CONDITION"));
     expect(unconditioned).toEqual([]);
@@ -97,6 +122,13 @@ describe("scripts/iam/h2-grant.sh stays least-privilege (H2)", () => {
     expect(code).not.toMatch(/firebaseauth\.(users\.delete|configs\.)/);
   });
 
+  // Character classes built from numeric code points so this file stays pure ASCII (a literal
+  // bidi character in the source would itself be invisible and unreviewable).
+  const range = (from: number, to: number) => `${String.fromCharCode(from)}-${String.fromCharCode(to)}`;
+  const HEBREW = new RegExp(`[${range(0x0590, 0x05ff)}]`);
+  // C0 controls, LRM/RLM, LRE..RLO embeddings/overrides, LRI..PDI isolates.
+  const INVISIBLE = new RegExp(`[${range(0x00, 0x1f)}${range(0x200e, 0x200f)}${range(0x202a, 0x202e)}${range(0x2066, 0x2069)}]`);
+
   it("creates exactly the three H2 accounts, with Hebrew names within GCP limits and English IDs", () => {
     // create_sa <id> "<displayName>" \  (newline)  "<description>"
     const accounts = [...script.matchAll(/^create_sa (\S+) "([^"]+)" \\\n\s+"([^"]+)"$/gm)].map(([, id, displayName, description]) => ({ id, displayName, description }));
@@ -105,9 +137,9 @@ describe("scripts/iam/h2-grant.sh stays least-privilege (H2)", () => {
       expect(id, id).toMatch(/^[a-z][-a-z0-9]{4,28}[a-z0-9]$/); // GCP service-account ID format
       expect(Buffer.byteLength(displayName, "utf8"), `${id} displayName bytes`).toBeLessThanOrEqual(100);
       expect(Buffer.byteLength(description, "utf8"), `${id} description bytes`).toBeLessThanOrEqual(256);
-      expect(displayName + description, `${id} has Hebrew text`).toMatch(/[֐-׿]/);
+      expect(HEBREW.test(displayName + description), `${id} has Hebrew text`).toBe(true);
       // No invisible bidi/control characters - they render unpredictably and hide edits.
-      expect(displayName + description, `${id} bidi/control chars`).not.toMatch(/[\u0000-\u001f‎‏‪-‮⁦-⁩]/);
+      expect(INVISIBLE.test(displayName + description), `${id} bidi/control chars`).toBe(false);
     }
   });
 

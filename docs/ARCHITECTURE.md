@@ -204,13 +204,14 @@ source tree.
 No function runs as the project's default compute account (which held `roles/editor`). Each
 function's `serviceAccount` comes from a `params.*ServiceAccount` value in `config.ts`;
 `service-accounts.test.ts` fails if any exported function falls back to the default, and it
-also statically guards `h2-grant.sh` (no broad roles, Firestore always conditioned, LF endings).
+also statically guards the IAM scripts (no broad roles, Firestore always conditioned, grant only
+adds, rollback removes the same list and deletes nothing, LF endings, ASCII-safe Hebrew names).
 
 Every Firestore grant is `roles/datastore.user` **conditioned to the `(default)` database** — the
 Admin SDK bypasses security rules, so an unconditioned grant would also reach the C1/C2 AI
 Studio databases and the restore-drill database.
 
-| Account | Functions | Grants (see `scripts/iam/h2-grant.sh`) |
+| Account | Functions | Grants (binding list: `scripts/iam/h2-common.sh`) |
 |---|---|---|
 | `pageloom-api@` | `api` | Firestore (main DB), custom `pageloomApiAuth` (`users.get/update/sendEmail` only — no user delete, no Auth config), main-bucket `objectUser` (no ACL control), token creator on itself (signed URLs), the 19 runtime secrets, log writer |
 | `pageloom-agents@` | `executeAgentTask` | Firestore (main DB), main-bucket `objectUser`, the 19 runtime secrets, Eventarc receiver, log writer |
@@ -224,7 +225,7 @@ Studio databases and the restore-drill database.
   CLI with explicit human approval only.
 - A new function needs an account chosen from this table (usually `pageloom-workers@`) and an
   entry in `service-accounts.test.ts`; a new Google API it calls needs a matching role added to
-  `h2-grant.sh` **before** it deploys, or it fails with `PERMISSION_DENIED` in production.
+  `h2-common.sh` (used by both `h2-grant.sh` and `h2-rollback.sh`) **before** it deploys, or it fails with `PERMISSION_DENIED` in production.
 
 ### API surface by subsystem
 

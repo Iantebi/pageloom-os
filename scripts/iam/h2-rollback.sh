@@ -6,37 +6,45 @@
 #             Editor is removed). Run this FIRST in any incident after phase 4.
 #   phase3  - functions back to the compute account: redeploy d884ffd (functions + hosting, pinTag).
 #             Printed only; the deploy itself needs its own approval.
-#   phase2  - disable the three H2 accounts (reversible with `gcloud iam service-accounts enable`).
+#   phase2  - undo phase 2 completely: (1) disable the three H2 accounts - takes effect at once and
+#             is reversible (`gcloud iam service-accounts enable`); (2) remove every binding
+#             h2-grant.sh added, from the same list (h2-common.sh), so nothing is left behind.
 #             Only after phase 3 is rolled back - otherwise the functions using them stop working.
+#             The custom role pageloomApiAuth is deliberately KEPT: with no members it grants
+#             nothing, and a deleted custom role's ID cannot be reused for ~37 days, which would
+#             block re-running h2-grant.sh. The accounts are disabled, not deleted, for the same
+#             reason (re-running the grant re-enables nothing by itself - see below).
 #
 # Dry run by default. Pass --execute as the second argument to run.
 # Pre-H2 IAM snapshot: ../pageloom-os-backups/pre-h2-20261119 (SHA256SUMS.txt inside).
 set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/h2-common.sh"
 
-PROJECT="pageloom-os-production"
 COMPUTE_SA="386075478217-compute@developer.gserviceaccount.com"
-DOMAIN="${PROJECT}.iam.gserviceaccount.com"
 PHASE="${1:-}"
-EXECUTE=false
 [[ "${2:-}" == "--execute" ]] && EXECUTE=true
-run() { echo "+ $*"; if $EXECUTE; then "$@" >/dev/null; fi; }
 
 $EXECUTE || echo "### DRY RUN - nothing is changed. ###"
 case "$PHASE" in
   phase4)
+    preflight
     run gcloud projects add-iam-policy-binding "$PROJECT" --member="serviceAccount:$COMPUTE_SA" --role=roles/editor --condition=None
     ;;
   phase3)
     echo "Redeploy the pre-H2 code (functions back on the compute account). Needs its own approval:"
-    echo "  cd ../pageloom-os-h1 && git checkout d884ffd"
+    echo "  cd ../pageloom-os-h1   # security/h1-only-20261117 = d884ffd, has functions/.env.$PROJECT"
     echo "  firebase deploy --only functions,hosting --project $PROJECT"
     ;;
   phase2)
-    for name in pageloom-api pageloom-agents pageloom-workers; do
-      run gcloud iam service-accounts disable "${name}@${DOMAIN}" --project="$PROJECT"
+    preflight
+    # 1. Stop the accounts from being usable at all - immediate, reversible.
+    for name in "${H2_ACCOUNTS[@]}"; do
+      run_tolerant gcloud iam service-accounts disable "${name}@${DOMAIN}" --project="$PROJECT"
     done
-    # Soft delete (restorable for 7 days with `gcloud iam roles undelete`).
-    run gcloud iam roles delete pageloomApiAuth --project="$PROJECT"
+    # 2. Remove exactly the bindings phase 2 added (same list as the grant).
+    h2_bindings remove
+    echo "Kept on purpose: custom role $H2_CUSTOM_ROLE (no members) and the 3 accounts (disabled)."
+    echo "To retry phase 2 later: enable the accounts, then re-run h2-grant.sh."
     ;;
   *)
     echo "usage: $0 phase4|phase3|phase2 [--execute]" >&2; exit 2
