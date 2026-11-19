@@ -30,7 +30,7 @@ case "$MODE" in
        const same=JSON.stringify((after.restrictions||{}).apiTargets||[])===targets;console.log("referrers:",JSON.stringify(after.restrictions.browserKeyRestrictions),"| API targets unchanged:",same);if(!same)process.exit(1)})()'
     fi ;;
   retire)
-    if $EXECUTE; then [[ "$(gcloud functions list --project="$PROJECT" --format='value(name)' | grep -c . || true)" == 0 ]] || { echo "ABORT: retire OS first" >&2; exit 1; }; fi
+    if $EXECUTE; then [[ "$(gcloud functions list --project="$PROJECT" --format='value(name.basename())' | tr -d '\r' | grep -vcE '^(dailyFirestoreBackup|backupFreshnessWatchdog)$' || true)" == 0 ]] || { echo "ABORT: retire OS first" >&2; exit 1; }; fi
     run gcloud services api-keys delete "$BROWSER_KEY" --project="$PROJECT" --quiet
     run gcloud services api-keys delete "$GEMINI_KEY" --project="$PROJECT" --quiet ;;
   *) echo "usage: $0 restrict|retire [--execute]" >&2; exit 2 ;;

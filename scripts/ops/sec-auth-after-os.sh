@@ -13,7 +13,7 @@ preflight
 REMOVE=(localhost pageloom-os-production--discovery-verify-2-cvicjs0g.web.app)
 echo "+ PATCH identitytoolkit config: authorizedDomains -= ${REMOVE[*]} ; signIn.anonymous.enabled=false"
 if $EXECUTE; then
-  [[ "$(gcloud functions list --project="$PROJECT" --format='value(name)' | grep -c . || true)" == 0 ]] || \
+  [[ "$(gcloud functions list --project="$PROJECT" --format='value(name.basename())' | tr -d '\r' | grep -vcE '^(dailyFirestoreBackup|backupFreshnessWatchdog)$' || true)" == 0 ]] || \
     { echo "ABORT: OS functions still deployed - retire OS first" >&2; exit 1; }
   TOKEN="$(gcloud auth print-access-token)" PROJECT="$PROJECT" REMOVE="${REMOVE[*]}" node -e '
   const P=process.env.PROJECT,H={Authorization:"Bearer "+process.env.TOKEN,"x-goog-user-project":P,"Content-Type":"application/json"};
