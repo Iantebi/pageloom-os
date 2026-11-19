@@ -152,10 +152,19 @@ describe("Storage rules engine (behavioral, via emulator)", () => {
       ["text/csv", "list.csv"],
       ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "brief.docx"],
       ["image/jpeg", "photo.jpg"],
+      // Windows browsers report .zip as x-zip-compressed; legacy .ppt is an explicit Office type.
+      ["application/x-zip-compressed", "assets.zip"],
+      ["application/vnd.ms-powerpoint", "deck.ppt"],
     ])("still accepts the explicit document/image type %s", async (contentType, name) => {
       const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
       const path = `organizations/${ORG}/uploads/${CLIENT_ALPHA_UID}/${PROJ_ALPHA_1}/${name}`;
       await assertSucceeds(uploadBytes(ref(client.storage(), path), TEXT_BYTES, { contentType }));
+    });
+
+    it("applies the same type allow-list to staff uploads (staff are not exempt from safeUploadShape)", async () => {
+      const owner = testEnv.authenticatedContext(OWNER_UID);
+      const path = `organizations/${ORG}/uploads/${CLIENT_ALPHA_UID}/${PROJ_ALPHA_1}/staff-logo.svg`;
+      await assertFails(uploadBytes(ref(owner.storage(), path), TEXT_BYTES, { contentType: "image/svg+xml" }));
     });
 
     it("rejects an upload larger than the declared 25MB safeUpload size limit", async () => {
