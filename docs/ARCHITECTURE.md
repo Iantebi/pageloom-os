@@ -180,7 +180,7 @@ CSP-blocked-hydration incident).
 
 ## 4. Backend — Firebase Functions
 
-One Express app plus nine background triggers, all defined from a single 40-module
+One Express app plus ten background triggers and schedules, all defined from a single 40-module
 source tree.
 
 ### Deployed functions (`functions/src/index.ts`)
@@ -198,6 +198,28 @@ source tree.
 | `monitorBusinessRisks` | Schedule · hourly | Evaluates domain/SSL/backup/inactivity/profitability alerts. |
 | `backupFreshnessWatchdog` | Schedule · every 6h | Independent dead-man's-switch check on backup and service health. |
 | `dailyCeoReport` | Schedule · 08:00 Asia/Jerusalem | Queues an internal CEO-agent report task per autonomy-enabled org. |
+
+### Runtime identities (H2 — least-privilege service accounts)
+
+No function runs as the project's default compute account (which held `roles/editor`). Each
+function's `serviceAccount` comes from a `params.*ServiceAccount` value in `config.ts`;
+`service-accounts.test.ts` fails if any exported function falls back to the default.
+
+| Account | Functions | Grants (see `scripts/iam/h2-grant.sh`) |
+|---|---|---|
+| `pageloom-api@` | `api` | Firestore user, Firebase Auth admin, main-bucket object admin, token creator on itself (signed URLs), the 19 runtime secrets, log writer |
+| `pageloom-agents@` | `executeAgentTask` | Firestore user, main-bucket object admin, the 19 runtime secrets, Eventarc receiver, log writer |
+| `pageloom-workers@` | the 8 workflow triggers and schedules | Firestore user, Eventarc receiver, log writer; read-only backup-bucket listing, Storage Transfer and Service Health for the watchdog. **No secrets.** |
+| `pageloom-backup@` | `dailyFirestoreBackup` | Unchanged (export-only custom role). |
+
+- The compute account remains only as Cloud Build's identity for function builds
+  (`roles/cloudbuild.builds.builder`); never point a function at it.
+- The agents' `gcp` tool (`cloud_run_deploy`, `cloud_build`) is granted **no** Cloud Run /
+  Cloud Build roles by design (decision 2026-11-19): it fails closed. Deploys go through the
+  CLI with explicit human approval only.
+- A new function needs an account chosen from this table (usually `pageloom-workers@`) and an
+  entry in `service-accounts.test.ts`; a new Google API it calls needs a matching role added to
+  `h2-grant.sh` **before** it deploys, or it fails with `PERMISSION_DENIED` in production.
 
 ### API surface by subsystem
 
