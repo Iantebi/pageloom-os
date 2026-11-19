@@ -75,6 +75,16 @@ case "$MODE" in
       fetch(`https://firebase.googleapis.com/v1beta1/projects/${P}/webApps/${process.env.APP}:remove`,{method:"POST",headers:H,body:JSON.stringify({immediate:false})}).then(r=>{console.log("  web app remove:",r.status);if(!r.ok)process.exit(1)})'
       backup_fns_ok; landing_ok
     fi
+    # Alert P9 watches monitorBusinessRisks, which no longer exists. The other function/scheduler
+    # alerts (P3, P4, P4b, P5, P6, P7) also cover the backup functions and stay.
+    echo "+ delete alert policy 'PageLoom P9 - monitorBusinessRisks dead-man' (OS-only)"
+    if $EXECUTE; then
+      TOKEN="$(gcloud auth print-access-token)" PROJECT="$PROJECT" node -e '
+      const P=process.env.PROJECT,H={Authorization:"Bearer "+process.env.TOKEN,"x-goog-user-project":P};
+      (async()=>{const l=await (await fetch(`https://monitoring.googleapis.com/v3/projects/${P}/alertPolicies?pageSize=50`,{headers:H})).json();
+       const p=(l.alertPolicies||[]).find(x=>x.displayName==="PageLoom P9 - monitorBusinessRisks dead-man");if(!p){console.log("  P9 already gone");return}
+       const r=await fetch(`https://monitoring.googleapis.com/v3/${p.name}`,{method:"DELETE",headers:H});console.log("  P9 delete:",r.status);if(!r.ok)process.exit(1)})()'
+    fi
     echo "Next: sec-auth-after-os.sh (domains + anonymous off) and sec-api-keys.sh retire."
     ;;
   *) echo "usage: $0 export|remove|cleanup [--execute]" >&2; exit 2 ;;
