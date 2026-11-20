@@ -161,6 +161,27 @@ describe("Storage rules engine (behavioral, via emulator)", () => {
       await assertSucceeds(uploadBytes(ref(client.storage(), path), TEXT_BYTES, { contentType }));
     });
 
+    // Declared-type tricks. Note: rules only see the DECLARED content-type, never the bytes, so a
+    // renamed .exe declared as image/png still passes - that is the limit of Storage rules.
+    it.each([
+      ["application/octet-stream", "unknown.bin"],
+      ["image/svg+xml; charset=utf-8", "logo-param.svg"],
+      ["IMAGE/SVG+XML", "logo-upper.svg"],
+      ["text/html;image/png", "mixed.html"],
+      ["image/png+svg", "suffix.png"],
+      ["text/plain2", "near-miss.txt"],
+    ])("rejects missing/disguised declared type %s", async (contentType, name) => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      const path = `organizations/${ORG}/uploads/${CLIENT_ALPHA_UID}/${PROJ_ALPHA_1}/${name}`;
+      await assertFails(uploadBytes(ref(client.storage(), path), TEXT_BYTES, { contentType }));
+    });
+
+    it("rejects an upload that declares no content-type at all", async () => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      const path = `organizations/${ORG}/uploads/${CLIENT_ALPHA_UID}/${PROJ_ALPHA_1}/no-type`;
+      await assertFails(uploadBytes(ref(client.storage(), path), TEXT_BYTES));
+    });
+
     it("applies the same type allow-list to staff uploads (staff are not exempt from safeUploadShape)", async () => {
       const owner = testEnv.authenticatedContext(OWNER_UID);
       const path = `organizations/${ORG}/uploads/${CLIENT_ALPHA_UID}/${PROJ_ALPHA_1}/staff-logo.svg`;
