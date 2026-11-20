@@ -1,13 +1,11 @@
 {
   "functions": [
     {
-      "source": "functions",
+      "source": "backup-functions",
       "codebase": "default",
       "runtime": "nodejs22",
       "predeploy": [
-        "npm --prefix packages/core run build",
-        "npm --prefix functions run prepare:vendor",
-        "npm --prefix functions run build"
+        "npm --prefix backup-functions run build"
       ]
     }
   ],
