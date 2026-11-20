@@ -1,5 +1,61 @@
 # PageLoom OS architecture — Master Knowledge Map
 
+## 0. Current production architecture (2026-11-20) — read this first
+
+PageLoom OS (the Next.js dashboard, the Functions `api`, the agent fleet and the workflow
+engine) was **retired on 2026-11-19**. Everything from §1 onwards describes that retired system
+and is kept as history only. Since the 2026-11-19 pivot, **Base44 builds and runs the apps;
+Firebase / Google Cloud provides only backups and the remaining storage**.
+
+```mermaid
+flowchart LR
+  subgraph Base44["Base44 (apps + their own data)"]
+    MASTER["PageLoom Master app\n(pageloom.co.il: landing pages, lead form, admin)"]
+    DISC["Client Discovery app\n(questionnaire + admin panel)"]
+  end
+  VIS["Visitor"] -->|"Turnstile + submitLead"| MASTER
+  MASTER -->|"lead sync"| CRM["HubSpot"]
+  CLIENT["Invited client"] -->|"saveDiscoveryProgress / submitDiscovery"| DISC
+  DISC -->|"submission snapshot + nightly snapshot-all"| DBK["DiscoveryBackup entity"]
+  subgraph GCP["Firebase / GCP project pageloom-os-production"]
+    SCHED["Cloud Scheduler"] --> BK["dailyFirestoreBackup"]
+    SCHED --> WD["backupFreshnessWatchdog"]
+    BK --> BB[("backups bucket\nFirestore exports, 30d retention")]
+    FS[("Firestore (default)")] --> BK
+    ST[("Storage bucket\n(OS-era files)")] -->|"weekly Storage Transfer"| MB[("media-backups bucket")]
+    WD -.checks.-> BB
+    WD -.checks.-> MB
+  end
+```
+
+**Active in `pageloom-os-production`:** 2 Cloud Functions (Gen 2, `europe-west1`):
+`dailyFirestoreBackup` (02:30 Asia/Jerusalem, runs as `pageloom-backup`) and
+`backupFreshnessWatchdog` (every 6 h, runs as `pageloom-workers`). There are no HTTP
+functions, no Eventarc triggers, no Hosting site for OS, and 0 API keys. Firestore and
+Storage rules stay deployed (`firestore.rules`, `storage.rules`).
+
+**Retired (must not come back):** the OS web app and Hosting site, the `api` function and
+the 8 other OS functions (agents, workflow engine, schedulers), the OS Secret Manager values
+(19 secrets, all versions disabled), and the OS API keys.
+
+**Deploy safely:**
+- Functions deploy only from `backup-functions/` (`firebase.json` → `source: backup-functions`). Use
+  a targeted deploy: `firebase deploy --only functions:dailyFirestoreBackup,functions:backupFreshnessWatchdog --project pageloom-os-production`.
+  Set `FUNCTIONS_DISCOVERY_TIMEOUT=120` on Windows. A non-interactive run needs the gitignored
+  `backup-functions/.env.pageloom-os-production` (7 non-secret params, same values as the defaults in `src/config.ts`).
+- `functions/` is the retired OS codebase. It is used only by the emulator e2e job (`firebase.os-e2e.json`) and must never be deployed.
+- Rules: `firebase deploy --only storage` / `--only firestore:rules`, each as its own approved step.
+- Every production change needs a fresh, scope-specific approval (see `CLAUDE.md`).
+
+**Backups and restore:** daily Firestore export to the backups bucket (30-day retention, 90-day
+lifecycle, 7-day soft delete); weekly Storage Transfer of the main bucket (media RPO 7 days);
+the watchdog alerts when either is stale. Restore follows `docs/disaster-recovery-runbook.md` §5,
+always into a separate database first, never over production.
+
+**Open items (2026-11-20):** UBLA on the main bucket is blocked until project owners get an
+object-level IAM role there (their object access currently comes from ACLs);
+`scripts/ops/sec-bucket-ubla.sh` needs its `pipefail` ACL-scan fix.
+
 > **Maintenance policy.** This document is the single source of truth for PageLoom OS's
 > architecture. Whenever a change touches any of the following, update the matching
 > section in the same PR: a new app/service/workspace; Firebase config, Security Rules,
