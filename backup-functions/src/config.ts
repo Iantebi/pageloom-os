@@ -1,7 +1,9 @@
 import { defineString } from "firebase-functions/params";
 
 // Only the params the two backup functions use. Defaults equal the production values (verified
-// 2026-11-20 against the previous functions/.env.pageloom-os-production), so no .env is needed.
+// 2026-11-20 against the previous functions/.env.pageloom-os-production). An interactive deploy
+// offers these defaults; a --non-interactive deploy needs backup-functions/.env.pageloom-os-production
+// (gitignored by the repo's .env* rule) with the same 7 non-secret values.
 // No defineSecret here on purpose: these functions bind no secrets.
 export const params = {
   region: defineString("PAGELOOM_FUNCTION_REGION", { default: "europe-west1" }),
