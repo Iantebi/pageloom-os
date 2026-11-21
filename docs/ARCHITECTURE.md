@@ -43,7 +43,7 @@ the 8 other OS functions (agents, workflow engine, schedulers), the OS Secret Ma
   a targeted deploy: `firebase deploy --only functions:dailyFirestoreBackup,functions:backupFreshnessWatchdog --project pageloom-os-production`.
   Set `FUNCTIONS_DISCOVERY_TIMEOUT=120` on Windows. A non-interactive run needs the gitignored
   `backup-functions/.env.pageloom-os-production` (7 non-secret params, same values as the defaults in `src/config.ts`).
-- `functions/` is the retired OS codebase. It is used only by the emulator e2e job (`firebase.os-e2e.json`) and must never be deployed.
+- `functions/` is the retired OS codebase. Since 2026-11-21 its `index.ts` defines no Cloud Function at all (guarded by `functions/src/index.test.ts`); it is kept only for history and shared tests. `firebase.json` has no `hosting` target, so a plain `firebase deploy` deploys only the backup functions and the rules (guarded by `backup-functions/src/deploy-config.test.ts`).
 - Rules: `firebase deploy --only storage` / `--only firestore:rules`, each as its own approved step.
 - Every production change needs a fresh, scope-specific approval (see `CLAUDE.md`).
 
