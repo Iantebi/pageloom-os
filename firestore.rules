@@ -19,22 +19,7 @@ service cloud.firestore {
     function client(orgId) { return member(orgId) && role(orgId) == 'client'; }
     function clientCustomerId(orgId) { return get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.customerId; }
     function clientProject(orgId, projectId) { return client(orgId) && get(/databases/$(database)/documents/organizations/$(orgId)/projects/$(projectId)).data.customerId == clientCustomerId(orgId) && (!('projectIds' in get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data) || get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.projectIds.size() == 0 || projectId in get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.projectIds); }
-    // List-query-safe equivalent of clientProject, used only at the top-level projects/{projectId}
-    // match below. Firestore cannot prove a list/query rule safe for every possible result when it
-    // depends on an explicit get() of the very document being evaluated (clientProject's redundant
-    // get(.../projects/$(projectId)) instead of the already-available `resource`) — it rejects the
-    // whole query outright with PERMISSION_DENIED regardless of what real data would return. Using
-    // resource.data/resource.id directly (identical semantics, same customerId + projectIds checks,
-    // same single fixed get() on the requester's own membership doc) is the form Firestore can prove
-    // safe for a list/query. clientProject(orgId, projectId) is kept as-is for sub-collection matches
-    // below (comments/questionnaires/documents), where the parent projectId is fixed by the path and
-    // this limitation does not apply.
-    // resource.data.get('customerId', null) (not bare .customerId) for the same reason as
-    // platformAdmin() above: the behavioral test suite showed the emulator's list/query safety
-    // analysis evaluates this condition against a resource that doesn't reliably carry the field,
-    // and bare property access throws "Property customerId is undefined on object" there instead
-    // of evaluating false - .get() with a default makes the equality check simply false instead.
-    function clientProjectList(orgId) { return client(orgId) && resource.data.get('customerId', null) == clientCustomerId(orgId) && (!('projectIds' in get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data) || get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.projectIds.size() == 0 || resource.id in get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.projectIds); }
+    // Raw projects contain private fields. Customers use /api/portal/projects.
     match /organizations/{orgId} {
       allow read: if staff(orgId); allow write: if false;
       match /members/{uid} { allow read: if staff(orgId); allow write: if false; }
@@ -90,7 +75,7 @@ service cloud.firestore {
       match /documentTemplates/{docId} { allow read: if staff(orgId); allow write: if false; }
       match /reports/{docId} { allow read: if staff(orgId); allow write: if false; }
       match /websites/{docId} { allow read: if staff(orgId); allow write: if false; }
-      match /websites/{websiteId}/content/{contentId} { allow read: if staff(orgId) || (client(orgId) && resource.data.customerId == clientCustomerId(orgId)); allow write: if false; }
+      match /websites/{websiteId}/content/{contentId} { allow read: if staff(orgId); allow write: if false; }
       match /websites/{websiteId}/contentSubmissions/{submissionId} { allow read: if privileged(orgId); allow write: if false; }
       match /websites/{websiteId}/contentRevisions/{revisionId} { allow read: if privileged(orgId); allow write: if false; }
       match /websiteVersions/{docId} { allow read: if staff(orgId); allow write: if false; }
@@ -100,7 +85,7 @@ service cloud.firestore {
       match /customers/{customerId}/documents/{documentId} { allow read: if staff(orgId); allow write: if false; }
       match /chats/{chatId}/messages/{messageId} { allow read: if staff(orgId); allow write: if false; }
       match /projects/{projectId}/artifacts/{artifactId} { allow read: if staff(orgId); allow write: if false; }
-      match /projects/{projectId} { allow read: if staff(orgId) || clientProjectList(orgId); allow write: if false; }
+      match /projects/{projectId} { allow read: if staff(orgId); allow write: if false; }
       match /projects/{projectId}/comments/{commentId} { allow read: if staff(orgId) || clientProject(orgId, projectId); allow write: if false; }
       match /projects/{projectId}/questionnaires/{questionnaireId} { allow read: if staff(orgId) || clientProject(orgId, projectId); allow write: if false; }
       match /projects/{projectId}/documents/{documentId} { allow read: if staff(orgId) || (clientProject(orgId, projectId) && resource.data.audience == 'customer'); allow write: if false; }
@@ -123,6 +108,14 @@ service cloud.firestore {
       match /projects/{projectId}/discoveryNotes/{noteId} { allow read: if staff(orgId); allow write: if false; }
       match /projects/{projectId}/businessProfile/{docId} { allow read: if staff(orgId); allow write: if false; }
     }
+    // New Client onboarding (2026-09-20, see docs/client-playbook/03-send-discovery.md) — a
+    // discoveryInvites/{token} document is the ONLY thing a not-yet-signed-in customer's browser
+    // has before it authenticates, and it deliberately lives outside organizations/{orgId} because
+    // resolving a token happens before the caller's organization is known. Never client-readable or
+    // client-writable at any stage of the flow: the public claim endpoint (client-onboarding-api.ts,
+    // mounted before the API's authenticate middleware) and the New Client creation endpoint both
+    // use the Admin SDK exclusively, which is not subject to these rules.
+    match /discoveryInvites/{token} { allow read, write: if false; }
     match /{document=**} { allow read, write: if false; }
   }
 }

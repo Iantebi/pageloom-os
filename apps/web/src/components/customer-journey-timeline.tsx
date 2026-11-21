@@ -1,6 +1,6 @@
 "use client";
 import { Check } from "lucide-react";
-import { type Project } from "@pageloom/core";
+import type { PortalProject } from "@/lib/portal-projects";
 import { Card } from "./product-ui";
 import { customerJourneyBucketIds, customerJourneyBucket } from "@/lib/i18n/dictionaries/customerJourney";
 import { t } from "@/lib/i18n";
@@ -9,7 +9,7 @@ import { t } from "@/lib/i18n";
 // Deliberately separate from <WorkflowTimeline> (workflow-timeline.tsx), which shows staff the raw
 // 22-stage internal pipeline — this groups those into the 10 plain-language buckets a customer
 // actually needs, each with what PageLoom is doing, whether the customer needs to act, and what's next.
-export function CustomerJourneyTimeline({ project }: { project: Project }) {
+export function CustomerJourneyTimeline({ project }: { project: PortalProject }) {
   const s = t("customerJourney");
   const stage = project.workflowStage;
   if (!stage) return null;

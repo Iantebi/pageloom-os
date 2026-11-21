@@ -89,9 +89,11 @@ describe("isQuestionVisible", () => {
 
 describe("missingRequiredDiscoveryFields / isSectionComplete", () => {
   it("reports every required, visible, empty question in a section", () => {
+    // whatItDoes and customerFeeling loosened to optional 2026-09-17 (see discovery-template.ts) —
+    // publicName is the section's only remaining required question.
     const section = discoverySection("business");
     const missing = missingRequiredDiscoveryFields(section, {});
-    expect(missing).toEqual(expect.arrayContaining(["business.publicName", "business.whatItDoes", "business.customerFeeling"]));
+    expect(missing).toEqual(["business.publicName"]);
     expect(missing).not.toContain("business.story");
   });
 
@@ -114,13 +116,11 @@ describe("missingRequiredDiscoveryFields / isSectionComplete", () => {
   // they have no testimonials could never complete the Trust section. `false` is a complete,
   // meaningful answer and must never be reported as a missing required field.
   it("treats an explicit `false` answer to a required boolean question as answered, not missing", () => {
-    const trust = discoverySection("trust");
-    expect(missingRequiredDiscoveryFields(trust, { "trust.hasTestimonials": false })).not.toContain("trust.hasTestimonials");
-    expect(missingRequiredDiscoveryFields(trust, { "trust.hasTestimonials": true })).not.toContain("trust.hasTestimonials");
-    expect(missingRequiredDiscoveryFields(trust, {})).toContain("trust.hasTestimonials");
-
+    // trust.hasTestimonials was loosened to optional 2026-09-17 (see discovery-template.ts), so
+    // branding.hasLogo now carries this regression instead — still a required boolean question.
     const branding = discoverySection("branding");
     expect(missingRequiredDiscoveryFields(branding, { "branding.hasLogo": false, "branding.colors": ["#112233"], "branding.style": ["modern"] })).toEqual([]);
+    expect(missingRequiredDiscoveryFields(branding, {})).toContain("branding.hasLogo");
 
     const presence = discoverySection("presence");
     const answered = { "presence.phone": "x", "presence.email": "x", "presence.hasWebsite": false, "presence.hasDomain": false };
@@ -128,11 +128,13 @@ describe("missingRequiredDiscoveryFields / isSectionComplete", () => {
   });
 
   it("isSectionComplete reflects missingRequiredDiscoveryFields exactly", () => {
-    const section = discoverySection("goals");
+    // goals's questions were loosened to optional 2026-09-17 (see discovery-template.ts), so
+    // customers now carries this test instead — still a section with required questions.
+    const section = discoverySection("customers");
     expect(isSectionComplete(section, {})).toBe(false);
     const complete: DiscoveryResponses = {
-      "goals.biggestProblem": "x", "goals.sixMonthSuccess": "x",
-      "goals.priorityOutcomes": ["more_inquiries"], "goals.capacityCheck": "x",
+      "customers.idealCustomer": "x", "customers.beforeContact": "x",
+      "customers.realProblem": "x", "customers.desiredOutcome": "x",
     };
     expect(isSectionComplete(section, complete)).toBe(true);
   });

@@ -27,7 +27,7 @@ const PROJECT_ID = "demo-pageloom-rules-fs";
 const ORG = "acme";
 
 // Fixture identities, mirroring the real member-document shape read by firestore.rules'
-// member()/role()/staff()/privileged()/client()/clientCustomerId()/clientProjectList()/clientProject().
+// member()/role()/staff()/privileged()/client()/clientCustomerId()/clientProject().
 const OWNER_UID = "owner-1";
 const STAFF_MEMBER_UID = "staff-member-1"; // role "member": staff-broad, but NOT privileged()
 const CLIENT_ALPHA_UID = "client-alpha-1"; // role "client", customerId cust-alpha, unrestricted projectIds
@@ -142,53 +142,34 @@ describe("Firestore rules engine (behavioral, via emulator)", () => {
     if (testEnv) await testEnv.cleanup();
   });
 
-  // These tests query with an explicit where('customerId','==', ownCustomerId) filter, matching
-  // exactly what the real app does (apps/web/src/app/(product)/portal/page.tsx, via
-  // useLiveCollection) for every client account - never a bare, unfiltered collection() listing.
-  // That distinction matters: Firestore's list/query rule-safety analysis cannot prove a rule
-  // depending on resource.data.customerId safe without a query filter that matches it, and
-  // correctly denies a bare listing outright regardless of what the real data would return -
-  // in the emulator AND in real, deployed production Firestore alike (verified directly against
-  // pageloom-os-production with the real test client account: a bare listing was denied with
-  // "Missing or insufficient permissions", while the same query with this where() filter
-  // succeeded and returned exactly the expected, correctly-scoped project). An earlier version of
-  // this file used a bare listing and mistakenly attributed the resulting denial to an emulator
-  // bug (firebase/firebase-tools#6252) - that diagnosis was wrong. This filtered form is the
-  // correct, provably-safe way to exercise clientProjectList, and is what production actually
-  // verified to work correctly.
-  describe("client project list-query safety (the exact bug class that shipped before)", () => {
-    it("lets a client list/query organizations/{org}/projects and returns only their own customer's projects", async () => {
+  // H1 (2026-11-16 security audit): raw project documents hold financial and internal fields
+  // (budget, revenue, cost, notes), so client accounts can no longer get or list them directly -
+  // not even their own, filtered by customerId. The portal reads a server-projected allow-list of
+  // fields via GET /api/portal/projects (functions/src/portal-projects-api.ts) instead.
+  describe("raw project documents are staff-only (H1)", () => {
+    it("denies a client listing their own customer's projects, even with the matching customerId filter", async () => {
       const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
-      const snap = await assertSucceeds(getDocs(query(collection(client.firestore(), `organizations/${ORG}/projects`), where("customerId", "==", CUST_ALPHA))));
-      const ids = snap.docs.map((d) => d.id).sort();
-      expect(ids).toEqual([PROJ_ALPHA_1, PROJ_ALPHA_2].sort());
+      await assertFails(getDocs(query(collection(client.firestore(), `organizations/${ORG}/projects`), where("customerId", "==", CUST_ALPHA))));
     });
 
-    it("filters an unrelated customer's project out of the list results (cross-tenant isolation in queries)", async () => {
-      const client = testEnv.authenticatedContext(CLIENT_BETA_UID);
-      const snap = await assertSucceeds(getDocs(query(collection(client.firestore(), `organizations/${ORG}/projects`), where("customerId", "==", CUST_BETA))));
-      const ids = snap.docs.map((d) => d.id);
-      expect(ids).toEqual([PROJ_BETA_1]);
-      expect(ids).not.toContain(PROJ_ALPHA_1);
-      expect(ids).not.toContain(PROJ_ALPHA_2);
+    it("denies a client a bare listing of the projects collection", async () => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      await assertFails(getDocs(collection(client.firestore(), `organizations/${ORG}/projects`)));
     });
 
-    it("denies a client attempting to list with a customerId filter that does not match their own membership", async () => {
+    it("denies a client listing with another customer's customerId filter", async () => {
       const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
       await assertFails(getDocs(query(collection(client.firestore(), `organizations/${ORG}/projects`), where("customerId", "==", CUST_BETA))));
     });
 
-    it("excludes an unassigned project from list results when projectIds is a non-empty allow-list", async () => {
+    it("denies a restricted client listing even their assigned project by id", async () => {
       const client = testEnv.authenticatedContext(CLIENT_ALPHA_RESTRICTED_UID);
-      const snap = await assertSucceeds(getDocs(query(collection(client.firestore(), `organizations/${ORG}/projects`), where("customerId", "==", CUST_ALPHA), where(documentId(), "in", [PROJ_ALPHA_1]))));
-      const ids = snap.docs.map((d) => d.id);
-      expect(ids).toEqual([PROJ_ALPHA_1]);
-      expect(ids).not.toContain(PROJ_ALPHA_2);
+      await assertFails(getDocs(query(collection(client.firestore(), `organizations/${ORG}/projects`), where("customerId", "==", CUST_ALPHA), where(documentId(), "in", [PROJ_ALPHA_1]))));
     });
 
-    it("lets a client directly get() their own assigned project", async () => {
+    it("denies a client a direct get() of their own assigned project", async () => {
       const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
-      await assertSucceeds(getDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}`)));
+      await assertFails(getDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}`)));
     });
 
     it("denies a direct get() of another customer's project", async () => {
@@ -199,6 +180,13 @@ describe("Firestore rules engine (behavioral, via emulator)", () => {
     it("denies a direct get() of an unassigned project excluded by a non-empty projectIds list", async () => {
       const client = testEnv.authenticatedContext(CLIENT_ALPHA_RESTRICTED_UID);
       await assertFails(getDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_2}`)));
+    });
+
+    it("still lets a staff member get and list projects", async () => {
+      const staff = testEnv.authenticatedContext(STAFF_MEMBER_UID);
+      await assertSucceeds(getDoc(doc(staff.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}`)));
+      const snap = await assertSucceeds(getDocs(collection(staff.firestore(), `organizations/${ORG}/projects`)));
+      expect(snap.docs.map((d) => d.id)).toEqual(expect.arrayContaining([PROJ_ALPHA_1, PROJ_ALPHA_2, PROJ_BETA_1]));
     });
   });
 
@@ -265,15 +253,21 @@ describe("Firestore rules engine (behavioral, via emulator)", () => {
     });
   });
 
-  describe("customer-scoped website content", () => {
-    it("lets a client read website content bearing their own customerId", async () => {
+  // H1: raw website content is staff-only; customers read it through the /website-content API.
+  describe("raw website content is staff-only (H1)", () => {
+    it("denies a client from reading website content bearing their own customerId", async () => {
       const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
-      await assertSucceeds(getDoc(doc(client.firestore(), `organizations/${ORG}/websites/site-alpha/content/home`)));
+      await assertFails(getDoc(doc(client.firestore(), `organizations/${ORG}/websites/site-alpha/content/home`)));
     });
 
     it("denies a client from reading another customer's website content", async () => {
       const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
       await assertFails(getDoc(doc(client.firestore(), `organizations/${ORG}/websites/site-beta/content/home`)));
+    });
+
+    it("still lets a staff member read website content", async () => {
+      const staff = testEnv.authenticatedContext(STAFF_MEMBER_UID);
+      await assertSucceeds(getDoc(doc(staff.firestore(), `organizations/${ORG}/websites/site-alpha/content/home`)));
     });
   });
 
@@ -421,7 +415,7 @@ describe("Firestore rules engine (behavioral, via emulator)", () => {
     });
   });
 
-  describe("fixed-path project subcollections (clientProject, not clientProjectList)", () => {
+  describe("fixed-path project subcollections (clientProject)", () => {
     it("lets a client read comments on their own assigned project", async () => {
       const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
       await assertSucceeds(getDoc(doc(client.firestore(), `organizations/${ORG}/projects/${PROJ_ALPHA_1}/comments/c1`)));

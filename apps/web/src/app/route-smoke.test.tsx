@@ -136,12 +136,15 @@ const routes: [name: string, load: () => Promise<{ default: () => React.ReactEle
   ["/agents", () => import("./(product)/agents/page")],
   ["/builder", () => import("./(product)/builder/page")],
   ["/crm", () => import("./(product)/crm/page")],
+  ["/clients/new", () => import("./(product)/clients/new/page")],
+  ["/discoveries", () => import("./(product)/discoveries/page")],
+  ["/billing", () => import("./(product)/billing/page")],
   ["/portal", () => import("./(product)/portal/page")],
   ["/settings", () => import("./(product)/settings/page")],
   ["/discovery", () => import("./discovery/page")],
-  ["/master", () => import("./(product)/master/page")],
-  ["/master/content", () => import("./(product)/master/content/page")],
-  ["/master/customer", () => import("./(product)/master/customer/page")],
+  ["/master", () => import("./(master)/master/page")],
+  ["/master/content", () => import("./(master)/master/content/page")],
+  ["/master/customer", () => import("./(master)/master/customer/page")],
 ];
 
 describe("authenticated route smoke test", () => {
@@ -149,7 +152,10 @@ describe("authenticated route smoke test", () => {
     it(`renders ${name} for an authenticated Owner without throwing`, async () => {
       const { default: Page } = await load();
       expect(() => renderToStaticMarkup(<Page />)).not.toThrow();
-    });
+      // /discovery lazily pulls in the whole AI Studio bundle, which pushes this render right up
+      // against the default 5000ms limit once the full suite runs under load (each isolated run
+      // passes comfortably around 4-5s) — bumping just this test's timeout rather than every test's.
+    }, name === "/discovery" ? 15000 : undefined);
   }
 
   it("renders /dashboard before the organization has loaded (organizationId still empty)", async () => {

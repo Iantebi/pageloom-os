@@ -38,6 +38,10 @@ type WebsiteLiveParams = { liveUrl: string };
 type PostLaunchFollowUpParams = { projectName: string };
 type DiscoverySubmittedParams = { projectName: string };
 type DiscoveryInformationRequestedParams = { sectionId: string };
+type DiscoveryStartedParams = { projectName: string };
+type DiscoveryDraftSavedParams = { projectName: string; sectionId: string };
+type DiscoveryFilesUploadedParams = { projectName: string };
+type ClientCommentReceivedParams = { projectName: string };
 
 // Mirrors the `type` string written at each notification producer — keep in sync if a producer adds,
 // renames, or removes a notification type.
@@ -67,9 +71,13 @@ export type NotificationParamsByType = {
   post_launch_follow_up: PostLaunchFollowUpParams;
   discovery_submitted: DiscoverySubmittedParams;
   discovery_information_requested: DiscoveryInformationRequestedParams;
+  discovery_started: DiscoveryStartedParams;
+  discovery_draft_saved: DiscoveryDraftSavedParams;
+  discovery_files_uploaded: DiscoveryFilesUploadedParams;
+  client_comment_received: ClientCommentReceivedParams;
 };
 export type NotificationType = keyof NotificationParamsByType;
-const notificationTypes = new Set<string>(["domain_expiry", "ssl_expiry", "backup_failure", "customer_inactivity", "project_stalled", "negative_profitability", "support_ticket_created", "support_ticket_resolved", "website_content_submitted", "website_content_changes_requested", "website_content_rejected", "website_content_published", "workflow_stage_changed", "payment_confirmed", "website_brief_received", "materials_missing", "build_started", "preview_ready", "revision_received", "revision_resolved", "final_approval_recorded", "website_live", "post_launch_follow_up", "discovery_submitted", "discovery_information_requested"]);
+const notificationTypes = new Set<string>(["domain_expiry", "ssl_expiry", "backup_failure", "customer_inactivity", "project_stalled", "negative_profitability", "support_ticket_created", "support_ticket_resolved", "website_content_submitted", "website_content_changes_requested", "website_content_rejected", "website_content_published", "workflow_stage_changed", "payment_confirmed", "website_brief_received", "materials_missing", "build_started", "preview_ready", "revision_received", "revision_resolved", "final_approval_recorded", "website_live", "post_launch_follow_up", "discovery_submitted", "discovery_information_requested", "discovery_started", "discovery_draft_saved", "discovery_files_uploaded", "client_comment_received"]);
 function isKnownType(value: string): value is NotificationType { return notificationTypes.has(value); }
 
 const approvalLabelsHe: Record<string, string> = { none: "ללא", ceo: "מנכ\"ל", customer: "לקוח" };
@@ -116,6 +124,10 @@ const formattersHe: Formatters = {
   post_launch_follow_up: params => `בדיקת מעקב לאחר ההשקה עבור ${str(params.projectName)}`,
   discovery_submitted: params => `אפיון העסק עבור ${str(params.projectName)} נשלח`,
   discovery_information_requested: params => `דרוש מידע נוסף בשלב "${discoveryQuestions.he.sections[str(params.sectionId) as keyof typeof discoveryQuestions.he.sections]?.title ?? str(params.sectionId)}" באפיון העסק`,
+  discovery_started: params => `${str(params.projectName)} התחילו את אפיון העסק`,
+  discovery_draft_saved: params => `${str(params.projectName)} שמרו התקדמות בשלב "${discoveryQuestions.he.sections[str(params.sectionId) as keyof typeof discoveryQuestions.he.sections]?.title ?? str(params.sectionId)}" באפיון העסק`,
+  discovery_files_uploaded: params => `${str(params.projectName)} העלו קבצים לאפיון העסק`,
+  client_comment_received: params => `הודעה חדשה מ-${str(params.projectName)}`,
 };
 
 const formattersEn: Formatters = {
@@ -144,6 +156,10 @@ const formattersEn: Formatters = {
   post_launch_follow_up: params => `Post-launch follow-up for ${str(params.projectName)}`,
   discovery_submitted: params => `Business Discovery for ${str(params.projectName)} was submitted`,
   discovery_information_requested: params => `More information is needed in the "${discoveryQuestions.en.sections[str(params.sectionId) as keyof typeof discoveryQuestions.en.sections]?.title ?? str(params.sectionId)}" stage of Business Discovery`,
+  discovery_started: params => `${str(params.projectName)} started their Business Discovery`,
+  discovery_draft_saved: params => `${str(params.projectName)} saved progress on the "${discoveryQuestions.en.sections[str(params.sectionId) as keyof typeof discoveryQuestions.en.sections]?.title ?? str(params.sectionId)}" stage of Business Discovery`,
+  discovery_files_uploaded: params => `${str(params.projectName)} uploaded files to their Business Discovery`,
+  client_comment_received: params => `New message from ${str(params.projectName)}`,
 };
 
 // A recognized `type` with a missing/undefined `params` document field (the #27 crash: every
