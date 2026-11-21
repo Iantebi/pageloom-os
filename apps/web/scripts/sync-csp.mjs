@@ -2,7 +2,12 @@ import{createHash}from"node:crypto";import{readFileSync,readdirSync,statSync,wri
 const webRoot=resolve(dirname(fileURLToPath(import.meta.url)),".."),out=join(webRoot,"out"),firebasePath=resolve(webRoot,"../../firebase.json");
 function files(dir){return readdirSync(dir).flatMap(name=>{const path=join(dir,name);return statSync(path).isDirectory()?files(path):path.endsWith(".html")?[path]:[]})}
 const hashes=new Set();for(const file of files(out)){const html=readFileSync(file,"utf8");for(const match of html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)){const body=match[1]??"";if(body)hashes.add(`'sha256-${createHash("sha256").update(body).digest("base64")}'`)}}
-const firebase=JSON.parse(readFileSync(firebasePath,"utf8")),headers=firebase.hosting.headers??[],rule=headers.find(item=>item.source==="**"),csp=rule?.headers?.find(item=>item.key==="Content-Security-Policy");if(!csp)throw new Error("Firebase Hosting Content-Security-Policy header is missing");
+const firebase=JSON.parse(readFileSync(firebasePath,"utf8"));
+// PageLoom OS (this web app) was retired on 2026-11-19 and firebase.json has no hosting target since
+// 2026-11-21, so there is no hosted CSP to keep in sync. Skip cleanly instead of failing the build,
+// and never re-create a hosting section (that would re-enable a website deploy).
+if(!firebase.hosting){console.log("No Firebase Hosting target in firebase.json (OS web app retired): CSP sync skipped.");process.exit(0)}
+const headers=firebase.hosting.headers??[],rule=headers.find(item=>item.source==="**"),csp=rule?.headers?.find(item=>item.key==="Content-Security-Policy");if(!csp)throw new Error("Firebase Hosting Content-Security-Policy header is missing");
 // https://www.gstatic.com/https://www.google.com are for Firebase App Check's ReCaptchaV3Provider
 // (see apps/web/src/lib/firebase.ts) - kept here, not just hand-edited into firebase.json, because
 // this script regenerates the whole script-src value on every build and would otherwise silently
