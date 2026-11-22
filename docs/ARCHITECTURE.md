@@ -46,15 +46,37 @@ the 8 other OS functions (agents, workflow engine, schedulers), the OS Secret Ma
 - `functions/` is the retired OS codebase. Since 2026-11-21 its `index.ts` defines no Cloud Function at all (guarded by `functions/src/index.test.ts`); it is kept only for history and shared tests. `firebase.json` has no `hosting` target, so a plain `firebase deploy` deploys only the backup functions and the rules (guarded by `backup-functions/src/deploy-config.test.ts`).
 - Rules: `firebase deploy --only storage` / `--only firestore:rules`, each as its own approved step.
 - Every production change needs a fresh, scope-specific approval (see `CLAUDE.md`).
+- **Deploy only from `main`** (PR #50, merged 2026-11-21 as `9cde91b`). Every older branch (30 of
+  them, incl. those of the closed PRs #43 and #48) still contains the OS functions and the hosting
+  target; a deploy from any of them would bring the OS back. Verified 2026-11-21: `firebase deploy --dry-run` from
+  `main` with no `--only` targets only `backup-functions/`, the Firestore/Storage rules and indexes;
+  the live rules (Storage 52/52 lines, Firestore 121/121) and composite indexes (8/8) equal `main`.
+
+**Deploy paths (audited 2026-11-22):** deploys are manual only. No GitHub workflow deploys (none
+holds Firebase/GCP credentials; the only secret is `CLAUDE_CODE_OAUTH_TOKEN`), there are no Cloud
+Build triggers or Cloud Deploy pipelines, and no service account has a user-managed key. Only the
+two human project Owners (and Google's own `cloudservices` agent) can deploy. The Autonomous
+Development Manager workflow never merges (it only labels PRs) and, since PR #49 (2026-11-22), runs
+only when started manually; all workflow actions are pinned to full commit SHAs.
+
+**`main` protection (since 2026-11-22):** the `protect main` ruleset blocks deletion and force
+pushes, requires a PR, and requires the `Install, typecheck, lint, test, build` check to pass. That
+check runs the guards `functions/src/index.test.ts` (no OS function may be defined) and
+`backup-functions/src/deploy-config.test.ts` (functions only from `backup-functions/`, no hosting),
+so a PR that re-adds the OS cannot be merged.
 
 **Backups and restore:** daily Firestore export to the backups bucket (30-day retention, 90-day
 lifecycle, 7-day soft delete); weekly Storage Transfer of the main bucket (media RPO 7 days);
 the watchdog alerts when either is stale. Restore follows `docs/disaster-recovery-runbook.md` §5,
 always into a separate database first, never over production.
 
-**Open items (2026-11-20):** UBLA on the main bucket is blocked until project owners get an
-object-level IAM role there (their object access currently comes from ACLs);
-`scripts/ops/sec-bucket-ubla.sh` needs its `pipefail` ACL-scan fix.
+**Open items (2026-11-22):**
+- Dependabot security updates for the retired root/`packages/core` manifests fail by design
+  (`@pageloom/core` is a generated `file:vendor/core` path; `packages/core` has no lockfile). They
+  do not affect deploys. Version updates target `backup-functions/` only.
+- UBLA on the main bucket is blocked until project owners get an object-level IAM role there
+  (their object access currently comes from ACLs); `scripts/ops/sec-bucket-ubla.sh` needs its
+  `pipefail` ACL-scan fix.
 
 > **Maintenance policy.** This document is the single source of truth for PageLoom OS's
 > architecture. Whenever a change touches any of the following, update the matching

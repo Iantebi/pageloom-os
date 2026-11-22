@@ -1,6 +1,6 @@
 # Dependabot version updates. Security alerts are a separate repository setting
 # (enabled via scripts/ops/gh-repo-hygiene.sh after approval).
-# PageLoom OS is being retired, so npm updates are limited to security-relevant noise control:
+# PageLoom OS was retired (2026-11-19), so npm version updates cover backup-functions/ only:
 # few open PRs, grouped, weekly. GitHub Actions stay SHA-pinned; Dependabot bumps the pins.
 version: 2
 updates:
@@ -9,8 +9,10 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 3
+  # Only the code that is actually deployed. The retired OS workspaces (root, packages/core) cannot
+  # be resolved by Dependabot (@pageloom/core is a generated file:vendor/core path) and are not deployed.
   - package-ecosystem: "npm"
-    directory: "/"
+    directory: "/backup-functions"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 3
