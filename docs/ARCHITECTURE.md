@@ -47,8 +47,8 @@ the 8 other OS functions (agents, workflow engine, schedulers), the OS Secret Ma
 - Rules: `firebase deploy --only storage` / `--only firestore:rules`, each as its own approved step.
 - Every production change needs a fresh, scope-specific approval (see `CLAUDE.md`).
 - **Deploy only from `main`** (PR #50, merged 2026-11-21 as `9cde91b`). Every older branch (30 of
-  them, plus open PRs #43 and #48) still contains the OS functions and the hosting target; a deploy
-  from any of them would bring the OS back. Verified 2026-11-21: `firebase deploy --dry-run` from
+  them, incl. those of the closed PRs #43 and #48) still contains the OS functions and the hosting
+  target; a deploy from any of them would bring the OS back. Verified 2026-11-21: `firebase deploy --dry-run` from
   `main` with no `--only` targets only `backup-functions/`, the Firestore/Storage rules and indexes;
   the live rules (Storage 52/52 lines, Firestore 121/121) and composite indexes (8/8) equal `main`.
 
@@ -56,7 +56,14 @@ the 8 other OS functions (agents, workflow engine, schedulers), the OS Secret Ma
 holds Firebase/GCP credentials; the only secret is `CLAUDE_CODE_OAUTH_TOKEN`), there are no Cloud
 Build triggers or Cloud Deploy pipelines, and no service account has a user-managed key. Only the
 two human project Owners (and Google's own `cloudservices` agent) can deploy. The Autonomous
-Development Manager workflow never merges (it only labels PRs).
+Development Manager workflow never merges (it only labels PRs) and, since PR #49 (2026-11-22), runs
+only when started manually; all workflow actions are pinned to full commit SHAs.
+
+**`main` protection (since 2026-11-22):** the `protect main` ruleset blocks deletion and force
+pushes, requires a PR, and requires the `Install, typecheck, lint, test, build` check to pass. That
+check runs the guards `functions/src/index.test.ts` (no OS function may be defined) and
+`backup-functions/src/deploy-config.test.ts` (functions only from `backup-functions/`, no hosting),
+so a PR that re-adds the OS cannot be merged.
 
 **Backups and restore:** daily Firestore export to the backups bucket (30-day retention, 90-day
 lifecycle, 7-day soft delete); weekly Storage Transfer of the main bucket (media RPO 7 days);
@@ -64,12 +71,9 @@ the watchdog alerts when either is stale. Restore follows `docs/disaster-recover
 always into a separate database first, never over production.
 
 **Open items (2026-11-22):**
-- The `protect main` ruleset requires a PR but no passing status checks, so a PR that re-adds OS
-  functions or hosting could still be merged even though the CI guards
-  (`functions/src/index.test.ts`, `backup-functions/src/deploy-config.test.ts`) would fail on it.
-  Recommended: require the `Install, typecheck, lint, test, build` check on `main`.
-- Open PRs #43 and #48 predate the retirement and carry the OS code; close or rebase them.
-- The Autonomous Development Manager still runs on a 30-minute cron from `main` until PR #49 lands.
+- Dependabot security updates for the retired root/`packages/core` manifests fail by design
+  (`@pageloom/core` is a generated `file:vendor/core` path; `packages/core` has no lockfile). They
+  do not affect deploys. Version updates target `backup-functions/` only.
 - UBLA on the main bucket is blocked until project owners get an object-level IAM role there
   (their object access currently comes from ACLs); `scripts/ops/sec-bucket-ubla.sh` needs its
   `pipefail` ACL-scan fix.
