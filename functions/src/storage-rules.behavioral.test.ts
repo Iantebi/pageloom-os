@@ -133,6 +133,61 @@ describe("Storage rules engine (behavioral, via emulator)", () => {
       );
     });
 
+    // 2026-11-19 hardening: the generic allow-list used to accept image/.*, text/.* and
+    // application/vnd.* - i.e. SVG and HTML (script-capable when opened from a download URL) and
+    // vnd.* executables. Only explicit document/image types are allowed now.
+    it.each([
+      ["image/svg+xml", "logo.svg"],
+      ["text/html", "page.html"],
+      ["text/javascript", "app.js"],
+      ["application/vnd.microsoft.portable-executable", "setup.bin"],
+    ])("rejects script-capable or executable type %s even on the uploader's own path", async (contentType, name) => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      const path = `organizations/${ORG}/uploads/${CLIENT_ALPHA_UID}/${PROJ_ALPHA_1}/${name}`;
+      await assertFails(uploadBytes(ref(client.storage(), path), TEXT_BYTES, { contentType }));
+    });
+
+    it.each([
+      ["application/pdf", "brief.pdf"],
+      ["text/csv", "list.csv"],
+      ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "brief.docx"],
+      ["image/jpeg", "photo.jpg"],
+      // Windows browsers report .zip as x-zip-compressed; legacy .ppt is an explicit Office type.
+      ["application/x-zip-compressed", "assets.zip"],
+      ["application/vnd.ms-powerpoint", "deck.ppt"],
+    ])("still accepts the explicit document/image type %s", async (contentType, name) => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      const path = `organizations/${ORG}/uploads/${CLIENT_ALPHA_UID}/${PROJ_ALPHA_1}/${name}`;
+      await assertSucceeds(uploadBytes(ref(client.storage(), path), TEXT_BYTES, { contentType }));
+    });
+
+    // Declared-type tricks. Note: rules only see the DECLARED content-type, never the bytes, so a
+    // renamed .exe declared as image/png still passes - that is the limit of Storage rules.
+    it.each([
+      ["application/octet-stream", "unknown.bin"],
+      ["image/svg+xml; charset=utf-8", "logo-param.svg"],
+      ["IMAGE/SVG+XML", "logo-upper.svg"],
+      ["text/html;image/png", "mixed.html"],
+      ["image/png+svg", "suffix.png"],
+      ["text/plain2", "near-miss.txt"],
+    ])("rejects missing/disguised declared type %s", async (contentType, name) => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      const path = `organizations/${ORG}/uploads/${CLIENT_ALPHA_UID}/${PROJ_ALPHA_1}/${name}`;
+      await assertFails(uploadBytes(ref(client.storage(), path), TEXT_BYTES, { contentType }));
+    });
+
+    it("rejects an upload that declares no content-type at all", async () => {
+      const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
+      const path = `organizations/${ORG}/uploads/${CLIENT_ALPHA_UID}/${PROJ_ALPHA_1}/no-type`;
+      await assertFails(uploadBytes(ref(client.storage(), path), TEXT_BYTES));
+    });
+
+    it("applies the same type allow-list to staff uploads (staff are not exempt from safeUploadShape)", async () => {
+      const owner = testEnv.authenticatedContext(OWNER_UID);
+      const path = `organizations/${ORG}/uploads/${CLIENT_ALPHA_UID}/${PROJ_ALPHA_1}/staff-logo.svg`;
+      await assertFails(uploadBytes(ref(owner.storage(), path), TEXT_BYTES, { contentType: "image/svg+xml" }));
+    });
+
     it("rejects an upload larger than the declared 25MB safeUpload size limit", async () => {
       const client = testEnv.authenticatedContext(CLIENT_ALPHA_UID);
       const path = `organizations/${ORG}/uploads/${CLIENT_ALPHA_UID}/${PROJ_ALPHA_1}/big.bin`;

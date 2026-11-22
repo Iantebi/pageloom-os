@@ -33,3 +33,4 @@ export * from "./handover.js";
 export * from "./discovery-template.js";
 export * from "./discovery.js";
 export * from "./mfa-policy.js";
+export * from "./client-onboarding.js";

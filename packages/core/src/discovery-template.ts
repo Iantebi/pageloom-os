@@ -62,20 +62,33 @@ export const discoveryTemplate: readonly DiscoverySectionDefinition[] = [
   {
     id: "business", order: 1, questions: [
       { id: "business.publicName", sectionId: "business", type: "short_text", required: true, semanticTag: "business_identity", maxLength: 200 },
-      { id: "business.whatItDoes", sectionId: "business", type: "long_text", required: true, semanticTag: "business_identity", maxLength: 3000 },
+      // whatItDoes and customerFeeling loosened to optional 2026-09-17 — see trust.hasTestimonials
+      // comment further below; the unified Discovery frontend (AI Studio import) has no step that
+      // asks either of these specifically, and a hard-required question with no UI path to answer
+      // it would permanently block /submit for every customer using that frontend.
+      { id: "business.whatItDoes", sectionId: "business", type: "long_text", required: false, semanticTag: "business_identity", maxLength: 3000 },
       { id: "business.story", sectionId: "business", type: "long_text", required: false, semanticTag: "business_story", maxLength: 3000 },
       { id: "business.founderPriorities", sectionId: "business", type: "long_text", required: false, semanticTag: "business_story", maxLength: 2000 },
-      { id: "business.customerFeeling", sectionId: "business", type: "long_text", required: true, semanticTag: "business_identity", maxLength: 2000 },
+      { id: "business.customerFeeling", sectionId: "business", type: "long_text", required: false, semanticTag: "business_identity", maxLength: 2000 },
+      // Added 2026-09-17 for the Discovery frontend unification (AI Studio import): optional fields
+      // that frontend collects with no prior home in this template. Additive only — every existing
+      // consumer (Admin/Master Panel, server validation) is unaffected by an unanswered optional field.
+      { id: "business.ownerName", sectionId: "business", type: "short_text", required: false, semanticTag: "business_identity", maxLength: 200 },
+      { id: "business.category", sectionId: "business", type: "short_text", required: false, semanticTag: "business_identity", maxLength: 200 },
+      { id: "business.tagline", sectionId: "business", type: "short_text", required: false, semanticTag: "business_identity", maxLength: 200 },
     ],
   },
   {
     id: "customers", order: 2, questions: [
       { id: "customers.idealCustomer", sectionId: "customers", type: "long_text", required: true, semanticTag: "ideal_customer", maxLength: 3000 },
-      { id: "customers.beforeContact", sectionId: "customers", type: "long_text", required: true, semanticTag: "customer_trigger", maxLength: 2000 },
+      // Loosened to optional 2026-09-17 — see business.whatItDoes comment above.
+      { id: "customers.beforeContact", sectionId: "customers", type: "long_text", required: false, semanticTag: "customer_trigger", maxLength: 2000 },
       { id: "customers.realProblem", sectionId: "customers", type: "long_text", required: true, semanticTag: "pain_point", maxLength: 2000 },
       { id: "customers.desiredOutcome", sectionId: "customers", type: "long_text", required: true, semanticTag: "desired_outcome", maxLength: 2000 },
       { id: "customers.commonFears", sectionId: "customers", type: "long_text", required: false, semanticTag: "objection", maxLength: 2000 },
       { id: "customers.ifUnsolved", sectionId: "customers", type: "long_text", required: false, semanticTag: "pain_point", maxLength: 2000 },
+      // Added 2026-09-17 — see business.ownerName comment above.
+      { id: "customers.obstacles", sectionId: "customers", type: "long_text", required: false, semanticTag: "objection", maxLength: 2000 },
     ],
   },
   {
@@ -87,21 +100,34 @@ export const discoveryTemplate: readonly DiscoverySectionDefinition[] = [
     id: "differentiation", order: 4, questions: [
       { id: "differentiation.whyCustomersChoseYou", sectionId: "differentiation", type: "long_text", required: true, semanticTag: "differentiator", maxLength: 3000 },
       { id: "differentiation.whatCustomersSay", sectionId: "differentiation", type: "long_text", required: false, semanticTag: "proof_signal", maxLength: 2000 },
+      // Loosened to optional 2026-09-17 — see business.whatItDoes comment above.
       {
-        id: "differentiation.processAdvantages", sectionId: "differentiation", type: "multi_select", required: true, semanticTag: "differentiator",
+        id: "differentiation.processAdvantages", sectionId: "differentiation", type: "multi_select", required: false, semanticTag: "differentiator",
         options: ["availability", "speed", "personal_service", "methodology", "guarantees", "transparency", "after_service", "expertise", "certifications"],
       },
       { id: "differentiation.other", sectionId: "differentiation", type: "long_text", required: false, semanticTag: "differentiator", maxLength: 2000 },
+      // Added 2026-09-17 — see business.ownerName comment above.
+      { id: "differentiation.corePromises", sectionId: "differentiation", type: "long_text", required: false, semanticTag: "differentiator", maxLength: 2000 },
+      { id: "differentiation.guarantees", sectionId: "differentiation", type: "long_text", required: false, semanticTag: "differentiator", maxLength: 2000 },
     ],
   },
   {
     id: "trust", order: 5, questions: [
-      { id: "trust.hasTestimonials", sectionId: "trust", type: "boolean", required: true, semanticTag: "proof_signal" },
+      // hasTestimonials loosened to optional 2026-09-17: the unified Discovery frontend (AI Studio
+      // import) has no step that asks this, and a hard-required question with no UI path to answer
+      // it would permanently block /submit for every customer using that frontend. The question and
+      // its server-side validation stay in place for any other consumer that does ask it.
+      { id: "trust.hasTestimonials", sectionId: "trust", type: "boolean", required: false, semanticTag: "proof_signal" },
       { id: "trust.testimonials", sectionId: "trust", type: "testimonial_repeater", required: false, semanticTag: "proof_signal", maxItems: 10, visibleIf: [{ questionId: "trust.hasTestimonials", equals: true }] },
       { id: "trust.wantsHelpCollecting", sectionId: "trust", type: "boolean", required: false, semanticTag: "proof_signal", visibleIf: [{ questionId: "trust.hasTestimonials", equals: false }] },
       { id: "trust.yearsExperience", sectionId: "trust", type: "short_text", required: false, semanticTag: "proof_signal", maxLength: 60 },
       { id: "trust.clientCount", sectionId: "trust", type: "short_text", required: false, semanticTag: "proof_signal", maxLength: 60 },
       { id: "trust.certifications", sectionId: "trust", type: "long_text", required: false, semanticTag: "proof_signal", maxLength: 1500 },
+      // Added 2026-09-17 — file-based equivalents of certifications/testimonials (a certificate scan,
+      // a screenshot of a review) that the unified frontend's uploads step collects but the text-only
+      // fields above can't hold.
+      { id: "trust.certificationFiles", sectionId: "trust", type: "file_repeater", required: false, semanticTag: "proof_signal", maxItems: 10 },
+      { id: "trust.testimonialFiles", sectionId: "trust", type: "file_repeater", required: false, semanticTag: "proof_signal", maxItems: 10 },
     ],
   },
   {
@@ -114,6 +140,13 @@ export const discoveryTemplate: readonly DiscoverySectionDefinition[] = [
         options: ["modern", "premium", "clean_minimal", "warm_friendly", "young_dynamic", "professional", "innovative", "calm"],
       },
       { id: "branding.avoid", sectionId: "branding", type: "long_text", required: false, semanticTag: "brand_style", maxLength: 1000 },
+      // Added 2026-09-17 — see business.ownerName comment above.
+      { id: "branding.fontStyle", sectionId: "branding", type: "short_text", required: false, semanticTag: "brand_style", maxLength: 200 },
+      { id: "branding.inspirationWebsites", sectionId: "branding", type: "long_text", required: false, semanticTag: "brand_style", maxLength: 1000 },
+      // Free-text personality phrases from a source with its own open-ended vocabulary — kept
+      // verbatim rather than force-mapped onto branding.style's fixed options, which would lose or
+      // misrepresent intent for a phrase that doesn't cleanly match any single option.
+      { id: "branding.personalityTraits", sectionId: "branding", type: "long_text", required: false, semanticTag: "brand_style", maxLength: 1000 },
     ],
   },
   {
@@ -123,6 +156,9 @@ export const discoveryTemplate: readonly DiscoverySectionDefinition[] = [
       { id: "materials.locationPhotos", sectionId: "materials", type: "file_repeater", required: false, semanticTag: "proof_signal", maxItems: 5 },
       { id: "materials.productPhotos", sectionId: "materials", type: "file_repeater", required: false, semanticTag: "proof_signal", maxItems: 10 },
       { id: "materials.priceListOrBrochure", sectionId: "materials", type: "file_repeater", required: false, semanticTag: "service", maxItems: 3 },
+      // Added 2026-09-17 — catch-all for uploads that don't fit an existing category (the unified
+      // frontend's generic "docs" upload category).
+      { id: "materials.otherDocuments", sectionId: "materials", type: "file_repeater", required: false, semanticTag: "service", maxItems: 10 },
     ],
   },
   {
@@ -138,17 +174,22 @@ export const discoveryTemplate: readonly DiscoverySectionDefinition[] = [
       { id: "presence.hasDomain", sectionId: "presence", type: "boolean", required: true, semanticTag: "acquisition_channel" },
       { id: "presence.socialLinks", sectionId: "presence", type: "social_links", required: false, semanticTag: "acquisition_channel" },
       { id: "presence.googleBusinessUrl", sectionId: "presence", type: "url", required: false, semanticTag: "acquisition_channel" },
+      // Added 2026-09-17 — see business.ownerName comment above.
+      { id: "presence.needsDomainHelp", sectionId: "presence", type: "boolean", required: false, semanticTag: "acquisition_channel" },
     ],
   },
   {
     id: "goals", order: 9, questions: [
-      { id: "goals.biggestProblem", sectionId: "goals", type: "long_text", required: true, semanticTag: "business_goal", maxLength: 2000 },
-      { id: "goals.sixMonthSuccess", sectionId: "goals", type: "long_text", required: true, semanticTag: "kpi", maxLength: 2000 },
+      // All four loosened to optional 2026-09-17 — see trust.hasTestimonials comment above; the
+      // unified frontend's Review/Completion steps collect no data of their own (they only summarize
+      // and finalize), so nothing in that frontend can ever answer these.
+      { id: "goals.biggestProblem", sectionId: "goals", type: "long_text", required: false, semanticTag: "business_goal", maxLength: 2000 },
+      { id: "goals.sixMonthSuccess", sectionId: "goals", type: "long_text", required: false, semanticTag: "kpi", maxLength: 2000 },
       {
-        id: "goals.priorityOutcomes", sectionId: "goals", type: "multi_select", required: true, semanticTag: "business_goal",
+        id: "goals.priorityOutcomes", sectionId: "goals", type: "multi_select", required: false, semanticTag: "business_goal",
         options: ["more_inquiries", "better_leads", "more_customers", "more_sales", "more_trust", "better_google_visibility", "easier_bookings", "less_manual_work", "better_follow_up", "better_digital_presence"],
       },
-      { id: "goals.capacityCheck", sectionId: "goals", type: "long_text", required: true, semanticTag: "business_capacity", maxLength: 1000 },
+      { id: "goals.capacityCheck", sectionId: "goals", type: "long_text", required: false, semanticTag: "business_capacity", maxLength: 1000 },
     ],
   },
 ];

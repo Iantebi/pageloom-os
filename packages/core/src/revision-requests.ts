@@ -14,6 +14,10 @@ export interface RevisionRequest {
   description: string;
   area?: string;
   status: RevisionRequestStatus;
+  // Which revision round this request counts as (1-based), fixed at creation time from how many
+  // requests already existed on the project — see launchBusinessRules.project.includedRevisionRounds
+  // in business-rules.ts for the number of rounds a project includes.
+  round: number;
   createdBy: string;
   createdAt: string;
   resolvedBy?: string;

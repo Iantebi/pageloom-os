@@ -25,6 +25,7 @@ describe("notifications.format", () => {
       "website_brief_received", "materials_missing", "build_started", "preview_ready",
       "revision_received", "revision_resolved", "final_approval_recorded", "website_live",
       "post_launch_follow_up", "discovery_submitted", "discovery_information_requested",
+      "discovery_started", "discovery_draft_saved", "discovery_files_uploaded", "client_comment_received",
     ];
     for (const type of types) {
       expect(() => notifications.he.format(type, undefined)).not.toThrow();

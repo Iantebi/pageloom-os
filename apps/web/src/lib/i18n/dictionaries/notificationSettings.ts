@@ -1,0 +1,28 @@
+export const notificationSettings = {
+  he: {
+    title: "התראות",
+    subtitle: "מה מדווח לבעלים בזמן אמת, ומה עדיין דורש הגדרה חד-פעמית.",
+    inAppTitle: "התראות בתוך המערכת",
+    inAppDescription: "פעיל: התחלת אפיון, שמירת טיוטה, שליחת אפיון, העלאת קבצים והודעות מלקוחות מדווחים כאן ובפעמון בראש המסך בזמן אמת.",
+    pushTitle: "התראות Push (דחיפה) לדסקטופ ולנייד",
+    pushDescription: "עדיין לא הוגדר. התשתית בצד השרת מוכנה (שמירת המכשירים, נקודת הקצה לשליחה) — נותרו כמה שלבי הגדרה חד-פעמיים בפיירבייס.",
+    setupTitle: "שלבים נדרשים להפעלת Push:",
+    setupStep1: "יצירת מפתח VAPID עבור Web Push בקונסולת Firebase (Cloud Messaging → Web configuration).",
+    setupStep2: "הגדרת המפתח כמשתנה סביבה (NEXT_PUBLIC_FIREBASE_VAPID_KEY) בסביבת ה-build.",
+    setupStep3: "הוספת קובץ Service Worker ייעודי (firebase-messaging-sw.js) והרשמה לאירועי push בדפדפן.",
+    setupStep4: "אישור הרשאת התראות מהדפדפן על ידי המשתמש (חד-פעמי, לכל מכשיר).",
+  },
+  en: {
+    title: "Notifications",
+    subtitle: "What reports to the Owner in real time, and what still needs a one-time setup.",
+    inAppTitle: "In-app notifications",
+    inAppDescription: "Active: Discovery started, draft saved, Discovery submitted, files uploaded, and customer messages all report here and in the bell icon in real time.",
+    pushTitle: "Push notifications on desktop and mobile",
+    pushDescription: "Not set up yet. The backend infrastructure is ready (device token storage, the send endpoint) — a few one-time Firebase setup steps remain.",
+    setupTitle: "Steps required to enable Push:",
+    setupStep1: "Generate a VAPID key for Web Push in the Firebase Console (Cloud Messaging → Web configuration).",
+    setupStep2: "Set that key as a build-time environment variable (NEXT_PUBLIC_FIREBASE_VAPID_KEY).",
+    setupStep3: "Add a dedicated service worker file (firebase-messaging-sw.js) and register for browser push events.",
+    setupStep4: "Have the user grant browser notification permission (one-time, per device).",
+  },
+} as const;

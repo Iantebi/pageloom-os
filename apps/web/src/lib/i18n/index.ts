@@ -44,12 +44,18 @@ import { workflowTimeline } from "./dictionaries/workflowTimeline";
 import { appearanceSettings } from "./dictionaries/appearanceSettings";
 import { customerJourney } from "./dictionaries/customerJourney";
 import { onboardingJourneyPanel } from "./dictionaries/onboardingJourneyPanel";
+import { notificationSettings } from "./dictionaries/notificationSettings";
+import { discoveriesPage } from "./dictionaries/discoveriesPage";
+import { billingPage } from "./dictionaries/billingPage";
 import { discoveryQuestions } from "./dictionaries/discoveryQuestions";
 import { discoveryShell } from "./dictionaries/discoveryShell";
 import { discoveryPanel } from "./dictionaries/discoveryPanel";
 import { errorBoundary } from "./dictionaries/errorBoundary";
 import { accountSecurity } from "./dictionaries/accountSecurity";
 import { mfaChallenge } from "./dictionaries/mfaChallenge";
+import { discoveryLink } from "./dictionaries/discoveryLink";
+import { newClient } from "./dictionaries/newClient";
+import { completedDiscoveries } from "./dictionaries/completedDiscoveries";
 
 const dictionaries = {
   common,
@@ -99,12 +105,18 @@ const dictionaries = {
   appearanceSettings,
   customerJourney,
   onboardingJourneyPanel,
+  discoveriesPage,
+  billingPage,
+  notificationSettings,
   discoveryQuestions,
   discoveryShell,
   discoveryPanel,
   errorBoundary,
   accountSecurity,
   mfaChallenge,
+  discoveryLink,
+  newClient,
+  completedDiscoveries,
 } as const;
 
 type Dictionaries = typeof dictionaries;

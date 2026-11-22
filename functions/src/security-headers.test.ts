@@ -12,10 +12,10 @@ describe("Strict-Transport-Security is enforced on every response surface", () =
     expect(source).toContain('res.setHeader("Strict-Transport-Security","max-age=63072000; includeSubDomains")');
   });
 
-  it("Firebase Hosting sets it on every response via firebase.json", () => {
+  // The OS website (Firebase Hosting) was retired on 2026-11-19 and its hosting target removed from
+  // firebase.json on 2026-11-21, so there is no hosting response surface left to set headers on.
+  it("no Firebase Hosting surface is deployed any more (retired OS website)", () => {
     const firebase = JSON.parse(readFileSync(new URL("../../firebase.json", import.meta.url), "utf8"));
-    const rule = firebase.hosting.headers.find((item: { source: string }) => item.source === "**");
-    const hsts = rule.headers.find((item: { key: string }) => item.key === "Strict-Transport-Security");
-    expect(hsts.value).toBe("max-age=63072000; includeSubDomains");
+    expect(firebase.hosting).toBeUndefined();
   });
 });

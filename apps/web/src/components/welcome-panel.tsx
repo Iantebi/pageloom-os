@@ -8,7 +8,7 @@ import { t } from "@/lib/i18n";
 // The Welcome experience (mission section 2): shown once, right after payment is confirmed, until
 // the customer has submitted their Website Brief. Not a persistent timeline step — see
 // customer-journey-timeline.tsx for the ongoing status view this panel hands off to.
-export function WelcomePanel({ project }: { project: Project }) {
+export function WelcomePanel({ project }: { project: Pick<Project, "workflowStage" | "customerApprovedAt"> }) {
   const s = t("customerJourney");
   if (!project.workflowStage) return null;
   const bucket = customerJourneyBucket(project.workflowStage, project.customerApprovedAt);
