@@ -1,0 +1,21 @@
+# Dependabot version updates. Security alerts are a separate repository setting
+# (enabled via scripts/ops/gh-repo-hygiene.sh after approval).
+# PageLoom OS is being retired, so npm updates are limited to security-relevant noise control:
+# few open PRs, grouped, weekly. GitHub Actions stay SHA-pinned; Dependabot bumps the pins.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+      development-dependencies:
+        dependency-type: "development"
