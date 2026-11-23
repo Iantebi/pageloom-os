@@ -312,6 +312,15 @@ Labels: **[PROD]** read-only check against `pageloom-os-production`; **[CODE]** 
   - Undo: `sec-monitoring-p1-p7.sh --restore <snapshot-dir> --execute`; the snapshot taken right before
     the change is kept by the operator outside the repository.
 
+- **[PROD] Stale per-revision incidents (found 2026-11-23, fix prepared, NOT applied):** 13 incidents
+  were open, none a backup failure. 3x P10 "Watchdog heartbeat missing" on OLD watchdog revisions
+  (00017/00018/00019): the dead-man condition has no cross-series aggregation, so each deploy leaves the
+  replaced revision's heartbeat series absent and a false incident opens ~14 h later (expect one for
+  revision 00020 ~14 h after the 2026-11-23 deploy). 10x P5 memory on OS services deleted 2026-11-19.
+  Fix: `scripts/ops/sec-monitoring-group-by-service.sh` groups those two conditions by
+  `resource.label.service_name` (verified read-only: one heartbeat series across revisions; one memory
+  series per service). Approval: `APPROVE PRODUCTION MONITORING: P5 + P10 GROUP BY SERVICE`.
+
 ### Prepared fixes (2026-11-23) - scripts; each change needs its own approval
 
 All three are dry-run by default (`--execute` to apply), guard on the state found in the audit, and
