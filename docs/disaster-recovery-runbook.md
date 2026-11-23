@@ -300,3 +300,54 @@ Labels: **[PROD]** read-only check against `pageloom-os-production`; **[CODE]** 
   still targets the retired `pageloom-os-production.web.app` (disabled, returns 404), so P7 fails
   constantly; P1's log-metric condition filters on `resource.labels.function_name`, which Gen 2
   runtime logs do not have (backup failures are still caught by P1's and P3's Scheduler conditions).
+
+### Prepared fixes (2026-11-23) - scripts ready, NOT applied; each needs its own approval
+
+All three are dry-run by default (`--execute` to apply), guard on the state found in the audit, and
+print their undo. Never run them between 00:00 and 01:00 UTC (daily export at 00:30 UTC).
+
+- **P1 + P7** - `scripts/ops/sec-monitoring-p1-p7.sh`: P1 metric filter moves to
+  `resource.type="cloud_run_revision" AND resource.labels.service_name="dailyfirestorebackup" AND
+  severity>=ERROR ...` (verified read-only: matches all 130 of the service's runtime log entries in
+  30 days, the old filter matched 0); P7 drops its uptime condition and keeps the 5xx ratio.
+  `--delete-uptime` optionally deletes the uptime check. Snapshot + `--restore <dir>` undo.
+- **IAM least privilege** - `scripts/ops/sec-backup-iam-least-privilege.sh`, three stages in order. Proof
+  is NOT taken from a duplicate-path (`already_completed`) answer. Each stage: (1) refuses to start
+  unless the previous phase's permission matrix passes (`check <phase>`, Policy Troubleshooter,
+  read-only, evaluates IAM conditions - `scripts/backup-verification/check-backup-iam.mjs`); (2) exporter
+  only: the old role is removed only after the troubleshooter shows export granted BY THE NEW ROLE;
+  (3) the new phase's matrix must pass or the stage prints its rollback; (4) `verify`: one manual run
+  of each job - the export call's audit entry must show `datastore.databases.export` granted=true and
+  the watchdog a clean heartbeat (interim); (5) `verify-scheduled` after the next 00:30 UTC run - the
+  definitive check (`verify-scheduled-backup.mjs`): a NEW scheduled export, permission granted in the
+  audit log, operation SUCCESSFUL, completion marker, run record `started`, clean watchdog heartbeat.
+  Tested against a stub gcloud + fake troubleshooter (`sec-backup-iam.test.mjs`). Stages:
+  `exporter` (replace `datastore.importExportAdmin` - which includes import - with custom role
+  `pageloomFirestoreExporter`: export + read-only metadata/operations, (default) database only;
+  evidence: every ExportDocuments audit entry checks only `datastore.databases.export`), `bucket`
+  (remove `pageloom-backup`'s objectAdmin on the backups bucket - the Firestore service agent writes the
+  files), `workers` (remove `pageloom-workers`' `datastore.user` - the watchdog never uses Firestore).
+- **Real restore drill** - `scripts/ops/sec-restore-drill.sh` `create -> import -> verify -> delete` into a
+  temporary `pageloom-restore-drill-YYYYMMDD` database (never `(default)`; import only into an empty
+  database). `verify` (`verify-restore.mjs` + `lib/restore-compare.mjs`) treats the export as a time
+  window, not a snapshot: documents that existed before it started must all be restored; those
+  unchanged since must be field-identical; those changed during/after it need only exist; those
+  created during/after it are not required. PASS also needs the import operation SUCCESSFUL, the
+  restored count = the export's = the import's, and >= 90% of restored documents verified
+  field-by-field - otherwise INCONCLUSIVE, so a partial restore can never PASS. It walks "missing
+  parent" documents (read-only test 2026-11-23: production walk = 1,229 = the export's own count).
+  Cleanup: `delete` refuses non-drill names and delete-protected databases, polls until the database
+  is gone (exit 4 delete failed / 5 still listed); a failed import exits 6 and says to delete;
+  `status` flags drill databases older than 24 h as LEFTOVER. All paths tested with a stub gcloud
+  (`sec-restore-drill.test.mjs`). Firestore keeps export operations only ~30 days: drill from a recent
+  export.
+
+**Storage noncurrent versions (re-checked 2026-11-23): no change needed.** The backups bucket's
+`age: 90` Delete rule has no `isLive` condition, so it also removes noncurrent versions once they are
+90 days old - they cannot accumulate (12 exist, ~0 bytes, from 2026-08-27..31, removed within days).
+The main and media-backup buckets already delete noncurrent versions 90 days after they become
+noncurrent. (Correction to the earlier "unbounded noncurrent growth" note.)
+
+**Leftover from an earlier drill:** database `pageloom-restore-drill-20260903` (no delete protection)
+still exists in the production project; deleting it is `scripts/ops/sec-drill-db.sh delete` and needs
+its own approval.

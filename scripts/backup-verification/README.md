@@ -74,3 +74,15 @@ Only drop `--dry-run` once you're ready to actually perform the restore against 
 project. Cleanup afterward (`gcloud firestore databases delete ...`) is always a separate,
 manual step - run the command the script prints yourself once you've finished verifying the
 restored data.
+
+## Added 2026-11-23 (used by scripts/ops/, all read-only)
+
+| File | Purpose |
+|---|---|
+| `verify-restore.mjs` + `lib/restore-compare.mjs` | Verdict for a real restore drill (PASS / FAIL / INCONCLUSIVE), export treated as a time window |
+| `check-backup-iam.mjs` + `lib/backup-iam-matrix.mjs` | Policy Troubleshooter permission matrix per IAM least-privilege phase |
+| `verify-scheduled-backup.mjs` + `lib/scheduled-backup.mjs` | Definitive end-to-end check of one scheduled backup run |
+| `sec-restore-drill.test.mjs`, `sec-backup-iam.test.mjs` | Drive the ops scripts against a stub gcloud and fake APIs (no cloud access) |
+
+These use the REST APIs with an access token (`TOKEN`), so unlike the three gcloud-based scripts
+above they also run on Windows.
