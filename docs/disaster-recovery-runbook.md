@@ -311,10 +311,17 @@ print their undo. Never run them between 00:00 and 01:00 UTC (daily export at 00
   severity>=ERROR ...` (verified read-only: matches all 130 of the service's runtime log entries in
   30 days, the old filter matched 0); P7 drops its uptime condition and keeps the 5xx ratio.
   `--delete-uptime` optionally deletes the uptime check. Snapshot + `--restore <dir>` undo.
-- **IAM least privilege** - `scripts/ops/sec-backup-iam-least-privilege.sh`, three stages, each followed
-  by `verify` (one manual run of both Scheduler jobs; today's export already exists so the backup
-  records `already_completed` - proving token, export permission and run-record write - and the
-  watchdog must log a heartbeat and no ERROR), then the next 00:30 UTC export must be SUCCESSFUL:
+- **IAM least privilege** - `scripts/ops/sec-backup-iam-least-privilege.sh`, three stages in order. Proof
+  is NOT taken from a duplicate-path (`already_completed`) answer. Each stage: (1) refuses to start
+  unless the previous phase's permission matrix passes (`check <phase>`, Policy Troubleshooter,
+  read-only, evaluates IAM conditions - `scripts/backup-verification/check-backup-iam.mjs`); (2) exporter
+  only: the old role is removed only after the troubleshooter shows export granted BY THE NEW ROLE;
+  (3) the new phase's matrix must pass or the stage prints its rollback; (4) `verify`: one manual run
+  of each job - the export call's audit entry must show `datastore.databases.export` granted=true and
+  the watchdog a clean heartbeat (interim); (5) `verify-scheduled` after the next 00:30 UTC run - the
+  definitive check (`verify-scheduled-backup.mjs`): a NEW scheduled export, permission granted in the
+  audit log, operation SUCCESSFUL, completion marker, run record `started`, clean watchdog heartbeat.
+  Tested against a stub gcloud + fake troubleshooter (`sec-backup-iam.test.mjs`). Stages:
   `exporter` (replace `datastore.importExportAdmin` - which includes import - with custom role
   `pageloomFirestoreExporter`: export + read-only metadata/operations, (default) database only;
   evidence: every ExportDocuments audit entry checks only `datastore.databases.export`), `bucket`
@@ -322,10 +329,18 @@ print their undo. Never run them between 00:00 and 01:00 UTC (daily export at 00
   files), `workers` (remove `pageloom-workers`' `datastore.user` - the watchdog never uses Firestore).
 - **Real restore drill** - `scripts/ops/sec-restore-drill.sh` `create -> import -> verify -> delete` into a
   temporary `pageloom-restore-drill-YYYYMMDD` database (never `(default)`; import only into an empty
-  database). `verify` compares every production document unchanged since the export with its restored
-  copy (key-order independent, counts only, no values printed) and walks "missing parent" documents too
-  (tested read-only 2026-11-23: production walk = 1,229 documents = the export's own count).
-  Firestore keeps export operations only ~30 days, so drill from a recent export.
+  database). `verify` (`verify-restore.mjs` + `lib/restore-compare.mjs`) treats the export as a time
+  window, not a snapshot: documents that existed before it started must all be restored; those
+  unchanged since must be field-identical; those changed during/after it need only exist; those
+  created during/after it are not required. PASS also needs the import operation SUCCESSFUL, the
+  restored count = the export's = the import's, and >= 90% of restored documents verified
+  field-by-field - otherwise INCONCLUSIVE, so a partial restore can never PASS. It walks "missing
+  parent" documents (read-only test 2026-11-23: production walk = 1,229 = the export's own count).
+  Cleanup: `delete` refuses non-drill names and delete-protected databases, polls until the database
+  is gone (exit 4 delete failed / 5 still listed); a failed import exits 6 and says to delete;
+  `status` flags drill databases older than 24 h as LEFTOVER. All paths tested with a stub gcloud
+  (`sec-restore-drill.test.mjs`). Firestore keeps export operations only ~30 days: drill from a recent
+  export.
 
 **Storage noncurrent versions (re-checked 2026-11-23): no change needed.** The backups bucket's
 `age: 90` Delete rule has no `isLive` condition, so it also removes noncurrent versions once they are
