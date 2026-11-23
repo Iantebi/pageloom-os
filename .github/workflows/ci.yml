@@ -75,6 +75,19 @@ jobs:
         run: npx firebase emulators:exec --project demo-pageloom-rules-fs --only firestore,storage "npm run test:behavioral --workspace=@pageloom/functions"
         timeout-minutes: 10
 
+      # The two deployed backup functions, end to end on the Firestore emulator (demo-* project, no
+      # credentials, every Google API call mocked and fail-closed): the real scheduled handlers write
+      # their run records through the real Admin SDK, then a seeded dataset is exported and imported
+      # into a fresh emulator and verified field-by-field (ids, types, timestamps, nested data,
+      # references, subcollections). Catches Admin SDK / firebase-functions upgrade regressions that
+      # mocked unit tests cannot.
+      - name: Backup functions on the Firestore emulator (handlers + export/import round-trip)
+        run: |
+          npx firebase emulators:exec --project demo-pageloom-backup --only firestore "npm --prefix backup-functions run test:emulator"
+          npx firebase emulators:exec --project demo-pageloom-backup --only firestore --export-on-exit="$RUNNER_TEMP/backup-roundtrip" "node backup-functions/test-emulator/restore-roundtrip.mjs seed"
+          npx firebase emulators:exec --project demo-pageloom-backup --only firestore --import="$RUNNER_TEMP/backup-roundtrip" "node backup-functions/test-emulator/restore-roundtrip.mjs verify"
+        timeout-minutes: 10
+
       # The OS end-to-end customer-lifecycle job (Functions emulator + the retired api) was removed on
       # 2026-11-21: PageLoom OS was retired and functions/ no longer defines any Cloud Function.
       # The rules behavioral suite above and backup-functions' own tests cover what is deployed.
