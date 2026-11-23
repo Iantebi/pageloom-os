@@ -111,3 +111,47 @@ describe("isRelevantActiveServiceHealthEvent", () => {
     expect(isRelevantActiveServiceHealthEvent({ state: "ACTIVE" })).toBe(false);
   });
 });
+
+describe("latestCompletedExport (partial/failed export must not look fresh)", () => {
+  it("uses only the completion marker, ignoring newer shards of an unfinished export", async () => {
+    const { latestCompletedExport } = await import("./watchdog-policy.js");
+    const items = [
+      { name: "firestore/2026-11-21/2026-11-21.overall_export_metadata", timeCreated: "2026-11-21T00:31:02Z" },
+      { name: "firestore/2026-11-21/all_namespaces/all_kinds/output-0", timeCreated: "2026-11-21T00:31:01Z" },
+      // 2026-11-22 started but never completed: shards only, no overall_export_metadata
+      { name: "firestore/2026-11-22/all_namespaces/all_kinds/output-0", timeCreated: "2026-11-22T00:31:01Z" },
+    ];
+    expect(latestCompletedExport(items)?.toISOString()).toBe("2026-11-21T00:31:02.000Z");
+  });
+  it("returns null when no export ever completed, or the listing is empty/malformed", async () => {
+    const { latestCompletedExport } = await import("./watchdog-policy.js");
+    expect(latestCompletedExport([{ name: "firestore/x/output-0", timeCreated: "2026-11-22T00:00:00Z" }])).toBeNull();
+    expect(latestCompletedExport([])).toBeNull();
+    expect(latestCompletedExport([{}, { name: "a.overall_export_metadata" }])).toBeNull();
+  });
+});
+
+describe("transient vs permanent failures", () => {
+  it("retries network errors, timeouts, 429 and 5xx, but not 401/403/404", async () => {
+    const { isTransientError, HttpStatusError } = await import("./watchdog-policy.js");
+    expect(isTransientError(new TypeError("fetch failed"))).toBe(true);
+    expect(isTransientError(Object.assign(new Error("t"), { name: "TimeoutError" }))).toBe(true);
+    expect(isTransientError(new HttpStatusError(503))).toBe(true);
+    expect(isTransientError(new HttpStatusError(429))).toBe(true);
+    for (const status of [401, 403, 404]) expect(isTransientError(new HttpStatusError(status))).toBe(false);
+    expect(isTransientError(new SyntaxError("bad json"))).toBe(false);
+  });
+  it("withTransientRetry recovers from a blip, gives up after the limit, and never retries permanent errors", async () => {
+    const { withTransientRetry, HttpStatusError } = await import("./watchdog-policy.js");
+    const sleep = async () => {};
+    let calls = 0;
+    await expect(withTransientRetry(async () => { calls += 1; if (calls < 2) throw new TypeError("blip"); return "ok"; }, { sleep })).resolves.toBe("ok");
+    expect(calls).toBe(2);
+    calls = 0;
+    await expect(withTransientRetry(async () => { calls += 1; throw new HttpStatusError(500); }, { sleep, attempts: 3 })).rejects.toThrow("HTTP 500");
+    expect(calls).toBe(3);
+    calls = 0;
+    await expect(withTransientRetry(async () => { calls += 1; throw new HttpStatusError(403); }, { sleep })).rejects.toThrow("HTTP 403");
+    expect(calls).toBe(1);
+  });
+});

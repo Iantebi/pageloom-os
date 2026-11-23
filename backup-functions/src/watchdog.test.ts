@@ -9,8 +9,8 @@ describe("backup freshness watchdog pagination", () => {
   // see watchdog-policy.test.ts's "collectAllPages" suite for the behavioral proof, and the comment
   // in checkFirestoreFreshness for why a truncated first page silently hides the latest backup.
   it("paginates the Firestore backup bucket listing through collectAllPages", () => {
-    expect(watchdogSource).toContain("collectAllPages<{ timeCreated?: string }>");
-    expect(watchdogSource).toContain('"fields", "nextPageToken,items(timeCreated)"');
+    expect(watchdogSource).toContain("collectAllPages<{ name?: string; timeCreated?: string }>");
+    expect(watchdogSource).toContain('"fields", "nextPageToken,items(name,timeCreated)"');
   });
   it("paginates the Storage Transfer operations listing through collectAllPages", () => {
     expect(watchdogSource).toContain("collectAllPages<{ metadata?: { status?: string; endTime?: string } }>");
