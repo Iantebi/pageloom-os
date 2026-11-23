@@ -1,6 +1,31 @@
 import { params } from "./config.js";
 import { operationalLog, safeErrorName } from "./observability.js";
-import { isFirestoreBackupStale, isStorageBackupStale, isRelevantActiveServiceHealthEvent, latestTimestamp, collectAllPages } from "./watchdog-policy.js";
+import { isFirestoreBackupStale, isStorageBackupStale, isRelevantActiveServiceHealthEvent, latestCompletedExport, collectAllPages, HttpStatusError, withTransientRetry } from "./watchdog-policy.js";
+
+// Every Google API read goes through here: non-2xx is an error (never parsed as an empty listing),
+// each request has a hard timeout so one hung call cannot eat the whole run, and only transient
+// failures (network, timeout, 429, 5xx) are retried within the run.
+const REQUEST_TIMEOUT_MS = 30_000;
+async function getJson<T>(url: string | URL, token: string): Promise<T> {
+  return withTransientRetry(async () => {
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+    if (!response.ok) throw new HttpStatusError(response.status);
+    return (await response.json()) as T;
+  });
+}
+
+// When freshness cannot be PROVEN (permission lost, bucket missing, API failing after retries, or
+// no completed export at all) the watchdog fails closed: it reports the backup as stale at ERROR, so
+// the existing P10 alert (pageloom_watchdog_backup_stale) fires. Before, these cases were WARNINGs
+// that no alert policy watched - a silent gap, since the heartbeat kept arriving. The `reason`
+// field separates "proven old" from "could not verify" for diagnosis; neither carries secrets.
+function unverifiable(event: "watchdog.firestore_backup_stale" | "watchdog.storage_backup_stale", reason: string, error?: unknown): void {
+  operationalLog("error", event, {
+    reason,
+    errorName: error === undefined ? undefined : safeErrorName(error),
+    httpStatus: error instanceof HttpStatusError ? error.status : undefined,
+  });
+}
 
 async function accessToken(): Promise<string> {
   const { GoogleAuth } = await import("google-auth-library");
@@ -25,17 +50,18 @@ async function checkFirestoreFreshness(now: Date): Promise<void> {
     // it otherwise - or a full bucket silently truncates to its oldest objects (GCS lists
     // alphabetically, and "firestore/YYYY-MM-DD/" sorts oldest-first) and the most recent backup is
     // never seen. See watchdog-policy.ts's collectAllPages for the pagination cap.
-    const items = await collectAllPages<{ timeCreated?: string }>(async (pageToken) => {
+    const items = await collectAllPages<{ name?: string; timeCreated?: string }>(async (pageToken) => {
       const url = new URL(`https://storage.googleapis.com/storage/v1/b/${bucket}/o`);
       url.searchParams.set("prefix", "firestore/");
-      url.searchParams.set("fields", "nextPageToken,items(timeCreated)");
+      url.searchParams.set("fields", "nextPageToken,items(name,timeCreated)");
       if (pageToken) url.searchParams.set("pageToken", pageToken);
-      const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      return (await response.json()) as { items?: Array<{ timeCreated?: string }>; nextPageToken?: string };
+      return getJson<{ items?: Array<{ name?: string; timeCreated?: string }>; nextPageToken?: string }>(url, token);
     });
-    const latest = latestTimestamp(items.map((item) => item.timeCreated));
+    // Only a completed export counts (see EXPORT_COMPLETE_SUFFIX): shards of a failed or partial
+    // export must not make the backup look fresh.
+    const latest = latestCompletedExport(items);
     if (!latest) {
-      operationalLog("warning", "watchdog.check_failed", { check: "firestore", reason: "no_backup_objects_found" });
+      unverifiable("watchdog.firestore_backup_stale", items.length ? "no_completed_export_found" : "no_backup_objects_found");
       return;
     }
     if (isFirestoreBackupStale(now, latest)) {
@@ -45,7 +71,7 @@ async function checkFirestoreFreshness(now: Date): Promise<void> {
       });
     }
   } catch (error) {
-    operationalLog("warning", "watchdog.check_failed", { check: "firestore", reason: safeErrorName(error) });
+    unverifiable("watchdog.firestore_backup_stale", "check_failed", error);
   }
 }
 
@@ -57,8 +83,7 @@ async function checkStorageFreshness(now: Date): Promise<void> {
     const filter = encodeURIComponent(JSON.stringify({ projectId, jobNames: [jobName] }));
     const operations = await collectAllPages<{ metadata?: { status?: string; endTime?: string } }>(async (pageToken) => {
       const url = `https://storagetransfer.googleapis.com/v1/transferOperations?filter=${filter}${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ""}`;
-      const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      const result = (await response.json()) as { operations?: Array<{ metadata?: { status?: string; endTime?: string } }>; nextPageToken?: string };
+      const result = await getJson<{ operations?: Array<{ metadata?: { status?: string; endTime?: string } }>; nextPageToken?: string }>(url, token);
       return { items: result.operations, nextPageToken: result.nextPageToken };
     });
     const successEndTimes = operations
@@ -68,7 +93,7 @@ async function checkStorageFreshness(now: Date): Promise<void> {
       .sort();
     const latestEnd = successEndTimes.at(-1);
     if (!latestEnd) {
-      operationalLog("warning", "watchdog.check_failed", { check: "storage", reason: "no_successful_operations_found" });
+      unverifiable("watchdog.storage_backup_stale", "no_successful_operations_found");
       return;
     }
     const latestDate = new Date(latestEnd);
@@ -79,7 +104,7 @@ async function checkStorageFreshness(now: Date): Promise<void> {
       });
     }
   } catch (error) {
-    operationalLog("warning", "watchdog.check_failed", { check: "storage", reason: safeErrorName(error) });
+    unverifiable("watchdog.storage_backup_stale", "check_failed", error);
   }
 }
 

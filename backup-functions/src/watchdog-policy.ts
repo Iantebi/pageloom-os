@@ -56,3 +56,56 @@ export async function collectAllPages<Item>(
   } while (pageToken && pages < MAX_PAGINATION_PAGES);
   return items;
 }
+
+// A Firestore managed export writes its per-collection output shards first and the top-level
+// "<prefix>/<name>.overall_export_metadata" file LAST, only once the export operation completed.
+// Freshness must be anchored to that completion marker: a newest-object timestamp alone also
+// counts the shards of an export that started but then failed or was cut off half-way, which
+// would make a partial/failed backup look fresh.
+export const EXPORT_COMPLETE_SUFFIX = ".overall_export_metadata";
+
+export function latestCompletedExport(items: Array<{ name?: string | undefined; timeCreated?: string | undefined }>): Date | null {
+  return latestTimestamp(items.filter((item) => item.name?.endsWith(EXPORT_COMPLETE_SUFFIX)).map((item) => item.timeCreated));
+}
+
+// A non-2xx Google API response. Previously such responses were parsed as if they were a normal
+// listing: a 403 (lost permission) or 404 (bucket gone) body simply has no `items`, which was then
+// reported as "no backups found" at WARNING severity - and no alert policy fires on warnings, while
+// the watchdog's own heartbeat kept arriving. Making the status explicit lets the caller fail closed.
+export class HttpStatusError extends Error {
+  readonly status: number;
+  constructor(status: number) {
+    super(`HTTP ${status}`);
+    this.name = "HttpStatusError";
+    this.status = status;
+  }
+}
+
+// Only network failures, timeouts, 429 and 5xx are worth retrying inside the same run; a 401/403/404
+// will not fix itself seconds later and must surface immediately.
+export function isTransientError(error: unknown): boolean {
+  if (error instanceof HttpStatusError) return error.status === 429 || error.status >= 500;
+  if (error instanceof Error) return error.name === "TypeError" || error.name === "AbortError" || error.name === "TimeoutError";
+  return false;
+}
+
+// Back-off between in-run retries (2s, then 4s). Exported so tests can run with zero delay.
+export const transientRetryDefaults = { attempts: 3, delayMs: 2_000 };
+
+export async function withTransientRetry<T>(
+  fn: () => Promise<T>,
+  {
+    attempts = transientRetryDefaults.attempts,
+    delayMs = transientRetryDefaults.delayMs,
+    sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+  }: { attempts?: number; delayMs?: number; sleep?: (ms: number) => Promise<void> } = {},
+): Promise<T> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (attempt >= attempts || !isTransientError(error)) throw error;
+      await sleep(delayMs * attempt);
+    }
+  }
+}

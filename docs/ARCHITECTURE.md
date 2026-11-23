@@ -50,7 +50,9 @@ the 8 other OS functions (agents, workflow engine, schedulers), the OS Secret Ma
   them, incl. those of the closed PRs #43 and #48) still contains the OS functions and the hosting
   target; a deploy from any of them would bring the OS back. Verified 2026-11-21: `firebase deploy --dry-run` from
   `main` with no `--only` targets only `backup-functions/`, the Firestore/Storage rules and indexes;
-  the live rules (Storage 52/52 lines, Firestore 121/121) and composite indexes (8/8) equal `main`.
+  the live rules (Storage 52/52 lines, Firestore 121/121) equal `main`. Composite indexes: all 8 in
+  `main` exist live, plus 1 OS-era extra (`workflowInstances` status+timeoutAt, re-checked 2026-11-23);
+  harmless, and a functions-only deploy never touches indexes.
 
 **Deploy paths (audited 2026-11-22):** deploys are manual only. No GitHub workflow deploys (none
 holds Firebase/GCP credentials; the only secret is `CLAUDE_CODE_OAUTH_TOKEN`), there are no Cloud
@@ -68,7 +70,13 @@ so a PR that re-adds the OS cannot be merged.
 **Backups and restore:** daily Firestore export to the backups bucket (30-day retention, 90-day
 lifecycle, 7-day soft delete); weekly Storage Transfer of the main bucket (media RPO 7 days);
 the watchdog alerts when either is stale. Restore follows `docs/disaster-recovery-runbook.md` §5,
-always into a separate database first, never over production.
+always into a separate database first, never over production. Since 2026-11-23 (`main`, not yet
+deployed - see the runbook §14) the watchdog counts only COMPLETED exports (the
+`.overall_export_metadata` marker), and fails closed: if freshness cannot be proven (403/404,
+API down after retries, no completed export) it raises the same ERROR the stale alert (P10) watches,
+instead of an unalerted WARNING. CI runs both functions on the Firestore emulator plus an
+export/import round-trip (`backup-functions/test-emulator/`), and `src/resilience.test.ts` covers
+network/timeout/permission/partial-export/malformed-data failure modes.
 
 **Open items (2026-11-22):**
 - Dependabot security updates for the retired root/`packages/core` manifests fail by design

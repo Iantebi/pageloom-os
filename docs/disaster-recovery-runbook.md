@@ -35,7 +35,7 @@ Firebase Hosting keeps prior releases. To roll back:
 ```bash
 firebase hosting:clone pageloom-os-production:live pageloom-os-production:live --version <previous-version-id>
 ```
-or use the Firebase Console → Hosting → Release history → "Rollback" on the last known-good release. For a bad Cloud Functions deployment, redeploy the previous commit's `functions/` code (`git checkout <previous-good-sha> -- functions && firebase deploy --only functions`), since Functions doesn't have a one-click rollback the way Hosting does. For a bad Firestore rules deployment, redeploy the previous `firestore.rules` from git the same way — rules changes take effect immediately but the previous version is always recoverable from git history.
+or use the Firebase Console → Hosting → Release history → "Rollback" on the last known-good release. For a bad Cloud Functions deployment (since 2026-11-21 only the two backup functions exist, deployed from `backup-functions/`), redeploy the previous good commit from a clean worktree with the same targeted command: `git worktree add --detach <dir> <previous-good-sha>`, copy the gitignored `backup-functions/.env.pageloom-os-production` into it, then `firebase deploy --only functions:dailyFirestoreBackup,functions:backupFreshnessWatchdog --project pageloom-os-production` from that worktree (see §14 for the verified rollback point). Never `git checkout <old-sha> -- functions`: the retired OS codebase lives in `functions/` on old commits. For a bad Firestore rules deployment, redeploy the previous `firestore.rules` from git the same way — rules changes take effect immediately but the previous version is always recoverable from git history.
 
 ## 5. Accidental Firestore deletion
 
@@ -266,3 +266,37 @@ raw CLI argument down to the exact `gcloud` invocation, that `pageloom-os-produc
 case, with any surrounding whitespace) and a missing/empty target are always rejected before
 any command is constructed or run. Run via `npm run test:backup-tooling` (chained onto the
 root `npm test`, so CI covers it on every PR with no workflow-file change required).
+
+## 14. Backup functions: verification and upgrade state (2026-11-23)
+
+Labels: **[PROD]** read-only check against `pageloom-os-production`; **[CODE]** proven by tests;
+**[EMU]** proven on the local/CI Firestore emulator; **[NOT VERIFIED]** could not be tested.
+
+- **[PROD]** Exactly 2 functions (Gen 2, `europe-west1`, `nodejs22`): `dailyFirestoreBackup`
+  (512Mi, 540s, `pageloom-backup`, Scheduler `30 2 * * *` Asia/Jerusalem, retry 3) and
+  `backupFreshnessWatchdog` (512Mi, 60s, `pageloom-workers`, `every 6 hours` UTC, retry 3). Cloud Run
+  invoker is only each function's own service account (no `allUsers`). 0 Pub/Sub, 0 Eventarc
+  triggers, 0 Cloud Build triggers, 0 user-managed SA keys. Production still runs
+  firebase-functions 6.6.0 / firebase-admin 13.10.0 (the deployed source and lockfile are byte-
+  identical to commit `1b5dd19`).
+- **[PROD]** Daily exports SUCCESSFUL every day (e.g. 2026-11-23: 1,229 documents); 90 dated folders
+  kept (lifecycle working); bucket: PAP enforced, UBLA, versioning, 30-day retention, 7-day soft delete.
+- **[CODE][EMU]** `main` (firebase-functions 7.4.0, firebase-admin 14.5.1, google-auth-library 11.3.4,
+  TypeScript 7, Vitest 5): the deploy manifest of both functions is identical to the deployed one
+  (same names, region, memory, timeout, service accounts, schedules, retry) - a targeted deploy
+  updates both in place. TypeScript 7 emits byte-identical JS.
+- **Rollback point:** `1b5dd19`. Verified 2026-11-23: it builds, its 33 tests pass, its `lib/` is
+  byte-identical to what runs in production, it has no hosting target and no OS functions, and its
+  rules files equal `main`'s. A targeted functions deploy touches no rules or indexes.
+- **[EMU]** Restore round-trip: 1,200 documents seeded with the deployed Admin SDK, exported, imported
+  into a fresh emulator and verified (ids, strings/unicode, numbers, booleans, null, timestamps,
+  geopoints, bytes, arrays, nested maps, references, subcollections).
+- **[NOT VERIFIED]** A real managed-export import (`gcloud firestore import` of a GCS export into a
+  temporary database). The last real drill was 2026-08-31 (§10). It creates a temporary cloud
+  database (a small cost), so it needs its own approval; use `restore-drill.mjs` (§13) against a
+  non-production project. Note: the §13 scripts call `gcloud` through `execFileSync`, which cannot
+  start `gcloud.cmd` on Windows - run them from Linux/macOS/Cloud Shell.
+- **Known monitoring gaps (production config, changes need approval):** the uptime check behind P7
+  still targets the retired `pageloom-os-production.web.app` (disabled, returns 404), so P7 fails
+  constantly; P1's log-metric condition filters on `resource.labels.function_name`, which Gen 2
+  runtime logs do not have (backup failures are still caught by P1's and P3's Scheduler conditions).
