@@ -296,21 +296,29 @@ Labels: **[PROD]** read-only check against `pageloom-os-production`; **[CODE]** 
   database (a small cost), so it needs its own approval; use `restore-drill.mjs` (§13) against a
   non-production project. Note: the §13 scripts call `gcloud` through `execFileSync`, which cannot
   start `gcloud.cmd` on Windows - run them from Linux/macOS/Cloud Shell.
-- **Known monitoring gaps (production config, changes need approval):** the uptime check behind P7
-  still targets the retired `pageloom-os-production.web.app` (disabled, returns 404), so P7 fails
-  constantly; P1's log-metric condition filters on `resource.labels.function_name`, which Gen 2
-  runtime logs do not have (backup failures are still caught by P1's and P3's Scheduler conditions).
+- **[PROD] Monitoring gaps FIXED 2026-11-23 03:40 UTC** (approved; `sec-monitoring-p1-p7.sh --execute`):
+  - P1's log metric `pageloom_firestorebackup_app_error` used to filter on
+    `resource.labels.function_name`, which Gen 2 runtime logs do not have, so that condition could
+    never fire. It now filters on `resource.type="cloud_run_revision" AND
+    resource.labels.service_name="dailyfirestorebackup" AND severity>=ERROR` (minus the
+    `already_completed|already exists` duplicates). Verified after the change: it matches the
+    service's 142 runtime log entries of the last 30 days, 0 of them errors. A log-based metric
+    counts only from the change onward (no backfill).
+  - P7's uptime condition on the retired, disabled `pageloom-os-production.web.app` (permanent 404)
+    was removed; the policy is now "PageLoom P7 - Cloud Run 5xx ratio" with its 5xx condition,
+    notification channel and alert strategy unchanged. The other 8 policies were verified unchanged.
+  - The uptime check itself still exists (its deletion was not approved); no alert uses it any more.
+    It can be deleted later with `--delete-uptime` as its own approved step.
+  - Undo: `sec-monitoring-p1-p7.sh --restore <snapshot-dir> --execute`; the snapshot taken right before
+    the change is kept by the operator outside the repository.
 
-### Prepared fixes (2026-11-23) - scripts ready, NOT applied; each needs its own approval
+### Prepared fixes (2026-11-23) - scripts; each change needs its own approval
 
 All three are dry-run by default (`--execute` to apply), guard on the state found in the audit, and
 print their undo. Never run them between 00:00 and 01:00 UTC (daily export at 00:30 UTC).
 
-- **P1 + P7** - `scripts/ops/sec-monitoring-p1-p7.sh`: P1 metric filter moves to
-  `resource.type="cloud_run_revision" AND resource.labels.service_name="dailyfirestorebackup" AND
-  severity>=ERROR ...` (verified read-only: matches all 130 of the service's runtime log entries in
-  30 days, the old filter matched 0); P7 drops its uptime condition and keeps the 5xx ratio.
-  `--delete-uptime` optionally deletes the uptime check. Snapshot + `--restore <dir>` undo.
+- **P1 + P7** - `scripts/ops/sec-monitoring-p1-p7.sh`: **APPLIED 2026-11-23** (see above). Its guard
+  now refuses to run again, because production no longer matches the pre-fix state.
 - **IAM least privilege** - `scripts/ops/sec-backup-iam-least-privilege.sh`, three stages in order. Proof
   is NOT taken from a duplicate-path (`already_completed`) answer. Each stage: (1) refuses to start
   unless the previous phase's permission matrix passes (`check <phase>`, Policy Troubleshooter,
