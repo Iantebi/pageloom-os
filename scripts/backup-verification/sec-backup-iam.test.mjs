@@ -9,6 +9,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isolatedEnv, assertStubResolves } from "./lib/test-sandbox.mjs";
 
 const SCRIPT = join(dirname(fileURLToPath(import.meta.url)), "..", "ops", "sec-backup-iam-least-privilege.sh");
 
@@ -66,11 +67,12 @@ function sandbox(flags = ["iea", "objadmin", "wds"]) {
   writeFileSync(join(dir, "bin", "gcloud"), STUB.replace(/\r/g, ""));
   chmodSync(join(dir, "bin", "gcloud"), 0o755);
   for (const f of flags) writeFileSync(join(dir, f), "");
+  assertStubResolves(dir, isolatedEnv(dir));
   return dir;
 }
 function iam(dir, args, env = {}) {
   return new Promise((resolve) => {
-    const child = spawn("bash", [SCRIPT, ...args], { env: { ...process.env, PATH: `${join(dir, "bin")}:${process.env.PATH}`, STUB_DIR: dir, TROUBLESHOOTER_URL: `${url}?dir=${encodeURIComponent(dir)}`, IAM_POLL_SECONDS: "0", CLOUDSDK_PYTHON: "", TZ: "UTC", ...env } });
+    const child = spawn("bash", [SCRIPT, ...args], { env: isolatedEnv(dir, { TROUBLESHOOTER_URL: `${url}?dir=${encodeURIComponent(dir)}`, IAM_POLL_SECONDS: "0", TZ: "UTC", ...env }) });
     let out = "";
     child.stdout.on("data", (d) => { out += d; });
     child.stderr.on("data", (d) => { out += d; });
@@ -146,5 +148,21 @@ test("troubleshooter unreachable: the stage aborts before any change", { skip: i
   const r = await iam(dir, ["exporter", "--execute"], { TROUBLESHOOTER_URL: "http://127.0.0.1:9/v3/iam:troubleshoot" });
   assert.equal(r.code, 1);
   assert.doesNotMatch(r.calls, /policy-binding|roles create/);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("SAFETY: without the stub, the scripts cannot act - empty gcloud config means no account, preflight aborts", async () => {
+  // Simulates the stub NOT being found: real gcloud (if installed) is reached, but with the isolated,
+  // empty CLOUDSDK_CONFIG it has no signed-in account, so the --execute stage must abort in preflight.
+  const dir = mkdtempSync(join(tmpdir(), "iam-nostub-"));
+  const env = isolatedEnv(dir, { PATH: process.env.PATH });
+  const r = await new Promise((resolve) => {
+    const child = spawn("bash", [SCRIPT, "exporter", "--execute"], { env });
+    let out = ""; child.stdout.on("data", (d) => { out += d; }); child.stderr.on("data", (d) => { out += d; });
+    child.on("close", (code) => resolve({ code, out }));
+  });
+  assert.notEqual(r.code, 0);
+  assert.match(r.out, /ABORT: (no active gcloud account|gcloud does not run)|ERROR \(fail closed\)|IAM phase .* FAILED|command not found/);
+  assert.doesNotMatch(r.out, /^\+ gcloud projects (add|remove)-iam-policy-binding/m);
   rmSync(dir, { recursive: true, force: true });
 });

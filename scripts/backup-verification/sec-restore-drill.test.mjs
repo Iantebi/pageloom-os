@@ -9,6 +9,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isolatedEnv, assertStubResolves } from "./lib/test-sandbox.mjs";
 
 const SCRIPT = join(dirname(fileURLToPath(import.meta.url)), "..", "ops", "sec-restore-drill.sh");
 const DB = "pageloom-restore-drill-20261124";
@@ -56,6 +57,7 @@ function sandbox({ dbs = [], prot = {} } = {}) {
   chmodSync(join(bin, "gcloud"), 0o755);
   writeFileSync(join(dir, "dbs"), dbs.map((d) => `${d.name} ${d.created ?? new Date().toISOString()}`).join("\n") + (dbs.length ? "\n" : ""));
   for (const [db, state] of Object.entries(prot)) writeFileSync(join(dir, `prot-${db}`), `${state}\n`);
+  assertStubResolves(dir, isolatedEnv(dir));
   return dir;
 }
 // Async on purpose: the fake Firestore server lives in this process, so a blocking spawnSync would
@@ -63,7 +65,7 @@ function sandbox({ dbs = [], prot = {} } = {}) {
 function drill(dir, stage, { execute = true, env = {}, db = DB } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn("bash", [SCRIPT, stage, ...(execute ? ["--execute"] : [])], {
-      env: { ...process.env, PATH: `${join(dir, "bin")}:${process.env.PATH}`, STUB_DIR: dir, DRILL_DB: db, EXPORT_DATE: "2026-11-23", DRILL_POLL_SECONDS: "0", FIRESTORE_API_BASE: apiBase, CLOUDSDK_PYTHON: "", ...env },
+      env: isolatedEnv(dir, { DRILL_DB: db, EXPORT_DATE: "2026-11-23", DRILL_POLL_SECONDS: "0", FIRESTORE_API_BASE: apiBase, ...env }),
     });
     let out = "";
     child.stdout.on("data", (d) => { out += d; });

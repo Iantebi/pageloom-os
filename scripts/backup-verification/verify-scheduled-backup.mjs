@@ -10,6 +10,7 @@
 import { fileURLToPath } from "node:url";
 import { evaluateScheduledBackup } from "./lib/scheduled-backup.mjs";
 import { BACKUP_SA, PROJECT } from "./lib/backup-iam-matrix.mjs";
+import { assertOverrideIsLoopback } from "./lib/safe-endpoint.mjs";
 
 const BUCKET = "pageloom-os-production-backups";
 const DEFAULT_BASES = { logging: "https://logging.googleapis.com/v2", firestore: "https://firestore.googleapis.com/v1", storage: "https://storage.googleapis.com/storage/v1" };
@@ -53,7 +54,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error("date must be YYYY-MM-DD");
     if (!process.env.TOKEN) throw new Error("TOKEN is required");
-    const input = await collect(day, { token: process.env.TOKEN, ...(process.env.API_BASES ? { bases: JSON.parse(process.env.API_BASES) } : {}) });
+    const input = await collect(day, { token: process.env.TOKEN, ...(process.env.API_BASES ? { bases: Object.fromEntries(Object.entries(JSON.parse(process.env.API_BASES)).map(([k, v]) => [k, assertOverrideIsLoopback(`API_BASES.${k}`, v)])) } : {}) });
     const result = evaluateScheduledBackup(input);
     console.log(JSON.stringify({ day, exportOp: input.exportOp && { state: input.exportOp.state, documents: input.exportOp.documents, endTime: input.exportOp.endTime }, runRecord: input.runRecord?.status ?? null,
       exportPermissionGranted: (input.audit?.authorizationInfo ?? []).find((a) => a.permission === "datastore.databases.export")?.granted ?? null,

@@ -9,6 +9,7 @@
  */
 import { fileURLToPath } from "node:url";
 import { PROJECT, checksFor, evaluateCheck, evaluatePhase, troubleshootBody } from "./lib/backup-iam-matrix.mjs";
+import { assertOverrideIsLoopback } from "./lib/safe-endpoint.mjs";
 
 const DEFAULT_URL = "https://policytroubleshooter.googleapis.com/v3/iam:troubleshoot";
 
@@ -30,7 +31,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const phase = process.argv[2];
   try {
     if (!process.env.TOKEN) throw new Error("TOKEN is required");
-    const out = await checkPhase(phase, { token: process.env.TOKEN, ...(process.env.TROUBLESHOOTER_URL ? { url: process.env.TROUBLESHOOTER_URL } : {}) });
+    const out = await checkPhase(phase, { token: process.env.TOKEN, ...(process.env.TROUBLESHOOTER_URL ? { url: assertOverrideIsLoopback("TROUBLESHOOTER_URL", process.env.TROUBLESHOOTER_URL) } : {}) });
     for (const r of out.results) console.log(`  ${r.ok ? "ok  " : "FAIL"} ${r.id.padEnd(44)} ${r.state.padEnd(14)} via [${r.roles.join(", ")}]${r.ok ? "" : `  <- ${r.problems.join("; ")}`}`);
     console.log(out.ok ? `  IAM phase "${phase}": all ${out.total} checks as expected` : `  IAM phase "${phase}": ${out.failed.length} of ${out.total} checks FAILED`);
     process.exit(out.ok ? 0 : 1);

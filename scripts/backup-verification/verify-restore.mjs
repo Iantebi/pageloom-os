@@ -13,6 +13,7 @@
  */
 import { fileURLToPath } from "node:url";
 import { evaluateRestore } from "./lib/restore-compare.mjs";
+import { assertOverrideIsLoopback } from "./lib/safe-endpoint.mjs";
 
 export const DRILL_DB_PATTERN = /^pageloom-restore-drill-\d{8}$/;
 
@@ -90,7 +91,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const mode = process.argv[2];
   try {
     if (!project || !token) throw new Error("PROJECT and TOKEN are required");
-    const client = makeClient({ project, token, ...(base ? { base } : {}) });
+    const client = makeClient({ project, token, ...(base ? { base: assertOverrideIsLoopback("FIRESTORE_API_BASE", base) } : {}) });
     const { code, report } = await run({ mode, project, drillDb, source, client });
     console.log(JSON.stringify(report, null, 1));
     if (mode === "full") console.log(report.verdict === "PASS" ? "  RESTORE VERIFIED" : `  RESTORE ${report.verdict} - see reasons above`);
