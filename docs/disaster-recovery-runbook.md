@@ -300,3 +300,39 @@ Labels: **[PROD]** read-only check against `pageloom-os-production`; **[CODE]** 
   still targets the retired `pageloom-os-production.web.app` (disabled, returns 404), so P7 fails
   constantly; P1's log-metric condition filters on `resource.labels.function_name`, which Gen 2
   runtime logs do not have (backup failures are still caught by P1's and P3's Scheduler conditions).
+
+### Prepared fixes (2026-11-23) - scripts ready, NOT applied; each needs its own approval
+
+All three are dry-run by default (`--execute` to apply), guard on the state found in the audit, and
+print their undo. Never run them between 00:00 and 01:00 UTC (daily export at 00:30 UTC).
+
+- **P1 + P7** - `scripts/ops/sec-monitoring-p1-p7.sh`: P1 metric filter moves to
+  `resource.type="cloud_run_revision" AND resource.labels.service_name="dailyfirestorebackup" AND
+  severity>=ERROR ...` (verified read-only: matches all 130 of the service's runtime log entries in
+  30 days, the old filter matched 0); P7 drops its uptime condition and keeps the 5xx ratio.
+  `--delete-uptime` optionally deletes the uptime check. Snapshot + `--restore <dir>` undo.
+- **IAM least privilege** - `scripts/ops/sec-backup-iam-least-privilege.sh`, three stages, each followed
+  by `verify` (one manual run of both Scheduler jobs; today's export already exists so the backup
+  records `already_completed` - proving token, export permission and run-record write - and the
+  watchdog must log a heartbeat and no ERROR), then the next 00:30 UTC export must be SUCCESSFUL:
+  `exporter` (replace `datastore.importExportAdmin` - which includes import - with custom role
+  `pageloomFirestoreExporter`: export + read-only metadata/operations, (default) database only;
+  evidence: every ExportDocuments audit entry checks only `datastore.databases.export`), `bucket`
+  (remove `pageloom-backup`'s objectAdmin on the backups bucket - the Firestore service agent writes the
+  files), `workers` (remove `pageloom-workers`' `datastore.user` - the watchdog never uses Firestore).
+- **Real restore drill** - `scripts/ops/sec-restore-drill.sh` `create -> import -> verify -> delete` into a
+  temporary `pageloom-restore-drill-YYYYMMDD` database (never `(default)`; import only into an empty
+  database). `verify` compares every production document unchanged since the export with its restored
+  copy (key-order independent, counts only, no values printed) and walks "missing parent" documents too
+  (tested read-only 2026-11-23: production walk = 1,229 documents = the export's own count).
+  Firestore keeps export operations only ~30 days, so drill from a recent export.
+
+**Storage noncurrent versions (re-checked 2026-11-23): no change needed.** The backups bucket's
+`age: 90` Delete rule has no `isLive` condition, so it also removes noncurrent versions once they are
+90 days old - they cannot accumulate (12 exist, ~0 bytes, from 2026-08-27..31, removed within days).
+The main and media-backup buckets already delete noncurrent versions 90 days after they become
+noncurrent. (Correction to the earlier "unbounded noncurrent growth" note.)
+
+**Leftover from an earlier drill:** database `pageloom-restore-drill-20260903` (no delete protection)
+still exists in the production project; deleting it is `scripts/ops/sec-drill-db.sh delete` and needs
+its own approval.
