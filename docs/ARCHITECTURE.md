@@ -78,6 +78,12 @@ instead of an unalerted WARNING. CI runs both functions on the Firestore emulato
 export/import round-trip (`backup-functions/test-emulator/`), and `src/resilience.test.ts` covers
 network/timeout/permission/partial-export/malformed-data failure modes.
 
+**Monitoring (since 2026-11-23):** 9 Cloud Monitoring alert policies, all on one email channel.
+P1 (Firestore backup health) now really catches backup function errors: its log metric filters on
+the Cloud Run service `dailyfirestorebackup` (before, it filtered on a label Gen 2 logs never carry).
+P7 is "Cloud Run 5xx ratio" only: its uptime condition on the retired OS site was removed (the
+uptime check still exists, unused). Details and undo: `docs/disaster-recovery-runbook.md` §14.
+
 **Open items (2026-11-22):**
 - Dependabot security updates for the retired root/`packages/core` manifests fail by design
   (`@pageloom/core` is a generated `file:vendor/core` path; `packages/core` has no lockfile). They
