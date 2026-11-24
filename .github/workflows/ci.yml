@@ -55,6 +55,17 @@ jobs:
           npm --prefix backup-functions run build
           npm audit --prefix backup-functions --omit=dev --audit-level=high
 
+      # discovery-storage-gateway/ is a separate standalone package and functions codebase
+      # ("discovery-gateway"): private file storage for the Base44 Client Discovery app. Not deployed
+      # by CI (deploys are manual and individually approved, see CLAUDE.md).
+      - name: Discovery storage gateway (install, typecheck, test, build, prod audit)
+        run: |
+          npm ci --prefix discovery-storage-gateway
+          npm --prefix discovery-storage-gateway run typecheck
+          npm --prefix discovery-storage-gateway test
+          npm --prefix discovery-storage-gateway run build
+          npm audit --prefix discovery-storage-gateway --omit=dev --audit-level=moderate
+
       # Behavioral rules tests run the REAL firestore.rules/storage.rules files through the
       # actual Firestore/Storage emulator rules engine (see functions/src/*.behavioral.test.ts),
       # unlike the string-match rules tests above. They need a JVM (for the Firestore emulator)
