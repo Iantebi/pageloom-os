@@ -7,9 +7,16 @@ const root = new URL("../../", import.meta.url);
 const firebase = JSON.parse(readFileSync(new URL("firebase.json", root), "utf8"));
 
 describe("firebase.json deploy targets", () => {
-  it("deploys functions only from backup-functions/", () => {
-    const sources = (firebase.functions ?? []).map((f: { source: string }) => f.source);
-    expect(sources).toEqual(["backup-functions"]);
+  it("deploys functions only from backup-functions/ and discovery-storage-gateway/, as separate codebases", () => {
+    const entries = (firebase.functions ?? []) as { source: string; codebase: string }[];
+    expect(entries.map((f) => f.source)).toEqual(["backup-functions", "discovery-storage-gateway"]);
+    // Separate codebases: `--only functions:default` / `--only functions:discovery-gateway` deploy one
+    // without touching (or deleting) the other.
+    expect(entries.map((f) => f.codebase)).toEqual(["default", "discovery-gateway"]);
+  });
+  it("the gateway codebase exports exactly one function", () => {
+    const index = readFileSync(new URL("discovery-storage-gateway/src/index.ts", root), "utf8");
+    expect([...index.matchAll(/^export const (\w+)/gm)].map((m) => m[1])).toEqual(["discoveryStorageGateway"]);
   });
   it("has no hosting target (the retired OS web app must not be redeployed)", () => {
     expect(firebase.hosting).toBeUndefined();
@@ -36,7 +43,7 @@ describe("no automated deploy path", () => {
     for (const f of files) expect(code(f), f).not.toMatch(deployOrAuth);
   });
   it("no package.json script deploys", () => {
-    for (const p of ["package.json", "backup-functions/package.json"]) {
+    for (const p of ["package.json", "backup-functions/package.json", "discovery-storage-gateway/package.json"]) {
       const scripts = JSON.parse(readFileSync(new URL(p, root), "utf8")).scripts ?? {};
       for (const [name, cmd] of Object.entries(scripts)) expect(String(cmd), `${p} > ${name}`).not.toMatch(/firebase\s+deploy/);
     }

@@ -7,6 +7,14 @@
       "predeploy": [
         "npm --prefix backup-functions run build"
       ]
+    },
+    {
+      "source": "discovery-storage-gateway",
+      "codebase": "discovery-gateway",
+      "runtime": "nodejs22",
+      "predeploy": [
+        "npm --prefix discovery-storage-gateway run build"
+      ]
     }
   ],
   "firestore": {

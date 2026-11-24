@@ -43,7 +43,7 @@ the 8 other OS functions (agents, workflow engine, schedulers), the OS Secret Ma
   a targeted deploy: `firebase deploy --only functions:dailyFirestoreBackup,functions:backupFreshnessWatchdog --project pageloom-os-production`.
   Set `FUNCTIONS_DISCOVERY_TIMEOUT=120` on Windows. A non-interactive run needs the gitignored
   `backup-functions/.env.pageloom-os-production` (7 non-secret params, same values as the defaults in `src/config.ts`).
-- `functions/` is the retired OS codebase. Since 2026-11-21 its `index.ts` defines no Cloud Function at all (guarded by `functions/src/index.test.ts`); it is kept only for history and shared tests. `firebase.json` has no `hosting` target, so a plain `firebase deploy` deploys only the backup functions and the rules (guarded by `backup-functions/src/deploy-config.test.ts`).
+- `functions/` is the retired OS codebase. Since 2026-11-21 its `index.ts` defines no Cloud Function at all (guarded by `functions/src/index.test.ts`); it is kept only for history and shared tests. `firebase.json` has no `hosting` target, so a plain `firebase deploy` deploys only functions (the backup codebase and, since 2026-11-24, the discovery-gateway codebase - see below) and the rules (guarded by `backup-functions/src/deploy-config.test.ts`).
 - Rules: `firebase deploy --only storage` / `--only firestore:rules`, each as its own approved step.
 - Every production change needs a fresh, scope-specific approval (see `CLAUDE.md`).
 - **Deploy only from `main`** (PR #50, merged 2026-11-21 as `9cde91b`). Every older branch (30 of
@@ -83,6 +83,23 @@ P1 (Firestore backup health) now really catches backup function errors: its log 
 the Cloud Run service `dailyfirestorebackup` (before, it filtered on a label Gen 2 logs never carry).
 P7 is "Cloud Run 5xx ratio" only: its uptime condition on the retired OS site was removed (the
 uptime check still exists, unused). Details and undo: `docs/disaster-recovery-runbook.md` §14.
+
+**Discovery storage gateway (code only, NOT deployed - 2026-11-24):** a second functions codebase,
+`discovery-gateway` (`discovery-storage-gateway/`, one HTTPS function `discoveryStorageGateway`,
+`europe-west1`), will hold the Client Discovery app's uploaded files (logo, photos, testimonial
+screenshots) in two new private buckets, `pageloom-discovery-files` (europe-west1) and
+`pageloom-discovery-files-backup` (EU), both with public access prevention. Base44 runs outside
+Google Cloud, so the gateway is invoker-public but accepts only HMAC-signed, 60-second requests
+(shared secret `DISCOVERY_GATEWAY_SECRET` in Secret Manager and in the Base44 app's secrets) for keys
+under `discovery/<prod|dev>/<case id>/`. Operations: put (original + backup copy), get, copy
+(backup repair / restore); no list, delete, overwrite or signed URLs. It runs as its own service
+account `discovery-storage-gw` (object create/view on those two buckets only, no key). Ownership
+checks stay in the Base44 functions. Infra, deploy and the Base44 switch each need their own
+approval (plan: Discovery storage plan, 2026-11-24).
+- **Deploys with two codebases:** a plain `firebase deploy` / `--only functions` now covers BOTH
+  codebases. Always target one: `--only functions:default` (or the two backup function names) for
+  backups, `--only functions:discovery-gateway` for the gateway. Guarded by
+  `backup-functions/src/deploy-config.test.ts` (sources, codebases, one gateway export).
 
 **Open items (2026-11-22):**
 - Dependabot security updates for the retired root/`packages/core` manifests fail by design

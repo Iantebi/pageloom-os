@@ -21,3 +21,14 @@ updates:
         dependency-type: "production"
       development-dependencies:
         dependency-type: "development"
+  # Discovery storage gateway (second functions codebase, 2026-11-24).
+  - package-ecosystem: "npm"
+    directory: "/discovery-storage-gateway"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+      development-dependencies:
+        dependency-type: "development"
