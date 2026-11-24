@@ -8,7 +8,8 @@
 #            Transfer job and has fine-grained ACLs; the backups bucket belongs to the Firestore exports.
 #  account : service account discovery-storage-gw (no key) with objectCreator + objectViewer on those
 #            two buckets ONLY. objectCreator cannot delete, so no object can be overwritten or removed.
-#  secret  : Secret Manager secret DISCOVERY_GATEWAY_SECRET (48 random bytes, generated here, never
+#  secret  : Secret Manager secret DISCOVERY_GATEWAY_SECRET (48 random bytes = 64 base64 chars, no CR/LF -
+#            Windows openssl ends lines with CR, which broke version 1 on 2026-11-24; generated here, never
 #            printed) + secretAccessor for the gateway account. The same value then goes into the
 #            Base44 app's secrets BY THE OWNER (Google Cloud console -> copy -> Base44 secrets);
 #            it must never pass through chat, logs or the repository.
@@ -70,7 +71,7 @@ case "$MODE" in
     else
       run gcloud secrets create "$SECRET" --project="$PROJECT" --replication-policy=user-managed --locations=europe-west1
       echo "+ (48 random bytes) | gcloud secrets versions add $SECRET --data-file=-   [value never printed]"
-      if $EXECUTE; then openssl rand -base64 48 | tr -d '\n' | gcloud secrets versions add "$SECRET" --project="$PROJECT" --data-file=- >/dev/null; fi
+      if $EXECUTE; then openssl rand -base64 48 | tr -d '\r\n' | gcloud secrets versions add "$SECRET" --project="$PROJECT" --data-file=- >/dev/null; fi
     fi
     run gcloud secrets add-iam-policy-binding "$SECRET" --project="$PROJECT" --member="serviceAccount:$GW_SA" --role=roles/secretmanager.secretAccessor
     echo "NEXT (owner, by hand): copy the secret value from the Google Cloud console into the Base44"
