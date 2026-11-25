@@ -59,3 +59,17 @@ production-changing command and does not require the confirmation below.
 
 This file lives at the repository root specifically so it loads automatically in every
 session working in this repo, independent of what any single conversation contains.
+
+# Working efficiently (token economy)
+
+These rules add to, and never override, the production deployment safety gate above.
+
+1. Work token-efficiently: read only the files relevant to the current step.
+2. Do not repeat checks or actions that were already verified in this session, unless a
+   new change requires re-verifying them.
+3. Do not start parallel agents or subagents unless genuinely needed.
+4. Split large tasks into clear, separate phases.
+5. Keep every existing security rule, approval requirement, work plan and test in place.
+6. Never change production without explicit approval (see the safety gate above).
+7. At the end of every phase, give a short summary: what was done, what was tested,
+   and what remains.
