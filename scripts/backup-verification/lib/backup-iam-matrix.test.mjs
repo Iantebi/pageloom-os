@@ -60,3 +60,29 @@ test("checkPhase: API error fails closed; all-expected phase passes", async () =
   const out = await checkPhase("after-workers", { token: "t", url: "http://x", fetchImpl });
   assert.equal(out.ok, true, JSON.stringify(out.failed));
 });
+
+test("every phase keeps the Discovery gateway's own access and keeps backup accounts out of client files", () => {
+  for (const phase of ["current", "after-grant", "after-exporter", "after-bucket", "after-workers"]) {
+    const ids = checksFor(phase).map((c) => c.id);
+    for (const b of ["pageloom-discovery-files", "pageloom-discovery-files-backup"]) {
+      assert.ok(ids.includes(`discovery-gw-writes-${b}`) && ids.includes(`discovery-gw-reads-${b}`), `${phase}: gateway ${b}`);
+      assert.ok(ids.includes(`pageloom-backup-cannot-read-${b}`) && ids.includes(`pageloom-workers-cannot-read-${b}`), `${phase}: isolation ${b}`);
+    }
+  }
+});
+
+test("checkPhase retries a rate limit (429) then succeeds; a 403 is never retried", async () => {
+  const ok = (c) => resp(c.expect === "CAN_ACCESS" ? "CAN_ACCESS" : "CANNOT_ACCESS", c.via ?? ["some.role"]);
+  const checks = checksFor("current");
+  let calls = 0;
+  const flaky = async (_u, init) => { calls += 1; if (calls === 2) return new Response("{}", { status: 429 }); const t = JSON.parse(init.body).accessTuple; return Response.json(ok(checks.find((c) => c.principal === t.principal && c.permission === t.permission && (c.context?.name ?? c.resource) === (t.conditionContext?.resource?.name ?? t.fullResourceName)))); };
+  const out = await checkPhase("current", { token: "t", url: "http://x", fetchImpl: flaky, sleep: async () => {}, retryDelaysMs: [0, 0] });
+  assert.equal(out.ok, true, JSON.stringify(out.failed));
+  assert.equal(calls, checks.length + 1);
+  let n = 0;
+  await assert.rejects(checkPhase("current", { token: "t", url: "http://x", fetchImpl: async () => { n += 1; return new Response("{}", { status: 403 }); }, sleep: async () => {}, retryDelaysMs: [0, 0] }), /HTTP 403/);
+  assert.equal(n, 1);
+  let m = 0;
+  await assert.rejects(checkPhase("current", { token: "t", url: "http://x", fetchImpl: async () => { m += 1; return new Response("{}", { status: 429 }); }, sleep: async () => {}, retryDelaysMs: [0, 0] }), /HTTP 429/);
+  assert.equal(m, 3);
+});

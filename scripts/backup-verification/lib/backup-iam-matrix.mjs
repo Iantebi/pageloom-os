@@ -13,9 +13,13 @@ export const BACKUP_SA = `pageloom-backup@${D}`;
 export const WORKERS_SA = `pageloom-workers@${D}`;
 export const FIRESTORE_AGENT = "service-386075478217@gcp-sa-firestore.iam.gserviceaccount.com";
 export const EXPORTER_ROLE = "pageloomFirestoreExporter";
+// Client Discovery storage gateway (separate system, codebase "discovery-gateway", added 2026-11-24).
+// The backup IAM stages must never touch it; these checks prove both directions of the separation.
+export const DISCOVERY_GW_SA = `discovery-storage-gw@${D}`;
 
 const PROJECT_RES = `//cloudresourcemanager.googleapis.com/projects/${PROJECT}`;
 const BUCKET_RES = "//storage.googleapis.com/projects/_/buckets/pageloom-os-production-backups";
+const DISCOVERY_BUCKETS = ["pageloom-discovery-files", "pageloom-discovery-files-backup"].map((b) => `//storage.googleapis.com/projects/_/buckets/${b}`);
 const run = (svc) => `//run.googleapis.com/projects/${PROJECT}/locations/europe-west1/services/${svc}`;
 const db = (name) => ({ name: `projects/${PROJECT}/databases/${name}`, service: "firestore.googleapis.com", type: "firestore.googleapis.com/Database" });
 const CAN = "CAN_ACCESS";
@@ -30,6 +34,15 @@ const ALWAYS = [
   { id: "watchdog-lists-backup-bucket", principal: WORKERS_SA, permission: "storage.objects.list", resource: BUCKET_RES, expect: CAN },
   { id: "watchdog-reads-transfer-ops", principal: WORKERS_SA, permission: "storagetransfer.operations.list", resource: PROJECT_RES, expect: CAN },
   { id: "watchdog-reads-service-health", principal: WORKERS_SA, permission: "servicehealth.events.list", resource: PROJECT_RES, expect: CAN },
+  // Discovery gateway keeps its own access (unaffected by every stage) ...
+  ...DISCOVERY_BUCKETS.flatMap((bucket) => [
+    { id: `discovery-gw-writes-${bucket.split("/").pop()}`, principal: DISCOVERY_GW_SA, permission: "storage.objects.create", resource: bucket, expect: CAN },
+    { id: `discovery-gw-reads-${bucket.split("/").pop()}`, principal: DISCOVERY_GW_SA, permission: "storage.objects.get", resource: bucket, expect: CAN },
+  ]),
+  // ... and neither backup service account can read client files.
+  ...DISCOVERY_BUCKETS.flatMap((bucket) => [BACKUP_SA, WORKERS_SA].map((principal) => (
+    { id: `${principal.split("@")[0]}-cannot-read-${bucket.split("/").pop()}`, principal, permission: "storage.objects.get", resource: bucket, expect: CANNOT }
+  ))),
 ];
 const exportDefault = (extra) => ({ id: "backup-can-export-default-db", principal: BACKUP_SA, permission: "datastore.databases.export", resource: PROJECT_RES, context: db("(default)"), expect: CAN, ...extra });
 

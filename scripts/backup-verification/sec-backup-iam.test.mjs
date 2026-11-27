@@ -47,7 +47,8 @@ before(async () => {
       const t = JSON.parse(body).accessTuple;
       const db = t.conditionContext?.resource?.name?.split("/").pop();
       let roles = ["some.role"];
-      if (t.permission === "datastore.databases.export") roles = [has("iea") && "datastore.importExportAdmin", has("exp") && !brokenExporter && db === "(default)" && "projects/p/roles/pageloomFirestoreExporter"].filter(Boolean);
+      if (/pageloom-discovery-files/.test(t.fullResourceName)) roles = t.principal.startsWith("discovery-storage-gw") ? ["storage.objectViewer"] : [];
+      else if (t.permission === "datastore.databases.export") roles = [has("iea") && "datastore.importExportAdmin", has("exp") && !brokenExporter && db === "(default)" && "projects/p/roles/pageloomFirestoreExporter"].filter(Boolean);
       else if (t.permission === "datastore.databases.import") roles = has("iea") ? ["datastore.importExportAdmin"] : [];
       else if (/storage\.objects\.(create|delete)/.test(t.permission) && t.principal.startsWith("pageloom-backup")) roles = has("objadmin") ? ["storage.objectAdmin"] : [];
       else if (t.permission === "datastore.entities.get" && t.principal.startsWith("pageloom-workers")) roles = has("wds") ? ["datastore.user"] : [];
