@@ -13,14 +13,23 @@ import { assertOverrideIsLoopback } from "./lib/safe-endpoint.mjs";
 
 const DEFAULT_URL = "https://policytroubleshooter.googleapis.com/v3/iam:troubleshoot";
 
-export async function checkPhase(phase, { token, url = DEFAULT_URL, fetchImpl = fetch }) {
+// The Troubleshooter API has a low per-minute quota; a rate limit (429) or server error (5xx) is
+// retried with back-off. Anything else, or still failing after the retries, fails closed.
+const RETRY_DELAYS_MS = [5_000, 15_000, 30_000];
+export async function checkPhase(phase, { token, url = DEFAULT_URL, fetchImpl = fetch, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), retryDelaysMs = RETRY_DELAYS_MS }) {
   const results = [];
   for (const check of checksFor(phase)) {
-    const res = await fetchImpl(url, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "x-goog-user-project": PROJECT, "Content-Type": "application/json" },
-      body: JSON.stringify(troubleshootBody(check)),
-    });
+    let res;
+    for (let attempt = 0; ; attempt += 1) {
+      res = await fetchImpl(url, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "x-goog-user-project": PROJECT, "Content-Type": "application/json" },
+        body: JSON.stringify(troubleshootBody(check)),
+      });
+      const transient = res.status === 429 || res.status >= 500;
+      if (res.ok || !transient || attempt >= retryDelaysMs.length) break;
+      await sleep(retryDelaysMs[attempt]);
+    }
     if (!res.ok) throw new Error(`troubleshooter HTTP ${res.status} for ${check.id}`);
     results.push(evaluateCheck(check, await res.json()));
   }
